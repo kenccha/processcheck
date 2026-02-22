@@ -1,5 +1,5 @@
-// 사용자 역할 (3 roles: 실무자, 매니저, PM/기획조정실)
-export type UserRole = "worker" | "manager" | "pm";
+// 사용자 역할 (3 roles: 실무자, 매니저, 기획조정실(옵저버))
+export type UserRole = "worker" | "manager" | "observer";
 
 // 사용자
 export interface User {
@@ -61,11 +61,19 @@ export type TaskStatus = "pending" | "in_progress" | "completed" | "rejected";
 // 위험도
 export type RiskLevel = "green" | "yellow" | "red";
 
+// 프로젝트 유형
+export type ProjectType = "신규개발" | "설계변경";
+
+// 설계변경 규모
+export type ChangeScale = "minor" | "medium" | "major";
+
 // 프로젝트
 export interface Project {
   id: string;
   name: string;
   productType: string;
+  projectType: ProjectType;
+  changeScale?: ChangeScale; // 설계변경일 때만 사용
   status: "active" | "completed" | "on_hold";
   progress: number; // 0-100
   startDate: Date;
@@ -156,13 +164,13 @@ export interface DashboardStats {
 }
 
 // 체크리스트 템플릿 관련 타입
-export type StageType = "work" | "gate";
 
 export interface ChecklistTemplateStage {
   id: string;
-  name: string;
+  name: string;           // 페이즈 이름 (발의, 기획, WM 등)
   order: number;
-  type: StageType;
+  workStageName: string;  // 작업 단계명 (발의검토, 기획검토 등)
+  gateStageName: string;  // 승인 단계명 (발의승인, 기획승인 등)
   createdBy: string;
   createdAt: Date;
   lastModifiedBy: string;

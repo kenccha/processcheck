@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="dark">
-      <body className="bg-surface-0 text-slate-200 antialiased">
+      <body className="bg-surface-0 text-slate-200 antialiased" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

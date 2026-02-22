@@ -6,6 +6,48 @@ import { getUser, logout } from "./auth.js";
 import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
 import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
 
+// ─── Theme Management ────────────────────────────────────────────────────────
+
+function getTheme() {
+  return localStorage.getItem("pc-theme") || "light";
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("pc-theme", theme);
+}
+
+function toggleTheme() {
+  const current = getTheme();
+  const next = current === "dark" ? "light" : "dark";
+  setTheme(next);
+  // Update toggle button icon
+  const btn = document.getElementById("nav-theme-btn");
+  if (btn) btn.innerHTML = getThemeIcon();
+}
+
+function getThemeIcon() {
+  const isDark = getTheme() === "dark";
+  if (isDark) {
+    // Sun icon — click to switch to light
+    return `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path stroke-linecap="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
+  }
+  // Moon icon — click to switch to dark
+  return `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>`;
+}
+
+// Apply saved theme on load (before render to avoid flash)
+export function initTheme() {
+  const saved = getTheme();
+  if (saved === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  // Light is default, no attribute needed (but set it explicitly for clarity)
+  if (saved === "light") {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
@@ -50,6 +92,9 @@ export function renderNav(container) {
           </div>
         </div>
         <div class="nav-right">
+          <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
+            ${getThemeIcon()}
+          </button>
           <button class="nav-bell" id="nav-bell-btn">
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -95,6 +140,9 @@ export function renderNav(container) {
 
   // Logout
   container.querySelector("#nav-logout-btn").addEventListener("click", logout);
+
+  // Theme toggle
+  container.querySelector("#nav-theme-btn").addEventListener("click", toggleTheme);
 
   // Mobile hamburger
   const hamburger = container.querySelector("#nav-hamburger-btn");

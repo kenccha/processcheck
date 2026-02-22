@@ -3,16 +3,18 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
-import { renderNav, renderSpinner } from "../components.js";
+import { renderNav, renderSpinner, initTheme } from "../components.js";
+initTheme();
 import {
   subscribeProjects,
   subscribeChecklistItems,
   completeTask,
   approveTask,
   rejectTask,
+  restartTask,
   addComment,
 } from "../firestore-service.js";
-import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass } from "../utils.js";
+import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES } from "../utils.js";
 
 // ── Guard ────────────────────────────────────────────────────────────────────
 const user = guardPage();
@@ -97,8 +99,24 @@ function canComplete() {
   return user.role === "worker" && task && (task.status === "pending" || task.status === "in_progress");
 }
 
+function isGateStage(stageName) {
+  return GATE_STAGES.includes(stageName);
+}
+
 function canApprove() {
-  return user.role === "manager" && task && task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending");
+  if (!task || task.status !== "completed" || (task.approvalStatus && task.approvalStatus !== "pending")) {
+    return false;
+  }
+  // gate stage → observer(기획조정실)만 승인
+  if (isGateStage(task.stage)) {
+    return user.role === "observer";
+  }
+  // work stage → manager만 승인
+  return user.role === "manager";
+}
+
+function canRestart() {
+  return user.role === "worker" && task && task.status === "rejected";
 }
 
 function allRequiredChecked() {
@@ -391,6 +409,7 @@ function renderActionSection() {
         ${ICONS.checkCircle}
         <span class="text-sm font-semibold">승인 완료</span>
       </div>
+      ${task.approvedBy ? `<p class="text-xs text-dim text-center">승인자: ${escapeHtml(task.approvedBy)}</p>` : ""}
     `;
   }
 
@@ -401,16 +420,27 @@ function renderActionSection() {
         ${ICONS.spinner}
         <span class="text-sm font-semibold">승인 대기 중</span>
       </div>
+      <div class="text-xs text-dim text-center" style="margin-top:0.25rem">
+        ${task.reviewer ? `검토자: ${escapeHtml(task.reviewer)}` : ""}
+        ${task.completedDate ? ` · 완료일: ${formatDate(task.completedDate)}` : ""}
+      </div>
     `;
   }
 
-  // Rejected
+  // Rejected — worker can restart
   if (task.approvalStatus === "rejected") {
     return `
       <div class="flex items-center justify-center gap-2 p-4" style="color:var(--danger-400)">
         ${ICONS.x}
         <span class="text-sm font-semibold">반려됨</span>
       </div>
+      ${task.rejectedBy ? `<p class="text-xs text-dim text-center">반려자: ${escapeHtml(task.rejectedBy)}</p>` : ""}
+      ${canRestart() ? `
+        <button class="btn-primary w-full mt-3" id="restart-task-btn" ${actionLoading ? "disabled" : ""}>
+          ${actionLoading ? ICONS.spinner : ICONS.checkCircle}
+          <span>재작업 시작</span>
+        </button>
+      ` : ""}
     `;
   }
 
@@ -426,29 +456,40 @@ function renderActionSection() {
 function renderTimeline() {
   if (!task) return "";
 
+  // 추정 날짜 계산
+  const dueDate = task.dueDate instanceof Date ? task.dueDate : (task.dueDate ? new Date(task.dueDate) : null);
+  const assignedDate = dueDate ? new Date(dueDate.getTime() - 14 * 86400000) : null;
+  const startedDate = dueDate ? new Date(dueDate.getTime() - 7 * 86400000) : null;
+
   const events = [
     {
       label: "작업 배정됨",
+      date: assignedDate,
       active: true,
       completed: true,
     },
     {
       label: "작업 시작됨",
+      date: startedDate,
       active: task.status === "in_progress" || task.status === "completed" || task.status === "rejected",
       completed: task.status === "in_progress" || task.status === "completed" || task.status === "rejected",
+      hideIfInactive: task.status === "pending",
     },
     {
       label: "작업 완료됨",
+      date: task.completedDate || null,
       active: task.status === "completed" || task.status === "rejected",
       completed: task.status === "completed" || task.status === "rejected",
     },
     {
-      label: "승인 완료",
+      label: task.approvalStatus === "approved" ? `승인 완료${task.approvedBy ? ` (${task.approvedBy})` : ""}` : "승인 완료",
+      date: task.approvedAt || null,
       active: task.approvalStatus === "approved",
       completed: task.approvalStatus === "approved",
     },
     {
-      label: "반려됨",
+      label: task.approvalStatus === "rejected" ? `반려됨${task.rejectedBy ? ` (${task.rejectedBy})` : ""}` : "반려됨",
+      date: task.rejectedAt || null,
       active: task.approvalStatus === "rejected",
       completed: false,
       isDanger: true,
@@ -465,10 +506,15 @@ function renderTimeline() {
       ? (ev.isDanger ? "var(--danger-400)" : "var(--slate-200)")
       : "var(--slate-600)";
 
+    const dateStr = ev.date ? formatDate(ev.date) : "";
+
     return `
       <div class="timeline-item">
         <div class="${dotClass}" ${ev.isDanger && ev.active ? 'style="border-color:var(--danger-500);background:var(--danger-500)"' : ""}></div>
-        <div class="text-sm" style="color:${textColor}">${escapeHtml(ev.label)}</div>
+        <div>
+          <div class="text-sm" style="color:${textColor}">${escapeHtml(ev.label)}</div>
+          ${dateStr ? `<div class="text-xs" style="color:var(--slate-500);margin-top:0.125rem">${dateStr}</div>` : ""}
+        </div>
       </div>
     `;
   }).join("");
@@ -561,6 +607,25 @@ function bindEvents() {
       } catch (e) {
         console.error(e);
         showFeedback("error", "반려 중 오류가 발생했습니다.");
+      } finally {
+        actionLoading = false;
+      }
+    });
+  }
+
+  // Restart task (after rejection)
+  const restartBtn = app.querySelector("#restart-task-btn");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", async () => {
+      if (actionLoading) return;
+      actionLoading = true;
+      render();
+      try {
+        await restartTask(taskId);
+        showFeedback("success", "작업이 재시작되었습니다.");
+      } catch (e) {
+        console.error(e);
+        showFeedback("error", "재시작 중 오류가 발생했습니다.");
       } finally {
         actionLoading = false;
       }

@@ -30,7 +30,7 @@ export default function Navigation() {
     const map: Record<string, string> = {
       worker: "실무자",
       manager: "매니저",
-      pm: "PM (기획조정실)",
+      observer: "기획조정실",
     };
     return map[role] || role;
   };

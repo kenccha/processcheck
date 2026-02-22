@@ -1,84 +1,57 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Login Page — authentication and database seeding
+// Login Page — 3 sample user card login (no name input)
+// Matches Next.js app/page.tsx design
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { getUser, login } from "../auth.js";
 import { seedDatabaseIfEmpty } from "../firestore-service.js";
 
-// If already logged in, redirect
+// If already logged in, redirect immediately
 if (getUser()) {
   window.location.href = "dashboard.html";
 }
 
-// State
-let selectedRole = "worker";
-let loading = false;
-
 // DOM refs
-const nameInput = document.getElementById("login-name-input");
-const errorDiv = document.getElementById("login-error");
-const loginBtn = document.getElementById("login-btn");
-const spinnerView = document.getElementById("login-spinner");
-const formView = document.getElementById("login-form");
+const seedingView = document.getElementById("login-seeding");
+const contentView = document.getElementById("login-content");
+const userCards = document.querySelectorAll(".user-card");
 
-// Seed database
-spinnerView.classList.remove("hidden");
-formView.classList.add("hidden");
+// Seed database first, then show cards
 seedDatabaseIfEmpty()
-  .catch((e) => console.warn("시드 오류:", e))
+  .catch((e) => console.warn("시드 오류 (무시 가능):", e))
   .finally(() => {
-    spinnerView.classList.add("hidden");
-    formView.classList.remove("hidden");
+    seedingView.style.display = "none";
+    contentView.style.display = "";
   });
 
-// Role selection
-const roleCards = document.querySelectorAll("[data-role]");
-roleCards.forEach((card) => {
-  card.addEventListener("click", () => {
-    selectedRole = card.dataset.role;
-    roleCards.forEach((c) => {
-      c.classList.toggle("role-selected", c.dataset.role === selectedRole);
-    });
+// Card click → login → redirect
+userCards.forEach((card) => {
+  card.addEventListener("click", async () => {
+    const role = card.dataset.role;
+    const userName = card.dataset.user;
+
+    // Disable all cards while loading
+    userCards.forEach((c) => c.setAttribute("disabled", ""));
+
+    // Show loading state on clicked card
+    card.classList.add("loading");
+    const iconEl = card.querySelector(".user-card-icon svg");
+    const savedIcon = iconEl ? iconEl.outerHTML : "";
+    if (iconEl) {
+      iconEl.outerHTML =
+        '<div class="spinner" style="width:24px;height:24px;border-width:2px"></div>';
+    }
+
+    try {
+      await login(userName, role);
+      window.location.href = "dashboard.html";
+    } catch (e) {
+      console.error("로그인 오류:", e);
+      // Restore state on error
+      card.classList.remove("loading");
+      const spinnerEl = card.querySelector(".user-card-icon .spinner");
+      if (spinnerEl) spinnerEl.outerHTML = savedIcon;
+      userCards.forEach((c) => c.removeAttribute("disabled"));
+    }
   });
 });
-
-// Login
-async function handleLogin() {
-  const name = nameInput.value.trim();
-  if (!name) {
-    showError("이름을 입력해주세요.");
-    return;
-  }
-  if (loading) return;
-  loading = true;
-  hideError();
-  loginBtn.disabled = true;
-  loginBtn.innerHTML =
-    '<div class="spinner" style="width:20px;height:20px;border-width:2px"></div><span>로그인 중...</span>';
-
-  try {
-    await login(name, selectedRole);
-    window.location.href = "dashboard.html";
-  } catch (e) {
-    console.error(e);
-    showError("로그인 중 오류가 발생했습니다.");
-  } finally {
-    loading = false;
-    loginBtn.disabled = false;
-    loginBtn.innerHTML = "<span>로그인</span>";
-  }
-}
-
-loginBtn.addEventListener("click", handleLogin);
-nameInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") handleLogin();
-});
-
-function showError(msg) {
-  errorDiv.querySelector("span").textContent = msg;
-  errorDiv.classList.remove("hidden");
-}
-
-function hideError() {
-  errorDiv.classList.add("hidden");
-}

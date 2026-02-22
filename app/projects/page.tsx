@@ -11,12 +11,12 @@ import {
 } from "@/lib/firestoreService";
 import {
   departments,
-  projectStages,
   formatStageName,
   getRiskColor,
   getStatusLabel as getTaskStatusLabel,
 } from "@/lib/mockData";
-import type { ChecklistItem, Department, Project, ProjectStage } from "@/lib/types";
+import type { ChecklistItem, Department, Project } from "@/lib/types";
+import { PHASE_GROUPS } from "@/lib/types";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -38,6 +38,8 @@ export default function ProjectsPage() {
     endDate: "",
   });
   const [creating, setCreating] = useState(false);
+  const [sortKey, setSortKey] = useState<"name" | "status" | "progress" | "currentStage" | "pm" | "endDate">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   // 실시간 프로젝트 구독
   useEffect(() => {
@@ -58,6 +60,37 @@ export default function ProjectsPage() {
       project.productType.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const sortedProjects = useMemo(() => {
+    const sorted = [...filteredProjects].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name": cmp = a.name.localeCompare(b.name, "ko"); break;
+        case "status": cmp = a.status.localeCompare(b.status); break;
+        case "progress": cmp = a.progress - b.progress; break;
+        case "currentStage": cmp = a.currentStage.localeCompare(b.currentStage, "ko"); break;
+        case "pm": cmp = a.pm.localeCompare(b.pm, "ko"); break;
+        case "endDate": cmp = new Date(a.endDate).getTime() - new Date(b.endDate).getTime(); break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [filteredProjects, sortKey, sortDir]);
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: typeof sortKey }) => (
+    <span className="inline-block ml-1 text-[10px]">
+      {sortKey === columnKey ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+    </span>
+  );
 
   const getProjectStatusLabel = (status: Project["status"]) => {
     switch (status) {
@@ -100,8 +133,12 @@ export default function ProjectsPage() {
     { key: "rejected", label: "반려" },
   ];
 
-  const matrixCellStatus = (stage: ProjectStage, dept: Department) => {
-    const tasks = filteredTasks.filter((item) => item.stage === stage && item.department === dept);
+  // 페이즈 병합 매트릭스 셀 (workStage + gateStage 합산)
+  const phaseCellStatus = (phaseIndex: number, dept: Department) => {
+    const phase = PHASE_GROUPS[phaseIndex];
+    const tasks = filteredTasks.filter(
+      (item) => (item.stage === phase.workStage || item.stage === phase.gateStage) && item.department === dept
+    );
     if (tasks.length === 0) return { status: "none", count: 0, total: 0 };
     const completed = tasks.filter((t) => t.status === "completed").length;
     const inProgress = tasks.filter((t) => t.status === "in_progress").length;
@@ -119,10 +156,10 @@ export default function ProjectsPage() {
     }
   };
 
-  const currentMonth = useMemo(() => {
+  const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
-  }, []);
+  });
 
   const calendarDays = useMemo(() => {
     const startDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
@@ -153,6 +190,7 @@ export default function ProjectsPage() {
       await createProject({
         name: newProject.name,
         productType: newProject.productType,
+        projectType: "신규개발",
         pm: newProject.pm,
         startDate: new Date(newProject.startDate),
         endDate: new Date(newProject.endDate),
@@ -310,7 +348,7 @@ export default function ProjectsPage() {
                 {/* Current stage */}
                 <div className="mb-4 p-3 bg-surface-1 rounded-xl border border-surface-3">
                   <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">현재 단계</div>
-                  <div className="text-sm font-medium text-slate-200">{project.currentStage.replace(/_/g, " ")}</div>
+                  <div className="text-sm font-medium text-slate-200">{project.currentStage}</div>
                 </div>
 
                 {/* Footer */}
@@ -334,16 +372,16 @@ export default function ProjectsPage() {
             <table className="min-w-full divide-y divide-surface-3 text-sm">
               <thead className="bg-surface-2">
                 <tr>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">프로젝트</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">상태</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">진행률</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">현재 단계</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">PM</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">종료일</th>
+                  <th onClick={() => toggleSort("name")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">프로젝트<SortIcon columnKey="name" /></th>
+                  <th onClick={() => toggleSort("status")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">상태<SortIcon columnKey="status" /></th>
+                  <th onClick={() => toggleSort("progress")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">진행률<SortIcon columnKey="progress" /></th>
+                  <th onClick={() => toggleSort("currentStage")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">현재 단계<SortIcon columnKey="currentStage" /></th>
+                  <th onClick={() => toggleSort("pm")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">PM<SortIcon columnKey="pm" /></th>
+                  <th onClick={() => toggleSort("endDate")} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">종료일<SortIcon columnKey="endDate" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-3">
-                {filteredProjects.map((project, i) => (
+                {sortedProjects.map((project, i) => (
                   <tr
                     key={project.id}
                     onClick={() => router.push(`/project?id=${project.id}`)}
@@ -368,7 +406,7 @@ export default function ProjectsPage() {
                         <span className="text-sm font-mono font-medium text-primary-400">{project.progress}%</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-400 text-sm">{project.currentStage.replace(/_/g, " ")}</td>
+                    <td className="px-5 py-3.5 text-slate-400 text-sm">{project.currentStage}</td>
                     <td className="px-5 py-3.5 text-slate-300 text-sm">{project.pm}</td>
                     <td className="px-5 py-3.5 font-mono text-slate-500 text-sm">{new Date(project.endDate).toLocaleDateString("ko-KR")}</td>
                   </tr>
@@ -509,9 +547,33 @@ export default function ProjectsPage() {
         {viewMode === "calendar" && (
           <div className="card p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-5 pb-3 border-b border-surface-3">
-              <h2 className="section-title">
-                {currentMonth.toLocaleDateString("ko-KR", { year: "numeric", month: "long" })}
-              </h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+                  className="p-1.5 rounded-lg bg-surface-3 hover:bg-surface-4 text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <h2 className="section-title">
+                  {currentMonth.toLocaleDateString("ko-KR", { year: "numeric", month: "long" })}
+                </h2>
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+                  className="p-1.5 rounded-lg bg-surface-3 hover:bg-surface-4 text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { const now = new Date(); setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1)); }}
+                  className="ml-2 px-2.5 py-1 text-xs font-medium text-slate-400 bg-surface-3 hover:bg-surface-4 hover:text-slate-200 rounded-lg transition-colors"
+                >
+                  오늘
+                </button>
+              </div>
               <span className="font-mono text-xs text-slate-500">
                 마감 작업 <span className="text-primary-400">{filteredTasks.length}</span>개
               </span>
@@ -575,14 +637,17 @@ export default function ProjectsPage() {
                 <thead>
                   <tr>
                     <th className="border border-surface-3 bg-surface-2 p-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 sticky left-0 z-10">
-                      부서 / 단계
+                      부서 / 페이즈
                     </th>
-                    {projectStages.map((stage) => (
+                    {PHASE_GROUPS.map((phase) => (
                       <th
-                        key={stage}
-                        className="border border-surface-3 bg-surface-2 p-3 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 min-w-[80px]"
+                        key={phase.name}
+                        className="border border-surface-3 bg-surface-2 p-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400 min-w-[100px]"
                       >
-                        {stage.split("_")[0]}
+                        <div>{phase.name}</div>
+                        <div className="text-[9px] text-slate-600 font-normal normal-case mt-0.5">
+                          {formatStageName(phase.workStage)} + {formatStageName(phase.gateStage)}
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -593,14 +658,14 @@ export default function ProjectsPage() {
                       <td className="border border-surface-3 bg-surface-1 p-3 text-sm font-medium text-slate-200 sticky left-0 z-10">
                         {dept}
                       </td>
-                      {projectStages.map((stage) => {
-                        const cellData = matrixCellStatus(stage, dept);
+                      {PHASE_GROUPS.map((phase, phaseIdx) => {
+                        const cellData = phaseCellStatus(phaseIdx, dept);
                         return (
-                          <td key={`${stage}-${dept}`} className="border border-surface-3 bg-surface-0 p-2 text-center">
+                          <td key={`${phase.name}-${dept}`} className="border border-surface-3 bg-surface-0 p-2 text-center">
                             <div className="flex items-center justify-center">
-                              <div className={`w-8 h-8 rounded-full ${getMatrixCellColor(cellData.status)} flex items-center justify-center transition-colors`}>
+                              <div className={`w-10 h-10 rounded-lg ${getMatrixCellColor(cellData.status)} flex items-center justify-center transition-colors`}>
                                 {cellData.status !== "none" ? (
-                                  <span className="text-[10px] font-mono text-white font-medium">
+                                  <span className="text-[11px] font-mono text-white font-medium">
                                     {cellData.count}/{cellData.total}
                                   </span>
                                 ) : (

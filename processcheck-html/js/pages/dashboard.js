@@ -3,9 +3,11 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
-import { renderNav, renderSpinner } from "../components.js";
+import { renderNav, renderSpinner, initTheme } from "../components.js";
+initTheme();
 import {
   subscribeChecklistItemsByAssignee,
+  subscribeAllChecklistItems,
   subscribeProjects,
   subscribeNotifications,
   markNotificationRead,
@@ -49,6 +51,7 @@ const unsubscribers = [];
 
 // ─── Subscriptions ──────────────────────────────────────────────────────────
 
+// Projects — all roles see all projects
 unsubscribers.push(
   subscribeProjects((projects) => {
     allProjects = projects;
@@ -57,17 +60,37 @@ unsubscribers.push(
   })
 );
 
-unsubscribers.push(
-  subscribeChecklistItemsByAssignee(user.name, (tasks) => {
-    allTasks = tasks;
-    computeDerived();
-    render();
-  })
-);
+// Tasks — role-based subscription (matches Next.js dashboard)
+if (user.role === "observer" || user.role === "manager") {
+  // 기획조정실(observer): 전체 태스크
+  // 매니저(manager): 전체 구독 후 파생에서 부서 필터
+  unsubscribers.push(
+    subscribeAllChecklistItems((tasks) => {
+      if (user.role === "manager") {
+        // 매니저는 자기 부서 태스크만
+        allTasks = tasks.filter((t) => t.department === user.department);
+      } else {
+        allTasks = tasks;
+      }
+      computeDerived();
+      render();
+    })
+  );
+} else {
+  // 실무자(worker): assignee 기준
+  unsubscribers.push(
+    subscribeChecklistItemsByAssignee(user.name, (tasks) => {
+      allTasks = tasks;
+      computeDerived();
+      render();
+    })
+  );
+}
 
+// Notifications
 unsubscribers.push(
   subscribeNotifications(user.id, (notifs) => {
-    notifications = notifs.slice(0, 5);
+    notifications = notifs.slice(0, 10);
     render();
   })
 );
@@ -80,27 +103,55 @@ function computeDerived() {
   const now = new Date();
   const threeDaysFromNow = new Date(now.getTime() + 3 * 86400000);
 
-  // Tasks that are pending or in_progress AND due within 3 days
-  myTasks = allTasks
-    .filter(
-      (t) =>
-        (t.status === "pending" || t.status === "in_progress") &&
-        new Date(t.dueDate) <= threeDaysFromNow
-    )
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  if (user.role === "observer") {
+    // 기획조정실: 모든 진행중/대기 태스크
+    myTasks = allTasks
+      .filter((t) => t.status === "pending" || t.status === "in_progress")
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
-  // Tasks that are completed but not yet approved
-  pendingApprovals = allTasks.filter(
-    (t) =>
-      t.status === "completed" &&
-      (!t.approvalStatus || t.approvalStatus === "pending")
-  );
+    // 기획조정실: 전체 승인 대기
+    pendingApprovals = allTasks.filter(
+      (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
+    );
+  } else if (user.role === "manager") {
+    // 매니저: 부서 내 진행중/대기 태스크
+    myTasks = allTasks
+      .filter((t) => t.status === "pending" || t.status === "in_progress")
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
-  // Active projects that contain at least one of the user's tasks
-  const myProjectIds = new Set(allTasks.map((t) => t.projectId));
-  myProjects = allProjects.filter(
-    (p) => p.status === "active" && myProjectIds.has(p.id)
-  );
+    // 매니저: 부서 내 승인 대기
+    pendingApprovals = allTasks.filter(
+      (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
+    );
+  } else {
+    // 실무자: 마감일 3일 이내
+    myTasks = allTasks
+      .filter(
+        (t) =>
+          (t.status === "pending" || t.status === "in_progress") &&
+          new Date(t.dueDate) <= threeDaysFromNow
+      )
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+    // 실무자: 내가 완료했지만 승인 안 된 것
+    pendingApprovals = allTasks.filter(
+      (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
+    );
+  }
+
+  // 내 프로젝트
+  if (user.role === "observer") {
+    // 기획조정실: 자기가 PM인 프로젝트
+    myProjects = allProjects.filter(
+      (p) => p.status === "active" && p.pm === user.name
+    );
+  } else {
+    // 매니저/실무자: 태스크 기반
+    const myProjectIds = new Set(allTasks.map((t) => t.projectId));
+    myProjects = allProjects.filter(
+      (p) => p.status === "active" && myProjectIds.has(p.id)
+    );
+  }
 }
 
 // ─── Date Helpers ───────────────────────────────────────────────────────────
@@ -173,27 +224,27 @@ function render() {
         </div>
       </div>
 
-      <!-- Stat Cards -->
+      <!-- Stat Cards (clickable) -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-fade-in-delay-1">
-        <div class="stat-card">
+        <div class="stat-card cursor-pointer card-hover" id="stat-tasks">
           <div class="stat-card-label">작업 대기</div>
           <div class="stat-card-row">
             <span class="stat-value" style="color: var(--primary-400)">${myTasks.length}</span>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card cursor-pointer card-hover" id="stat-approvals">
           <div class="stat-card-label">승인 대기</div>
           <div class="stat-card-row">
             <span class="stat-value" style="color: var(--warning-400)">${pendingApprovals.length}</span>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card cursor-pointer card-hover" id="stat-projects">
           <div class="stat-card-label">프로젝트</div>
           <div class="stat-card-row">
             <span class="stat-value" style="color: var(--success-400)">${myProjects.length}</span>
           </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card cursor-pointer card-hover" id="stat-notifs">
           <div class="stat-card-label">미확인 알림</div>
           <div class="stat-card-row">
             <span class="stat-value" style="color: ${unreadNotifCount > 0 ? "var(--danger-400)" : "var(--slate-400)"}">${unreadNotifCount}</span>
@@ -208,7 +259,7 @@ function render() {
         <div class="lg:col-span-2 flex flex-col gap-6">
 
           <!-- 작업 대기 Section -->
-          <div class="card" style="padding: 0; overflow: hidden;">
+          <div class="card" id="section-tasks" style="padding: 0; overflow: hidden;">
             <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
               <div class="flex items-center gap-2">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary-400)">
@@ -225,7 +276,7 @@ function render() {
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       </svg>
-                      <span class="empty-state-text">3일 이내 마감 예정인 작업이 없습니다</span>
+                      <span class="empty-state-text">${user.role === "worker" ? "3일 이내 마감 예정인 작업이 없습니다" : "대기 중인 작업이 없습니다"}</span>
                     </div>`
                   : myTasks
                       .map(
@@ -257,7 +308,7 @@ function render() {
           ${
             pendingApprovals.length > 0
               ? `
-            <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card" id="section-approvals" style="padding: 0; overflow: hidden;">
               <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
                 <div class="flex items-center gap-2">
                   <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--warning-400)">
@@ -320,6 +371,7 @@ function render() {
                       <span class="empty-state-text">배정된 프로젝트가 없습니다</span>
                     </div>`
                   : myProjects
+                      .slice(0, 3)
                       .map(
                         (project) => `
                     <div class="project-row cursor-pointer" data-project-id="${project.id}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;">
@@ -351,7 +403,7 @@ function render() {
         <div class="lg:col-span-1">
 
           <!-- 알림 Panel -->
-          <div class="card" style="padding: 0; overflow: hidden; position: sticky; top: 4.5rem;">
+          <div class="card" id="section-notifications" style="padding: 0; overflow: hidden; position: sticky; top: 4.5rem;">
             <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
               <div class="flex items-center gap-2">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--warning-400)">
@@ -377,7 +429,7 @@ function render() {
                   : notifications
                       .map(
                         (notif) => `
-                    <div class="notif-dash-item cursor-pointer" data-notif-id="${notif.id}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;${!notif.read ? " border-left: 3px solid var(--primary-500);" : ""}">
+                    <div class="notif-dash-item cursor-pointer" data-notif-id="${notif.id}" data-notif-link="${escapeHtml(notif.link || "")}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;${!notif.read ? " border-left: 3px solid var(--primary-500);" : ""}">
                       <div class="flex items-start gap-2">
                         ${
                           !notif.read
@@ -410,6 +462,38 @@ function render() {
 
   // ─── Bind Click Handlers ────────────────────────────────────────────────
 
+  // Stat cards → scroll to section or navigate
+  const statTasks = app.querySelector("#stat-tasks");
+  if (statTasks) {
+    statTasks.addEventListener("click", () => {
+      const el = document.getElementById("section-tasks");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  const statApprovals = app.querySelector("#stat-approvals");
+  if (statApprovals) {
+    statApprovals.addEventListener("click", () => {
+      const el = document.getElementById("section-approvals");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  const statProjects = app.querySelector("#stat-projects");
+  if (statProjects) {
+    statProjects.addEventListener("click", () => {
+      window.location.href = "projects.html";
+    });
+  }
+
+  const statNotifs = app.querySelector("#stat-notifs");
+  if (statNotifs) {
+    statNotifs.addEventListener("click", () => {
+      const el = document.getElementById("section-notifications");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
   // Task rows → navigate to task detail
   app.querySelectorAll(".task-row").forEach((row) => {
     row.addEventListener("click", () => {
@@ -417,7 +501,6 @@ function render() {
       const taskId = row.dataset.taskId;
       window.location.href = `task.html?projectId=${projectId}&taskId=${taskId}`;
     });
-    // Hover effect
     row.addEventListener("mouseenter", () => {
       row.style.background = "rgba(26, 34, 52, 0.5)";
     });
@@ -449,11 +532,20 @@ function render() {
     });
   }
 
-  // Notification items → mark as read
+  // Notification items → mark as read + navigate to link
   app.querySelectorAll(".notif-dash-item").forEach((item) => {
-    item.addEventListener("click", () => {
+    item.addEventListener("click", async () => {
       const notifId = item.dataset.notifId;
-      markNotificationRead(notifId);
+      const link = item.dataset.notifLink;
+
+      // Mark as read
+      await markNotificationRead(notifId);
+
+      // Navigate to notification link (convert Next.js routes to HTML routes)
+      if (link) {
+        const htmlLink = convertNotifLink(link);
+        if (htmlLink) window.location.href = htmlLink;
+      }
     });
     item.addEventListener("mouseenter", () => {
       item.style.background = "var(--surface-3)";
@@ -462,6 +554,47 @@ function render() {
       item.style.background = "";
     });
   });
+}
+
+// ─── Notification Link Converter ────────────────────────────────────────────
+// Converts Next.js style routes to HTML file routes
+
+function convertNotifLink(link) {
+  if (!link) return null;
+
+  // /task?projectId=X&taskId=Y → task.html?projectId=X&taskId=Y
+  if (link.startsWith("/task?") || link.startsWith("/task/?")) {
+    return link.replace(/^\/task\/?/, "task.html");
+  }
+
+  // /project?id=X → project.html?id=X
+  if (link.startsWith("/project?") || link.startsWith("/project/?")) {
+    return link.replace(/^\/project\/?/, "project.html");
+  }
+
+  // /projects/PROJ_ID/tasks/TASK_ID → task.html?projectId=PROJ_ID&taskId=TASK_ID
+  const taskMatch = link.match(/^\/projects\/([^/]+)\/tasks\/([^/]+)/);
+  if (taskMatch) {
+    return `task.html?projectId=${taskMatch[1]}&taskId=${taskMatch[2]}`;
+  }
+
+  // /projects/PROJ_ID → project.html?id=PROJ_ID
+  const projMatch = link.match(/^\/projects\/([^/]+)/);
+  if (projMatch) {
+    return `project.html?id=${projMatch[1]}`;
+  }
+
+  // /projects → projects.html
+  if (link === "/projects" || link === "/projects/") {
+    return "projects.html";
+  }
+
+  // /dashboard → dashboard.html
+  if (link === "/dashboard" || link === "/dashboard/") {
+    return "dashboard.html";
+  }
+
+  return null;
 }
 
 // ─── Cleanup ────────────────────────────────────────────────────────────────

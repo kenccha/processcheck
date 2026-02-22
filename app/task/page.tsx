@@ -10,18 +10,13 @@ import {
   completeTask,
   approveTask,
   rejectTask,
+  restartTask,
   addComment,
+  uploadTaskFile,
+  getTemplateItemsByStageAndDept,
 } from "@/lib/firestoreService";
 import { getStatusLabel } from "@/lib/mockData";
-import type { ChecklistItem, Project } from "@/lib/types";
-
-const DEFAULT_CHECKLIST = [
-  { id: "1", content: "요구사항 문서 작성 완료", checked: false, required: true },
-  { id: "2", content: "기술 스펙 문서 작성 완료", checked: false, required: true },
-  { id: "3", content: "관련 부서 검토 완료", checked: false, required: true },
-  { id: "4", content: "예산 검토 완료", checked: false, required: false },
-  { id: "5", content: "일정 검토 완료", checked: false, required: true },
-];
+import type { ChecklistItem, ChecklistTemplateItem, Project } from "@/lib/types";
 
 function TaskDetailContent() {
   const router = useRouter();
@@ -34,8 +29,10 @@ function TaskDetailContent() {
   const [project, setProject] = useState<Project | null>(null);
   const [comment, setComment] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
-  const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST.map((i) => ({ ...i })));
+  const [checklist, setChecklist] = useState<{ id: string; content: string; checked: boolean; required: boolean }[]>([]);
+  const [checklistLoading, setChecklistLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // 프로젝트 구독 (ID 필터)
@@ -60,6 +57,43 @@ function TaskDetailContent() {
     });
     return unsub;
   }, [projectId, taskId, router]);
+
+  // 태스크 로드 후 Firestore 체크리스트 템플릿 로드
+  useEffect(() => {
+    if (!task) return;
+    setChecklistLoading(true);
+    getTemplateItemsByStageAndDept(task.stage, task.department)
+      .then((templateItems: ChecklistTemplateItem[]) => {
+        if (templateItems.length > 0) {
+          setChecklist(
+            templateItems.map((ti) => ({
+              id: ti.id,
+              content: ti.content,
+              checked: false,
+              required: ti.isRequired,
+            }))
+          );
+        } else {
+          // 해당 단계/부서에 템플릿이 없으면 기본 항목
+          setChecklist([
+            { id: "default-1", content: "관련 문서 작성 완료", checked: false, required: true },
+            { id: "default-2", content: "관련 부서 검토 완료", checked: false, required: true },
+            { id: "default-3", content: "일정 검토 완료", checked: false, required: true },
+          ]);
+        }
+      })
+      .catch((e) => {
+        console.error("체크리스트 템플릿 로드 실패:", e);
+        setChecklist([
+          { id: "default-1", content: "관련 문서 작성 완료", checked: false, required: true },
+          { id: "default-2", content: "관련 부서 검토 완료", checked: false, required: true },
+          { id: "default-3", content: "일정 검토 완료", checked: false, required: true },
+        ]);
+      })
+      .finally(() => setChecklistLoading(false));
+  // Only re-load template when task's stage/department change, not on every task update
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.stage, task?.department]);
 
   // 피드백 자동 소멸
   useEffect(() => {
@@ -143,6 +177,38 @@ function TaskDetailContent() {
     }
   };
 
+  const handleRestart = async () => {
+    if (!task || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await restartTask(task.id);
+      showFeedback("success", "작업이 재시작되었습니다. 수정 후 다시 완료해주세요.");
+    } catch (e) {
+      console.error(e);
+      showFeedback("error", "재작업 처리 중 오류가 발생했습니다.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!task || !currentUser || !e.target.files?.length) return;
+    const files = Array.from(e.target.files);
+    setUploadLoading(true);
+    try {
+      for (const file of files) {
+        await uploadTaskFile(task.id, task.projectId, file, currentUser.name);
+      }
+      showFeedback("success", `${files.length}개 파일이 업로드되었습니다.`);
+    } catch (err) {
+      console.error(err);
+      showFeedback("error", "파일 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadLoading(false);
+      e.target.value = "";
+    }
+  };
+
   const handleAddComment = async () => {
     if (!task || !currentUser || actionLoading) return;
     if (!comment.trim()) {
@@ -196,6 +262,7 @@ function TaskDetailContent() {
     isManager &&
     task.status === "completed" &&
     (!task.approvalStatus || task.approvalStatus === "pending");
+  const canRestart = isWorker && task.status === "rejected";
 
   const getStatusColor = (status: ChecklistItem["status"]) => {
     switch (status) {
@@ -250,7 +317,7 @@ function TaskDetailContent() {
                 </span>
               )}
               <span className="text-xs text-slate-500 font-mono uppercase tracking-widest">
-                {task.stage.replace(/_/g, " ")}
+                {task.stage}
               </span>
             </div>
             <h1 className="text-3xl font-bold text-slate-100 tracking-tight">{task.title}</h1>
@@ -316,13 +383,22 @@ function TaskDetailContent() {
                 <div
                   className="h-full bg-gradient-to-r from-primary-600 to-primary-400 rounded-full transition-all duration-500 ease-out"
                   style={{
-                    width: `${(progress.completed / progress.total) * 100}%`,
+                    width: `${progress.total > 0 ? (progress.completed / progress.total) * 100 : 0}%`,
                   }}
                 />
               </div>
 
               <div className="space-y-3">
-                {checklist.map((item) => (
+                {checklistLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="ml-3 text-sm text-slate-500">체크리스트 로딩 중...</span>
+                  </div>
+                ) : checklist.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 text-sm">
+                    이 단계/부서에 해당하는 체크리스트 항목이 없습니다.
+                  </div>
+                ) : checklist.map((item) => (
                   <label
                     key={item.id}
                     className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-200 ${
@@ -380,12 +456,29 @@ function TaskDetailContent() {
               <h2 className="section-title mb-6">첨부 파일</h2>
               {canComplete && (
                 <div className="mb-6">
-                  <label className="group block w-full p-8 border-2 border-dashed border-surface-4 rounded-xl text-center cursor-pointer hover:border-primary-500/40 hover:bg-surface-1/50 transition-all duration-200">
-                    <svg className="w-10 h-10 mx-auto mb-3 text-slate-500 group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors">클릭하여 파일 업로드 또는 드래그 앤 드롭</p>
-                    <input type="file" className="hidden" multiple />
+                  <label className={`group block w-full p-8 border-2 border-dashed border-surface-4 rounded-xl text-center transition-all duration-200 ${
+                    uploadLoading ? "opacity-50 cursor-wait" : "cursor-pointer hover:border-primary-500/40 hover:bg-surface-1/50"
+                  }`}>
+                    {uploadLoading ? (
+                      <>
+                        <div className="w-10 h-10 mx-auto mb-3 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm text-slate-400">업로드 중...</p>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-10 h-10 mx-auto mb-3 text-slate-500 group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors">클릭하여 파일 업로드 또는 드래그 앤 드롭</p>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      className="hidden"
+                      multiple
+                      disabled={uploadLoading}
+                      onChange={handleFileUpload}
+                    />
                   </label>
                 </div>
               )}
@@ -572,8 +665,34 @@ function TaskDetailContent() {
                 </div>
               )}
 
+              {/* Restart action for rejected tasks (worker) */}
+              {canRestart && (
+                <div className="space-y-3">
+                  <div className="p-4 bg-danger-500/10 border border-danger-500/20 rounded-xl mb-3">
+                    <p className="text-sm text-danger-400 font-medium">반려됨</p>
+                    <p className="text-xs text-slate-500 mt-1">수정 후 다시 제출해주세요</p>
+                  </div>
+                  <button
+                    onClick={handleRestart}
+                    disabled={actionLoading}
+                    className="w-full py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-500 transition-all duration-200 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {actionLoading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>재작업 시작</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
               {/* View Only / other statuses */}
-              {!canComplete && !canApprove && task.approvalStatus !== "approved" && (
+              {!canComplete && !canApprove && !canRestart && task.approvalStatus !== "approved" && (
                 <div className="text-center py-8 text-slate-500">
                   {task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending") && (
                     <div>
@@ -591,7 +710,7 @@ function TaskDetailContent() {
                         </svg>
                       </div>
                       <p className="text-sm text-slate-400">반려됨</p>
-                      <p className="text-xs text-slate-500 mt-1">재작업이 필요합니다</p>
+                      <p className="text-xs text-slate-500 mt-1">담당자의 재작업이 필요합니다</p>
                     </div>
                   )}
                   {task.status === "pending" && !isWorker && !isManager && (

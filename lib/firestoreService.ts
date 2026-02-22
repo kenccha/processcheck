@@ -13,11 +13,13 @@ import {
   onSnapshot,
   DocumentData,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
 import type {
   User,
   Project,
   ChecklistItem,
+  FileAttachment,
   ChangeRequest,
   Notification,
   TaskComment,
@@ -136,20 +138,14 @@ export async function seedDatabaseIfEmpty(): Promise<boolean> {
       });
     }
 
-    // Template Stages
+    // Template Stages (6 Phases — 작업+승인 쌍으로 병합)
     const templateStages = [
-      { id: "stage-0", name: "0. 발의 검토", order: 0, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-1", name: "1. 발의 승인", order: 1, type: "gate", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-2", name: "2. 기획 검토", order: 2, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-3", name: "3. 기획 승인", order: 3, type: "gate", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-4", name: "4. W/M 제작", order: 4, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-5", name: "5. W/M 승인회", order: 5, type: "gate", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-6", name: "6. Tx 단계", order: 6, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-7", name: "7. Tx 승인회", order: 7, type: "gate", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-8", name: "8. Master Gate Pilot", order: 8, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-9", name: "9. MSG 승인회", order: 9, type: "gate", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-10", name: "10. 양산", order: 10, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "stage-11", name: "11. 영업 이관", order: 11, type: "work", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase0", name: "발의", order: 0, workStageName: "발의검토", gateStageName: "발의승인", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase1", name: "기획", order: 1, workStageName: "기획검토", gateStageName: "기획승인", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase2", name: "WM", order: 2, workStageName: "WM제작", gateStageName: "WM승인회", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase3", name: "Tx", order: 3, workStageName: "Tx단계", gateStageName: "Tx승인회", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase4", name: "MSG", order: 4, workStageName: "MasterGatePilot", gateStageName: "MSG승인회", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "phase5", name: "양산/이관", order: 5, workStageName: "양산", gateStageName: "영업이관", createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
     ];
     for (const s of templateStages) {
       batch.set(doc(db, "templateStages", s.id), s);
@@ -157,33 +153,33 @@ export async function seedDatabaseIfEmpty(): Promise<boolean> {
 
     // Template Departments
     const templateDepartments = [
-      { id: "dept-dev", name: "개발팀", order: 0, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-quality", name: "품질팀", order: 1, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-sales", name: "영업팀", order: 2, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-mfg", name: "제조팀", order: 3, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-purchase", name: "구매팀", order: 4, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-cs", name: "CS팀", order: 5, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-mgmt", name: "경영관리팀", order: 6, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-clinical", name: "글로벌임상팀", order: 7, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-design", name: "디자인연구소", order: 8, createdBy: "system", createdAt: Timestamp.now() },
-      { id: "dept-cert", name: "인증팀", order: 9, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept1", name: "개발팀", order: 0, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept2", name: "품질팀", order: 1, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept3", name: "영업팀", order: 2, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept4", name: "제조팀", order: 3, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept5", name: "구매팀", order: 4, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept6", name: "CS팀", order: 5, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept7", name: "경영관리팀", order: 6, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept8", name: "글로벌임상팀", order: 7, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept9", name: "디자인연구소", order: 8, createdBy: "system", createdAt: Timestamp.now() },
+      { id: "dept10", name: "인증팀", order: 9, createdBy: "system", createdAt: Timestamp.now() },
     ];
     for (const d of templateDepartments) {
       batch.set(doc(db, "templateDepartments", d.id), d);
     }
 
-    // Template Items (초기 샘플)
+    // Template Items (초기 샘플 — stageId는 페이즈 ID 참조)
     const templateItems = [
-      { id: "ti-1", stageId: "stage-0", departmentId: "dept-dev", content: "NABC 문서가 작성되었는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-2", stageId: "stage-0", departmentId: "dept-dev", content: "Needs(필요성) 항목이 작성되었는가?", order: 1, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-3", stageId: "stage-0", departmentId: "dept-sales", content: "시장 니즈 조사 자료가 있는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-4", stageId: "stage-2", departmentId: "dept-dev", content: "요구사항 문서 작성 완료", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-5", stageId: "stage-2", departmentId: "dept-dev", content: "기술 스펙 문서 작성 완료", order: 1, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-6", stageId: "stage-2", departmentId: "dept-dev", content: "관련 부서 검토 완료", order: 2, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-7", stageId: "stage-2", departmentId: "dept-dev", content: "예산 검토 완료", order: 3, isRequired: false, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-8", stageId: "stage-2", departmentId: "dept-dev", content: "일정 검토 완료", order: 4, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-9", stageId: "stage-4", departmentId: "dept-dev", content: "설계 도면 완성 여부 확인", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
-      { id: "ti-10", stageId: "stage-4", departmentId: "dept-quality", content: "품질 계획서가 수립되었는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-1", stageId: "phase0", departmentId: "dept1", content: "NABC 문서가 작성되었는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-2", stageId: "phase0", departmentId: "dept1", content: "Needs(필요성) 항목이 작성되었는가?", order: 1, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-3", stageId: "phase0", departmentId: "dept3", content: "시장 니즈 조사 자료가 있는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-4", stageId: "phase1", departmentId: "dept1", content: "요구사항 문서 작성 완료", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-5", stageId: "phase1", departmentId: "dept1", content: "기술 스펙 문서 작성 완료", order: 1, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-6", stageId: "phase1", departmentId: "dept1", content: "관련 부서 검토 완료", order: 2, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-7", stageId: "phase1", departmentId: "dept1", content: "예산 검토 완료", order: 3, isRequired: false, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-8", stageId: "phase1", departmentId: "dept1", content: "일정 검토 완료", order: 4, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-9", stageId: "phase2", departmentId: "dept1", content: "설계 도면 완성 여부 확인", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
+      { id: "ti-10", stageId: "phase2", departmentId: "dept2", content: "품질 계획서가 수립되었는가?", order: 0, isRequired: true, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() },
     ];
     for (const ti of templateItems) {
       batch.set(doc(db, "templateItems", ti.id), ti);
@@ -304,18 +300,77 @@ export async function completeTask(taskId: string): Promise<void> {
   await updateDoc(doc(db, "checklistItems", taskId), {
     status: "completed",
     completedDate: Timestamp.now(),
+    approvalStatus: "pending",
   });
+
+  // 자동 알림: 검토자에게 승인 요청 알림 + 프로젝트 통계 재계산
+  try {
+    const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+    if (taskSnap.exists()) {
+      const taskData = taskSnap.data();
+
+      // 프로젝트 통계 재계산
+      if (taskData.projectId) {
+        await recalculateProjectStats(taskData.projectId);
+      }
+
+      // reviewer 이름으로 사용자 찾기
+      const usersQ = query(collection(db, "users"), where("name", "==", taskData.reviewer));
+      const usersSnap = await getDocs(usersQ);
+      if (!usersSnap.empty) {
+        const reviewerUser = usersSnap.docs[0];
+        await addDoc(collection(db, "notifications"), {
+          userId: reviewerUser.id,
+          type: "approval_request",
+          title: "승인 대기",
+          message: `${taskData.assignee}님이 "${taskData.title}" 작업을 완료했습니다. 검토가 필요합니다.`,
+          link: `/task?projectId=${taskData.projectId}&taskId=${taskId}`,
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("알림 생성 실패:", e);
+  }
 }
 
 export async function approveTask(taskId: string, reviewerName: string): Promise<void> {
-  // 실제 서비스에서는 별도 "approved" 상태를 추가하거나
-  // 현재 구조에서는 completed = 최종 승인 완료로 처리
-  // 여기서는 approvedBy, approvedAt 필드를 추가
   await updateDoc(doc(db, "checklistItems", taskId), {
     approvedBy: reviewerName,
     approvedAt: Timestamp.now(),
     approvalStatus: "approved",
   });
+
+  // 자동 알림: 담당자에게 승인 완료 알림 + 프로젝트 통계 재계산
+  try {
+    const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+    if (taskSnap.exists()) {
+      const taskData = taskSnap.data();
+
+      // 프로젝트 통계 재계산 (승인 → 스테이지 자동 전환 포함)
+      if (taskData.projectId) {
+        await recalculateProjectStats(taskData.projectId);
+      }
+
+      const usersQ = query(collection(db, "users"), where("name", "==", taskData.assignee));
+      const usersSnap = await getDocs(usersQ);
+      if (!usersSnap.empty) {
+        const assigneeUser = usersSnap.docs[0];
+        await addDoc(collection(db, "notifications"), {
+          userId: assigneeUser.id,
+          type: "approval_request",
+          title: "승인 완료",
+          message: `${reviewerName}님이 "${taskData.title}" 작업을 승인했습니다.`,
+          link: `/task?projectId=${taskData.projectId}&taskId=${taskId}`,
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("알림 생성 실패:", e);
+  }
 }
 
 export async function rejectTask(
@@ -330,6 +385,36 @@ export async function rejectTask(
     rejectedAt: Timestamp.now(),
     rejectionReason: reason,
   });
+
+  // 자동 알림: 담당자에게 반려 알림 + 프로젝트 통계 재계산
+  try {
+    const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+    if (taskSnap.exists()) {
+      const taskData = taskSnap.data();
+
+      // 프로젝트 통계 재계산
+      if (taskData.projectId) {
+        await recalculateProjectStats(taskData.projectId);
+      }
+
+      const usersQ = query(collection(db, "users"), where("name", "==", taskData.assignee));
+      const usersSnap = await getDocs(usersQ);
+      if (!usersSnap.empty) {
+        const assigneeUser = usersSnap.docs[0];
+        await addDoc(collection(db, "notifications"), {
+          userId: assigneeUser.id,
+          type: "approval_request",
+          title: "작업 반려",
+          message: `${reviewerName}님이 "${taskData.title}" 작업을 반려했습니다. 사유: ${reason}`,
+          link: `/task?projectId=${taskData.projectId}&taskId=${taskId}`,
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("알림 생성 실패:", e);
+  }
 }
 
 export async function addComment(
@@ -355,6 +440,111 @@ export async function addComment(
       ...existing,
       { ...newComment, createdAt: Timestamp.fromDate(newComment.createdAt) },
     ],
+  });
+}
+
+// ─── File Upload ────────────────────────────────────────────────────────────
+
+export async function uploadTaskFile(
+  taskId: string,
+  projectId: string,
+  file: File,
+  uploadedBy: string
+): Promise<FileAttachment> {
+  const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+  const storagePath = `tasks/${projectId}/${taskId}/${fileId}_${file.name}`;
+  const storageRef = ref(storage, storagePath);
+
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+
+  const attachment: FileAttachment = {
+    id: fileId,
+    name: file.name,
+    url,
+    uploadedBy,
+    uploadedAt: new Date(),
+    size: file.size,
+  };
+
+  // Firestore에 파일 목록 업데이트
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  if (taskSnap.exists()) {
+    const existing: FileAttachment[] = taskSnap.data().files || [];
+    await updateDoc(doc(db, "checklistItems", taskId), {
+      files: [...existing, { ...attachment, uploadedAt: Timestamp.fromDate(attachment.uploadedAt) }],
+    });
+  }
+
+  return attachment;
+}
+
+// ─── Task Rework (반려 → 재작업) ──────────────────────────────────────────────
+
+export async function restartTask(taskId: string): Promise<void> {
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  await updateDoc(doc(db, "checklistItems", taskId), {
+    status: "in_progress",
+    approvalStatus: null,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectionReason: null,
+    completedDate: null,
+  });
+  // 프로젝트 통계 재계산
+  if (taskSnap.exists() && taskSnap.data().projectId) {
+    await recalculateProjectStats(taskSnap.data().projectId);
+  }
+}
+
+// ─── Project Stats Recalculation ─────────────────────────────────────────────
+
+export async function recalculateProjectStats(projectId: string): Promise<void> {
+  const q = query(collection(db, "checklistItems"), where("projectId", "==", projectId));
+  const snap = await getDocs(q);
+  const tasks = snap.docs.map((d) => d.data());
+
+  if (tasks.length === 0) return;
+
+  // Progress: % of tasks completed+approved
+  const completedOrApproved = tasks.filter(
+    (t) => t.status === "completed" || t.approvalStatus === "approved"
+  ).length;
+  const progress = Math.round((completedOrApproved / tasks.length) * 100);
+
+  // Risk level: based on overdue tasks
+  const now = new Date();
+  const overdue = tasks.filter(
+    (t) => t.status !== "completed" && t.approvalStatus !== "approved" && toDate(t.dueDate) < now
+  ).length;
+  const overdueRatio = overdue / tasks.length;
+  const riskLevel = overdueRatio > 0.3 ? "red" : overdueRatio > 0.1 ? "yellow" : "green";
+
+  // Current stage: the latest stage that has in_progress or pending tasks
+  const stageOrder = [
+    "발의검토", "발의승인", "기획검토", "기획승인",
+    "WM제작", "WM승인회", "Tx단계", "Tx승인회",
+    "MasterGatePilot", "MSG승인회", "양산", "영업이관",
+  ];
+  let currentStage = stageOrder[0];
+  for (const stage of stageOrder) {
+    const stageTasks = tasks.filter((t) => t.stage === stage);
+    if (stageTasks.length > 0) {
+      const allDone = stageTasks.every(
+        (t) => t.status === "completed" && (t.approvalStatus === "approved" || !t.approvalStatus)
+      );
+      if (!allDone) {
+        currentStage = stage;
+        break;
+      }
+      currentStage = stage; // keep advancing
+    }
+  }
+
+  await updateDoc(doc(db, "projects", projectId), {
+    progress,
+    riskLevel,
+    currentStage,
   });
 }
 
@@ -459,6 +649,22 @@ export function subscribeTemplateItems(
   });
 }
 
+export function subscribeAllTemplateItems(
+  callback: (items: ChecklistTemplateItem[]) => void
+) {
+  return onSnapshot(collection(db, "templateItems"), (snap) => {
+    const items = snap.docs
+      .map((d) => ({
+        ...d.data(),
+        id: d.id,
+        createdAt: toDate(d.data().createdAt),
+        lastModifiedAt: toDate(d.data().lastModifiedAt),
+      } as ChecklistTemplateItem))
+      .sort((a, b) => a.order - b.order);
+    callback(items);
+  });
+}
+
 export async function addTemplateItem(
   data: Omit<ChecklistTemplateItem, "id">
 ): Promise<string> {
@@ -499,7 +705,8 @@ export async function reorderTemplateItems(
 
 export async function addTemplateStage(data: {
   name: string;
-  type: "work" | "gate";
+  workStageName: string;
+  gateStageName: string;
   createdBy: string;
 }): Promise<string> {
   const stagesSnap = await getDocs(collection(db, "templateStages"));
@@ -542,6 +749,42 @@ export async function addTemplateDepartment(data: {
     createdAt: Timestamp.now(),
   });
   return ref.id;
+}
+
+// ─── Template Item Lookup by Name ────────────────────────────────────────────
+
+export async function getTemplateItemsByStageAndDept(
+  stageName: string,
+  deptName: string
+): Promise<ChecklistTemplateItem[]> {
+  // Find the phase whose workStageName or gateStageName matches
+  const stagesSnap = await getDocs(collection(db, "templateStages"));
+  const stage = stagesSnap.docs.find((d) => {
+    const data = d.data();
+    return data.name === stageName || data.workStageName === stageName || data.gateStageName === stageName;
+  });
+  if (!stage) return [];
+
+  // Find the department ID by name
+  const deptsSnap = await getDocs(collection(db, "templateDepartments"));
+  const dept = deptsSnap.docs.find((d) => d.data().name === deptName);
+  if (!dept) return [];
+
+  // Fetch template items for this stage+department
+  const q = query(
+    collection(db, "templateItems"),
+    where("stageId", "==", stage.id),
+    where("departmentId", "==", dept.id)
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({
+      ...d.data(),
+      id: d.id,
+      createdAt: toDate(d.data().createdAt),
+      lastModifiedAt: toDate(d.data().lastModifiedAt),
+    } as ChecklistTemplateItem))
+    .sort((a, b) => a.order - b.order);
 }
 
 export async function deleteTemplateDepartment(deptId: string): Promise<void> {
