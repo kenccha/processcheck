@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<
     "cards" | "table" | "gantt" | "kanban" | "timeline" | "calendar" | "matrix"
-  >("cards");
+  >("table");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProject, setNewProject] = useState({
     name: "",
@@ -158,7 +158,7 @@ export default function ProjectsPage() {
         endDate: new Date(newProject.endDate),
         status: "active",
         progress: 0,
-        currentStage: "0_발의검토",
+        currentStage: "발의검토",
         riskLevel: "green",
       });
       setShowCreateModal(false);
@@ -241,13 +241,13 @@ export default function ProjectsPage() {
               {/* View mode segmented control */}
               <div className="flex flex-wrap bg-surface-3 rounded-xl p-1 gap-0.5">
                 {[
-                  { key: "cards", label: "카드" },
                   { key: "table", label: "테이블" },
+                  { key: "matrix", label: "매트릭스" },
+                  { key: "cards", label: "카드" },
                   { key: "gantt", label: "간트" },
                   { key: "kanban", label: "칸반" },
                   { key: "timeline", label: "타임라인" },
                   { key: "calendar", label: "캘린더" },
-                  { key: "matrix", label: "매트릭스" },
                 ].map((view) => (
                   <button
                     key={view.key}

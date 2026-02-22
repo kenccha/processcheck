@@ -148,7 +148,7 @@ export default function DashboardPage() {
               {currentUser.name}
             </h1>
             <span className="text-sm font-mono text-slate-500 bg-surface-2 px-2.5 py-0.5 rounded border border-surface-3">
-              {currentUser.role === "pm" ? "PM" : currentUser.role === "manager" ? "매니저" : currentUser.role === "scheduler" ? "스케줄러" : "작업자"}
+              {currentUser.role === "pm" ? "PM (기획조정실)" : currentUser.role === "manager" ? "매니저" : "실무자"}
             </span>
           </div>
           <p className="text-slate-400 ml-5 pl-0.5">

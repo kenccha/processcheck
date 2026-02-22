@@ -48,31 +48,31 @@ const projects = [
     id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기",
     status: "active", progress: 35,
     startDate: ts("2026-01-01"), endDate: ts("2026-08-31"),
-    pm: "박민수", riskLevel: "yellow", currentStage: "4_WM제작",
+    pm: "박민수", riskLevel: "yellow", currentStage: "WM제작",
   },
   {
     id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계",
     status: "active", progress: 65,
     startDate: ts("2025-10-01"), endDate: ts("2026-05-31"),
-    pm: "박민수", riskLevel: "green", currentStage: "6_Tx단계",
+    pm: "박민수", riskLevel: "green", currentStage: "Tx단계",
   },
   {
     id: "proj3", name: "FRA 장비 신모델", productType: "FRA",
     status: "active", progress: 15,
     startDate: ts("2026-02-01"), endDate: ts("2026-12-31"),
-    pm: "박민수", riskLevel: "green", currentStage: "2_기획검토",
+    pm: "박민수", riskLevel: "green", currentStage: "기획검토",
   },
   {
     id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계",
     status: "active", progress: 85,
     startDate: ts("2025-11-01"), endDate: ts("2026-03-31"),
-    pm: "박민수", riskLevel: "red", currentStage: "9_MSG승인회",
+    pm: "박민수", riskLevel: "red", currentStage: "MSG승인회",
   },
   {
     id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계",
     status: "completed", progress: 100,
     startDate: ts("2025-06-01"), endDate: ts("2025-12-31"),
-    pm: "박민수", riskLevel: "green", currentStage: "11_영업이관",
+    pm: "박민수", riskLevel: "green", currentStage: "영업이관",
   },
 ];
 
@@ -80,173 +80,173 @@ const projects = [
 const checklistItems = [
   // 김철수의 오늘 할 일
   {
-    id: "task1", projectId: "proj1", stage: "4_WM제작", department: "개발팀",
+    id: "task1", projectId: "proj1", stage: "WM제작", department: "개발팀",
     title: "스펙 정리 및 분석 완료", description: "제품 스펙을 최종 확정하고 기술 문서를 작성합니다.",
     assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: day(1),
   },
   {
-    id: "task2", projectId: "proj1", stage: "4_WM제작", department: "개발팀",
+    id: "task2", projectId: "proj1", stage: "WM제작", department: "개발팀",
     title: "eBOM 작성", description: "설계 자재 명세서를 작성합니다.",
     assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: day(0),
   },
   {
-    id: "task3", projectId: "proj2", stage: "6_Tx단계", department: "개발팀",
+    id: "task3", projectId: "proj2", stage: "Tx단계", department: "개발팀",
     title: "기술 문서 검토", description: "최종 기술 문서를 검토하고 승인합니다.",
     assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: day(3),
   },
   // 김철수의 승인 대기 작업
   {
-    id: "task4", projectId: "proj1", stage: "2_기획검토", department: "개발팀",
+    id: "task4", projectId: "proj1", stage: "기획검토", department: "개발팀",
     title: "NABC 분석 완료", description: "Need, Approach, Benefit, Competition 분석",
     assignee: "김철수", reviewer: "이영희",
     status: "completed", dueDate: day(-7), completedDate: day(-1),
   },
   {
-    id: "task5", projectId: "proj2", stage: "6_Tx단계", department: "개발팀",
+    id: "task5", projectId: "proj2", stage: "Tx단계", department: "개발팀",
     title: "성능 테스트 보고서 작성", description: "성능 테스트 결과를 정리하고 보고서를 작성합니다.",
     assignee: "김철수", reviewer: "이영희",
     status: "completed", dueDate: day(2), completedDate: day(-1),
   },
   // 최지영의 작업 (품질팀)
   {
-    id: "task6", projectId: "proj1", stage: "4_WM제작", department: "품질팀",
+    id: "task6", projectId: "proj1", stage: "WM제작", department: "품질팀",
     title: "신뢰성 테스트 계획 수립", description: "제품의 신뢰성 테스트 계획을 수립합니다.",
     assignee: "최지영", reviewer: "강민지", status: "in_progress", dueDate: day(5),
   },
   {
-    id: "task7", projectId: "proj2", stage: "6_Tx단계", department: "품질팀",
+    id: "task7", projectId: "proj2", stage: "Tx단계", department: "품질팀",
     title: "낙하 테스트 실시", description: "제품 낙하 테스트를 실시하고 결과를 분석합니다.",
     assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: day(1),
   },
   // 정수현의 작업 (제조팀)
   {
-    id: "task8", projectId: "proj4", stage: "9_MSG승인회", department: "제조팀",
+    id: "task8", projectId: "proj4", stage: "MSG승인회", department: "제조팀",
     title: "양산 라인 셋업", description: "양산을 위한 제조 라인 준비 및 테스트",
     assignee: "정수현", reviewer: "이영희", status: "in_progress", dueDate: day(0),
   },
   {
-    id: "task9", projectId: "proj4", stage: "8_MasterGatePilot", department: "제조팀",
+    id: "task9", projectId: "proj4", stage: "MasterGatePilot", department: "제조팀",
     title: "시생산 결과 분석", description: "시생산 결과를 분석하고 개선사항을 도출합니다.",
     assignee: "정수현", reviewer: "이영희",
     status: "completed", dueDate: day(-7), completedDate: day(-2),
   },
   // 홍길동의 작업 (디자인연구소)
   {
-    id: "task10", projectId: "proj2", stage: "6_Tx단계", department: "디자인연구소",
+    id: "task10", projectId: "proj2", stage: "Tx단계", department: "디자인연구소",
     title: "UI/UX 디자인 최종 검토", description: "사용자 인터페이스 및 경험 디자인 최종 검토",
     assignee: "홍길동", reviewer: "이영희",
     status: "completed", dueDate: day(-7), completedDate: day(-3),
   },
   // 기타 부서 작업들
   {
-    id: "task11", projectId: "proj1", stage: "4_WM제작", department: "구매팀",
+    id: "task11", projectId: "proj1", stage: "WM제작", department: "구매팀",
     title: "부품 공급업체 선정", description: "주요 부품의 공급업체를 선정하고 계약합니다.",
     assignee: "박영수", reviewer: "김부장", status: "pending", dueDate: day(7),
   },
   {
-    id: "task12", projectId: "proj3", stage: "2_기획검토", department: "영업팀",
+    id: "task12", projectId: "proj3", stage: "기획검토", department: "영업팀",
     title: "시장 조사 및 분석", description: "목표 시장을 조사하고 경쟁사를 분석합니다.",
     assignee: "이상민", reviewer: "최과장", status: "in_progress", dueDate: day(5),
   },
   {
-    id: "task13", projectId: "proj1", stage: "4_WM제작", department: "인증팀",
+    id: "task13", projectId: "proj1", stage: "WM제작", department: "인증팀",
     title: "인증 전략 수립", description: "각국 인증 요구사항을 분석하고 전략을 수립합니다.",
     assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: day(7),
   },
   // 지연된 작업
   {
-    id: "task14", projectId: "proj4", stage: "9_MSG승인회", department: "개발팀",
+    id: "task14", projectId: "proj4", stage: "MSG승인회", department: "개발팀",
     title: "최종 도면 승인", description: "양산을 위한 최종 도면을 검토하고 승인합니다.",
     assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: day(-1),
   },
   // proj1 추가 작업들 (12단계 커버)
   {
-    id: "task15", projectId: "proj1", stage: "0_발의검토", department: "개발팀",
+    id: "task15", projectId: "proj1", stage: "발의검토", department: "개발팀",
     title: "제품 컨셉 정의", description: "신제품 컨셉과 목표를 정의합니다.",
     assignee: "김철수", reviewer: "이영희",
     status: "completed", dueDate: day(-7), completedDate: day(-7),
   },
   {
-    id: "task16", projectId: "proj1", stage: "0_발의검토", department: "품질팀",
+    id: "task16", projectId: "proj1", stage: "발의검토", department: "품질팀",
     title: "품질 목표 수립", description: "제품의 품질 목표와 기준을 수립합니다.",
     assignee: "최지영", reviewer: "강민지",
     status: "completed", dueDate: day(-7), completedDate: day(-7),
   },
   {
-    id: "task17", projectId: "proj1", stage: "0_발의검토", department: "영업팀",
+    id: "task17", projectId: "proj1", stage: "발의검토", department: "영업팀",
     title: "시장 기회 분석", description: "목표 시장과 경쟁 환경을 분석합니다.",
     assignee: "이상민", reviewer: "최과장",
     status: "completed", dueDate: day(-7), completedDate: day(-7),
   },
   {
-    id: "task18", projectId: "proj1", stage: "0_발의검토", department: "경영관리팀",
+    id: "task18", projectId: "proj1", stage: "발의검토", department: "경영관리팀",
     title: "사업성 검토", description: "ROI 및 수익성을 분석합니다.",
     assignee: "정재무", reviewer: "김부장",
     status: "completed", dueDate: day(-7), completedDate: day(-7),
   },
   {
-    id: "task19", projectId: "proj1", stage: "2_기획검토", department: "영업팀",
+    id: "task19", projectId: "proj1", stage: "기획검토", department: "영업팀",
     title: "가격 전략 수립", description: "제품 가격 전략을 수립합니다.",
     assignee: "이상민", reviewer: "최과장",
     status: "completed", dueDate: day(-7), completedDate: day(-7),
   },
   {
-    id: "task20", projectId: "proj1", stage: "4_WM제작", department: "개발팀",
+    id: "task20", projectId: "proj1", stage: "WM제작", department: "개발팀",
     title: "시제품 제작", description: "1차 시제품을 제작합니다.",
     assignee: "박영수", reviewer: "이영희", status: "pending", dueDate: day(7),
   },
   {
-    id: "task21", projectId: "proj1", stage: "4_WM제작", department: "제조팀",
+    id: "task21", projectId: "proj1", stage: "WM제작", department: "제조팀",
     title: "제작 공정 검토", description: "시제품 제작 공정을 검토합니다.",
     assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: day(7),
   },
   {
-    id: "task22", projectId: "proj1", stage: "6_Tx단계", department: "품질팀",
+    id: "task22", projectId: "proj1", stage: "Tx단계", department: "품질팀",
     title: "내구성 테스트", description: "제품 내구성 테스트를 실시합니다.",
     assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: day(7),
   },
   {
-    id: "task23", projectId: "proj1", stage: "6_Tx단계", department: "디자인연구소",
+    id: "task23", projectId: "proj1", stage: "Tx단계", department: "디자인연구소",
     title: "외관 디자인 확정", description: "제품 외관 디자인을 확정합니다.",
     assignee: "홍길동", reviewer: "박디자인", status: "pending", dueDate: day(7),
   },
   {
-    id: "task24", projectId: "proj1", stage: "8_MasterGatePilot", department: "제조팀",
+    id: "task24", projectId: "proj1", stage: "MasterGatePilot", department: "제조팀",
     title: "양산 공정 계획", description: "양산을 위한 제조 공정을 계획합니다.",
     assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: day(7),
   },
   {
-    id: "task25", projectId: "proj1", stage: "8_MasterGatePilot", department: "구매팀",
+    id: "task25", projectId: "proj1", stage: "MasterGatePilot", department: "구매팀",
     title: "자재 조달 계획", description: "양산 자재 조달 계획을 수립합니다.",
     assignee: "박구매", reviewer: "최구매", status: "pending", dueDate: day(7),
   },
   {
-    id: "task26", projectId: "proj1", stage: "8_MasterGatePilot", department: "제조팀",
+    id: "task26", projectId: "proj1", stage: "MasterGatePilot", department: "제조팀",
     title: "시생산 실시", description: "시생산을 실시하고 문제점을 파악합니다.",
     assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: day(7),
   },
   {
-    id: "task27", projectId: "proj1", stage: "9_MSG승인회", department: "품질팀",
+    id: "task27", projectId: "proj1", stage: "MSG승인회", department: "품질팀",
     title: "최종 품질 검증", description: "양산 전 최종 품질을 검증합니다.",
     assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: day(7),
   },
   {
-    id: "task28", projectId: "proj1", stage: "10_양산", department: "제조팀",
+    id: "task28", projectId: "proj1", stage: "양산", department: "제조팀",
     title: "양산 가동", description: "본격적인 양산을 시작합니다.",
     assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: day(7),
   },
   {
-    id: "task29", projectId: "proj1", stage: "11_영업이관", department: "영업팀",
+    id: "task29", projectId: "proj1", stage: "영업이관", department: "영업팀",
     title: "판매 시작 준비", description: "제품 판매를 위한 준비를 합니다.",
     assignee: "이상민", reviewer: "최과장", status: "pending", dueDate: day(7),
   },
   {
-    id: "task30", projectId: "proj1", stage: "11_영업이관", department: "CS팀",
+    id: "task30", projectId: "proj1", stage: "영업이관", department: "CS팀",
     title: "A/S 체계 구축", description: "고객 서비스 및 A/S 체계를 구축합니다.",
     assignee: "김서비스", reviewer: "박CS", status: "pending", dueDate: day(7),
   },
   {
-    id: "task31", projectId: "proj1", stage: "4_WM제작", department: "인증팀",
+    id: "task31", projectId: "proj1", stage: "WM제작", department: "인증팀",
     title: "인증 요구사항 검토", description: "각국 인증 요구사항을 검토합니다.",
     assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: day(5),
   },
@@ -322,22 +322,54 @@ const notifications = [
     message: "[신장계] 양산 라인 셋업 - 오늘 마감",
     link: "/task?projectId=proj4&taskId=task8", read: false, createdAt: hour(1),
   },
+  // PM(박민수) 알림 추가
+  {
+    id: "notif8", userId: "user3", type: "approval_request",
+    title: "승인 요청",
+    message: "[신규 체성분 분석기] 김철수님이 NABC 분석을 완료했습니다. 검토 필요.",
+    link: "/task?projectId=proj1&taskId=task4", read: false, createdAt: hour(1),
+  },
+  {
+    id: "notif9", userId: "user3", type: "deadline_approaching",
+    title: "⚠️ 프로젝트 위험 감지",
+    message: "[신장계 긴급 설계 변경] 마감일 임박 - 위험도 상승",
+    link: "/project?id=proj4", read: false, createdAt: hour(2),
+  },
+  {
+    id: "notif10", userId: "user3", type: "change_request",
+    title: "설계 변경 요청 접수",
+    message: "[신장계] 배터리 규격 변경 요청이 접수되었습니다. 검토 필요.",
+    link: "/project?id=proj4", read: true, createdAt: hour(24),
+  },
+  // 매니저(이영희) 알림 추가
+  {
+    id: "notif11", userId: "user2", type: "approval_request",
+    title: "승인 대기",
+    message: "[신규 체성분 분석기] 김철수님의 NABC 분석이 승인을 기다리고 있습니다.",
+    link: "/task?projectId=proj1&taskId=task4", read: false, createdAt: hour(1),
+  },
+  {
+    id: "notif12", userId: "user2", type: "approval_request",
+    title: "승인 대기",
+    message: "[가정용 혈압계] 성능 테스트 보고서가 승인을 기다리고 있습니다.",
+    link: "/task?projectId=proj2&taskId=task5", read: false, createdAt: hour(2),
+  },
 ];
 
 // ─── 템플릿 단계 ──────────────────────────────
 const templateStages = [
-  { id: "stage0", name: "0_발의검토", order: 0, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage1", name: "1_발의승인", order: 1, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage2", name: "2_기획검토", order: 2, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage3", name: "3_기획승인", order: 3, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage4", name: "4_WM제작", order: 4, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage5", name: "5_WM승인회", order: 5, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage6", name: "6_Tx단계", order: 6, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage7", name: "7_Tx승인회", order: 7, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage8", name: "8_MasterGatePilot", order: 8, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage9", name: "9_MSG승인회", order: 9, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage10", name: "10_양산", order: 10, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
-  { id: "stage11", name: "11_영업이관", order: 11, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage0", name: "발의검토", order: 0, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage1", name: "발의승인", order: 1, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage2", name: "기획검토", order: 2, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage3", name: "기획승인", order: 3, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage4", name: "WM제작", order: 4, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage5", name: "WM승인회", order: 5, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage6", name: "Tx단계", order: 6, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage7", name: "Tx승인회", order: 7, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage8", name: "MasterGatePilot", order: 8, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage9", name: "MSG승인회", order: 9, type: "gate", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage10", name: "양산", order: 10, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
+  { id: "stage11", name: "영업이관", order: 11, type: "work", createdBy: "시스템", createdAt: Timestamp.now(), lastModifiedBy: "시스템", lastModifiedAt: Timestamp.now() },
 ];
 
 // ─── 템플릿 부서 ──────────────────────────────
