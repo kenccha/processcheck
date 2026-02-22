@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import { useRequireAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,8 @@ import {
   subscribeChecklistItems,
   subscribeChangeRequests,
   subscribeProjects,
+  createChangeRequest,
+  updateChangeRequest,
 } from "@/lib/firestoreService";
 import {
   departments,
@@ -32,6 +34,14 @@ function ProjectDetailContent() {
   const [selectedStage, setSelectedStage] = useState<ProjectStage | "all">("all");
   const [selectedDepartment, setSelectedDepartment] = useState<Department | "all">("all");
   const [projectNotFound, setProjectNotFound] = useState(false);
+  const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
+  const [newChangeRequest, setNewChangeRequest] = useState({
+    title: "",
+    description: "",
+    scale: "medium" as "major" | "medium" | "minor",
+    affectedDepartments: [] as string[],
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 프로젝트 실시간 구독 (전체 중 ID 필터링)
   useEffect(() => {
@@ -588,7 +598,7 @@ function ProjectDetailContent() {
           <div className="bg-surface-2 rounded-2xl border border-surface-3 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="section-title">프로젝트 문서</h2>
-              <button className="btn-primary flex items-center space-x-2">
+              <button className="btn-primary flex items-center space-x-2" onClick={() => fileInputRef.current?.click()}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
@@ -601,7 +611,15 @@ function ProjectDetailContent() {
               </svg>
               <p className="text-base text-slate-400 mb-2">클릭하여 파일 업로드 또는 드래그 앤 드롭</p>
               <p className="text-sm text-slate-500">PDF, DOC, XLS, PPT, DWG, ZIP (최대 50MB)</p>
-              <input type="file" className="hidden" multiple />
+              <input
+                type="file"
+                className="hidden"
+                multiple
+                ref={fileInputRef}
+                onChange={(e) => {
+                  if (e.target.files?.length) alert(`${e.target.files.length}개 파일 선택됨. 파일 업로드 기능은 준비 중입니다.`);
+                }}
+              />
             </label>
           </div>
         )}
@@ -610,13 +628,121 @@ function ProjectDetailContent() {
         {activeTab === "changes" && (
           <div className="space-y-6">
             <div className="flex justify-end">
-              <button className="btn-primary flex items-center space-x-2">
+              <button className="btn-primary flex items-center space-x-2" onClick={() => setShowChangeRequestModal(true)}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
                 <span>새 변경 요청</span>
               </button>
             </div>
+
+            {showChangeRequestModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
+                  <h3 className="text-lg font-semibold text-slate-100 mb-4">새 변경 요청</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm text-slate-300 block mb-1">제목</label>
+                      <input
+                        type="text"
+                        className="input-field w-full"
+                        value={newChangeRequest.title}
+                        onChange={(e) => setNewChangeRequest({ ...newChangeRequest, title: e.target.value })}
+                        placeholder="변경 요청 제목"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-slate-300 block mb-1">설명</label>
+                      <textarea
+                        className="input-field w-full"
+                        rows={3}
+                        value={newChangeRequest.description}
+                        onChange={(e) => setNewChangeRequest({ ...newChangeRequest, description: e.target.value })}
+                        placeholder="변경 요청 상세 설명"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-slate-300 block mb-1">규모</label>
+                      <select
+                        className="input-field w-full"
+                        value={newChangeRequest.scale}
+                        onChange={(e) => setNewChangeRequest({ ...newChangeRequest, scale: e.target.value as "major" | "medium" | "minor" })}
+                      >
+                        <option value="minor">경미</option>
+                        <option value="medium">중간</option>
+                        <option value="major">대규모</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-slate-300 block mb-1">영향 부서</label>
+                      <div className="flex flex-wrap gap-2">
+                        {departments.map((dept) => (
+                          <button
+                            key={dept}
+                            type="button"
+                            onClick={() => {
+                              const current = newChangeRequest.affectedDepartments;
+                              const updated = current.includes(dept)
+                                ? current.filter((d) => d !== dept)
+                                : [...current, dept];
+                              setNewChangeRequest({ ...newChangeRequest, affectedDepartments: updated });
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                              newChangeRequest.affectedDepartments.includes(dept)
+                                ? "bg-primary-500/20 border-primary-500/40 text-primary-300"
+                                : "bg-surface-3 border-surface-4 text-slate-400 hover:border-slate-500"
+                            }`}
+                          >
+                            {dept}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex space-x-3 pt-2">
+                      <button
+                        className="flex-1 btn-primary"
+                        onClick={async () => {
+                          if (!newChangeRequest.title.trim()) {
+                            alert("제목을 입력하세요.");
+                            return;
+                          }
+                          if (newChangeRequest.affectedDepartments.length === 0) {
+                            alert("영향 부서를 선택하세요.");
+                            return;
+                          }
+                          const readBy: { [department: string]: boolean } = {};
+                          newChangeRequest.affectedDepartments.forEach((d) => { readBy[d] = false; });
+                          await createChangeRequest({
+                            projectId,
+                            title: newChangeRequest.title,
+                            description: newChangeRequest.description,
+                            requestedBy: currentUser.name,
+                            requestedAt: new Date(),
+                            affectedDepartments: newChangeRequest.affectedDepartments as Department[],
+                            scale: newChangeRequest.scale,
+                            status: "in_review",
+                            readBy,
+                          });
+                          setNewChangeRequest({ title: "", description: "", scale: "medium", affectedDepartments: [] });
+                          setShowChangeRequestModal(false);
+                        }}
+                      >
+                        등록
+                      </button>
+                      <button
+                        className="flex-1 btn-secondary"
+                        onClick={() => {
+                          setNewChangeRequest({ title: "", description: "", scale: "medium", affectedDepartments: [] });
+                          setShowChangeRequestModal(false);
+                        }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {changeRequests.length === 0 ? (
               <div className="bg-surface-2 rounded-2xl border border-surface-3 p-12 text-center">
@@ -685,10 +811,10 @@ function ProjectDetailContent() {
 
                   {change.status === "in_review" && (
                     <div className="flex space-x-3">
-                      <button className="flex-1 btn-primary">
+                      <button className="flex-1 btn-primary" onClick={() => updateChangeRequest(change.id, { status: "approved" })}>
                         승인
                       </button>
-                      <button className="flex-1 btn-danger">
+                      <button className="flex-1 btn-danger" onClick={() => { const reason = prompt("반려 사유를 입력하세요:"); if (reason) updateChangeRequest(change.id, { status: "rejected" }); }}>
                         반려
                       </button>
                     </div>

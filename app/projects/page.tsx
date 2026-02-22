@@ -7,6 +7,7 @@ import { useRequireAuth } from "@/contexts/AuthContext";
 import {
   subscribeProjects,
   subscribeAllChecklistItems,
+  createProject,
 } from "@/lib/firestoreService";
 import {
   departments,
@@ -28,6 +29,15 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<
     "cards" | "table" | "gantt" | "kanban" | "timeline" | "calendar" | "matrix"
   >("cards");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProject, setNewProject] = useState({
+    name: "",
+    productType: "",
+    pm: "",
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
+  });
+  const [creating, setCreating] = useState(false);
 
   // 실시간 프로젝트 구독
   useEffect(() => {
@@ -136,6 +146,30 @@ export default function ProjectsPage() {
     [filteredTasks]
   );
 
+  const handleCreateProject = async () => {
+    if (!newProject.name || !newProject.productType || !newProject.pm || !newProject.endDate) return;
+    setCreating(true);
+    try {
+      await createProject({
+        name: newProject.name,
+        productType: newProject.productType,
+        pm: newProject.pm,
+        startDate: new Date(newProject.startDate),
+        endDate: new Date(newProject.endDate),
+        status: "active",
+        progress: 0,
+        currentStage: "0_발의검토",
+        riskLevel: "green",
+      });
+      setShowCreateModal(false);
+      setNewProject({ name: "", productType: "", pm: "", startDate: new Date().toISOString().split("T")[0], endDate: "" });
+    } catch {
+      alert("프로젝트 생성 중 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-0 flex items-center justify-center">
@@ -161,7 +195,7 @@ export default function ProjectsPage() {
               <span className="text-primary-400">{filteredProjects.length}</span>개의 프로젝트
             </p>
           </div>
-          <button className="btn-primary flex items-center space-x-2">
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center space-x-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
@@ -595,6 +629,45 @@ export default function ProjectsPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-200 mb-2">프로젝트가 없습니다</h3>
             <p className="text-slate-500 text-sm">새 프로젝트를 생성하거나 검색 조건을 변경해보세요.</p>
+          </div>
+        )}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)}>
+            <div className="bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-semibold text-slate-100 mb-6">새 프로젝트</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1.5">프로젝트명 *</label>
+                  <input type="text" className="input-field" placeholder="예: 스마트 워치 2세대" value={newProject.name} onChange={(e) => setNewProject({...newProject, name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1.5">제품 종류 *</label>
+                  <input type="text" className="input-field" placeholder="예: 스마트 워치" value={newProject.productType} onChange={(e) => setNewProject({...newProject, productType: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1.5">PM *</label>
+                  <input type="text" className="input-field" placeholder="담당 PM 이름" value={newProject.pm} onChange={(e) => setNewProject({...newProject, pm: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-1.5">시작일</label>
+                    <input type="date" className="input-field" value={newProject.startDate} onChange={(e) => setNewProject({...newProject, startDate: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-1.5">종료일 *</label>
+                    <input type="date" className="input-field" value={newProject.endDate} onChange={(e) => setNewProject({...newProject, endDate: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-3">
+                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">취소</button>
+                <button onClick={handleCreateProject} disabled={creating || !newProject.name || !newProject.productType || !newProject.pm || !newProject.endDate} className="btn-primary disabled:opacity-50">
+                  {creating ? "생성 중..." : "프로젝트 생성"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

@@ -1,4 +1,15 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 export default function Home() {
+  const router = useRouter();
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <main className="min-h-screen bg-surface-0 text-slate-200">
       {/* Navigation */}
@@ -14,10 +25,10 @@ export default function Home() {
               </span>
             </div>
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">주요 기능</a>
-              <a href="#benefits" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">효과</a>
-              <a href="#use-cases" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">적용 사례</a>
-              <button className="btn-primary text-sm">시작하기</button>
+              <a href="#features" onClick={(e) => { e.preventDefault(); scrollTo("features"); }} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">주요 기능</a>
+              <a href="#benefits" onClick={(e) => { e.preventDefault(); scrollTo("benefits"); }} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">효과</a>
+              <a href="#use-cases" onClick={(e) => { e.preventDefault(); scrollTo("use-cases"); }} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">적용 사례</a>
+              <button className="btn-primary text-sm" onClick={() => router.push(basePath + "/")}>시작하기</button>
             </div>
           </div>
         </div>
@@ -63,10 +74,10 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-delay-4 opacity-0">
-              <button className="px-8 py-4 bg-primary-500 text-white rounded-xl hover:bg-primary-400 transition-all font-semibold text-lg shadow-glow hover:shadow-[0_0_30px_rgba(6,182,212,0.25)]">
+              <button className="px-8 py-4 bg-primary-500 text-white rounded-xl hover:bg-primary-400 transition-all font-semibold text-lg shadow-glow hover:shadow-[0_0_30px_rgba(6,182,212,0.25)]" onClick={() => router.push(basePath + "/")}>
                 무료로 시작하기
               </button>
-              <button className="px-8 py-4 bg-surface-2 text-slate-200 rounded-xl hover:bg-surface-3 transition-all font-semibold text-lg border border-surface-3 hover:border-surface-4">
+              <button className="px-8 py-4 bg-surface-2 text-slate-200 rounded-xl hover:bg-surface-3 transition-all font-semibold text-lg border border-surface-3 hover:border-surface-4" onClick={() => scrollTo("features")}>
                 데모 보기
               </button>
             </div>
@@ -340,10 +351,10 @@ export default function Home() {
             Firebase 기반 안전한 클라우드 서비스로 언제 어디서나 접속 가능
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <button className="px-8 py-4 bg-primary-500 text-white rounded-xl hover:bg-primary-400 transition-all font-semibold text-lg shadow-glow hover:shadow-[0_0_30px_rgba(6,182,212,0.25)]">
+            <button className="px-8 py-4 bg-primary-500 text-white rounded-xl hover:bg-primary-400 transition-all font-semibold text-lg shadow-glow hover:shadow-[0_0_30px_rgba(6,182,212,0.25)]" onClick={() => router.push(basePath + "/")}>
               무료로 시작하기
             </button>
-            <button className="px-8 py-4 bg-surface-2 text-slate-200 rounded-xl hover:bg-surface-3 transition-all font-semibold text-lg border border-surface-3">
+            <button className="px-8 py-4 bg-surface-2 text-slate-200 rounded-xl hover:bg-surface-3 transition-all font-semibold text-lg border border-surface-3" onClick={() => router.push(basePath + "/")}>
               데모 요청하기
             </button>
           </div>
@@ -374,9 +385,9 @@ export default function Home() {
             <div>
               <h4 className="text-sm font-semibold text-slate-200 mb-3">제품</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="text-slate-500 hover:text-slate-300 transition-colors">주요 기능</a></li>
-                <li><a href="#benefits" className="text-slate-500 hover:text-slate-300 transition-colors">효과</a></li>
-                <li><a href="#use-cases" className="text-slate-500 hover:text-slate-300 transition-colors">적용 사례</a></li>
+                <li><a href="#features" onClick={(e) => { e.preventDefault(); scrollTo("features"); }} className="text-slate-500 hover:text-slate-300 transition-colors">주요 기능</a></li>
+                <li><a href="#benefits" onClick={(e) => { e.preventDefault(); scrollTo("benefits"); }} className="text-slate-500 hover:text-slate-300 transition-colors">효과</a></li>
+                <li><a href="#use-cases" onClick={(e) => { e.preventDefault(); scrollTo("use-cases"); }} className="text-slate-500 hover:text-slate-300 transition-colors">적용 사례</a></li>
               </ul>
             </div>
             <div>

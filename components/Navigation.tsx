@@ -93,7 +93,7 @@ export default function Navigation() {
           {/* Right side */}
           <div className="flex items-center gap-3">
             {/* Notification bell */}
-            <button className="relative p-2 text-slate-400 hover:text-slate-200 hover:bg-surface-3/50 rounded-lg transition-all">
+            <button onClick={() => router.push("/dashboard")} className="relative p-2 text-slate-400 hover:text-slate-200 hover:bg-surface-3/50 rounded-lg transition-all">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
