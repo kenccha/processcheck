@@ -104,10 +104,10 @@ export default function DashboardPage() {
 
   const getDateColor = (date: Date) => {
     const diff = Math.ceil((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return "text-danger-600";
-    if (diff <= 1) return "text-danger-500";
-    if (diff <= 3) return "text-warning-500";
-    return "text-gray-600";
+    if (diff < 0) return "text-danger-400";
+    if (diff <= 1) return "text-danger-400";
+    if (diff <= 3) return "text-warning-400";
+    return "text-slate-500";
   };
 
   const formatTimeAgo = (date: Date) => {
@@ -120,156 +120,229 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-surface-0 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+          <span className="text-sm text-slate-500 font-mono tracking-wider uppercase">시스템 로딩</span>
+        </div>
       </div>
     );
   }
 
   if (!currentUser) return null;
 
+  const overdueCount = myTasks.filter((t) => new Date(t.dueDate) < new Date()).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-0 bg-grid">
       <Navigation />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            안녕하세요, {currentUser.name}님! 👋
-          </h1>
-          <p className="text-gray-600">
+        {/* Welcome Header */}
+        <div className="mb-8 animate-fade-in">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-2 h-8 bg-primary-500 rounded-full shadow-glow-sm" />
+            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
+              {currentUser.name}
+            </h1>
+            <span className="text-sm font-mono text-slate-500 bg-surface-2 px-2.5 py-0.5 rounded border border-surface-3">
+              {currentUser.role === "pm" ? "PM" : currentUser.role === "manager" ? "매니저" : currentUser.role === "scheduler" ? "스케줄러" : "작업자"}
+            </span>
+          </div>
+          <p className="text-slate-400 ml-5 pl-0.5">
             {myTasks.length > 0 ? (
               <>
-                <span className="font-medium text-primary-600">{myTasks.length}개</span>의 작업이 대기 중입니다.
-                {myTasks.filter((t) => new Date(t.dueDate) < new Date()).length > 0 && (
-                  <span className="ml-2 text-danger-600 font-medium">
-                    ({myTasks.filter((t) => new Date(t.dueDate) < new Date()).length}개 지연)
+                <span className="font-mono font-semibold text-primary-400">{myTasks.length}개</span>
+                <span className="text-slate-500"> 작업 대기 중</span>
+                {overdueCount > 0 && (
+                  <span className="ml-3 inline-flex items-center gap-1.5 text-danger-400 font-medium">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    {overdueCount}개 지연
                   </span>
                 )}
               </>
             ) : (
-              "오늘 할 일이 없습니다. 좋은 하루 되세요!"
+              <span className="text-slate-500">대기 중인 작업이 없습니다.</span>
             )}
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">오늘 할 일</span>
-              <span className="text-2xl">📋</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* 오늘 할 일 */}
+          <div className="animate-fade-in bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">작업 대기</span>
+              <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500/20 transition-colors">
+                <svg className="w-4.5 h-4.5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+                </svg>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900">{myTasks.length}</div>
+            <div className="stat-value text-slate-100 shadow-glow-sm">{myTasks.length}</div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">승인 대기</span>
-              <span className="text-2xl">⏳</span>
+          {/* 승인 대기 */}
+          <div className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-warning-400/30 transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">승인 대기</span>
+              <div className="w-9 h-9 rounded-lg bg-warning-400/10 flex items-center justify-center group-hover:bg-warning-400/20 transition-colors">
+                <svg className="w-4.5 h-4.5 text-warning-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-warning-500">{pendingApprovals.length}</div>
+            <div className="stat-value text-warning-400">{pendingApprovals.length}</div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">진행 중 프로젝트</span>
-              <span className="text-2xl">🚀</span>
+          {/* 진행 중 프로젝트 */}
+          <div className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">프로젝트</span>
+              <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500/20 transition-colors">
+                <svg className="w-4.5 h-4.5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                </svg>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-primary-600">{myProjects.length}</div>
+            <div className="stat-value text-primary-400">{myProjects.length}</div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm">읽지 않은 알림</span>
-              <span className="text-2xl">🔔</span>
+          {/* 알림 */}
+          <div className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-danger-400/30 transition-all duration-300 group relative">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">미확인 알림</span>
+              <div className="w-9 h-9 rounded-lg bg-danger-400/10 flex items-center justify-center group-hover:bg-danger-400/20 transition-colors relative">
+                <svg className="w-4.5 h-4.5 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-danger-400 rounded-full animate-pulse" />
+                )}
+              </div>
             </div>
-            <div className="text-3xl font-bold text-danger-500">
-              {notifications.filter((n) => !n.read).length}
-            </div>
+            <div className="stat-value text-danger-400">{unreadCount}</div>
           </div>
         </div>
 
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 좌측 */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* 오늘 할 일 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">📋 오늘 할 일</h2>
-                <span className="text-sm text-gray-500">{myTasks.length}개 작업</span>
+            <div className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-surface-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-5 bg-primary-500 rounded-full" />
+                  <h2 className="section-title">작업 대기</h2>
+                </div>
+                <span className="text-xs font-mono text-slate-500 bg-surface-3 px-2.5 py-1 rounded">
+                  {myTasks.length}건
+                </span>
               </div>
 
-              <div className="space-y-3">
+              <div className="divide-y divide-surface-3">
                 {myTasks.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">할 일이 없습니다 ✨</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <svg className="w-10 h-10 text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm">대기 중인 작업이 없습니다</p>
+                  </div>
                 ) : (
-                  myTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 mb-1">{task.title}</h3>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {task.department} · {task.stage.replace(/_/g, " ")}
-                          </p>
+                  myTasks.map((task) => {
+                    const isOverdue = new Date(task.dueDate) < new Date();
+                    const borderColor = isOverdue
+                      ? "border-l-danger-400"
+                      : task.status === "in_progress"
+                        ? "border-l-primary-400"
+                        : "border-l-slate-600";
+
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)}
+                        className={`px-6 py-4 border-l-2 ${borderColor} hover:bg-surface-3/50 transition-all duration-200 cursor-pointer group`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-slate-200 group-hover:text-primary-400 transition-colors truncate">
+                              {task.title}
+                            </h3>
+                            <p className="text-sm text-slate-500 mt-0.5 font-mono">
+                              {task.department} / {task.stage.replace(/_/g, " ")}
+                            </p>
+                          </div>
+                          <span
+                            className={`ml-3 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${
+                              task.status === "pending"
+                                ? "badge-neutral"
+                                : "badge-primary"
+                            }`}
+                          >
+                            {getStatusLabel(task.status)}
+                          </span>
                         </div>
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            task.status === "pending"
-                              ? "bg-gray-100 text-gray-700"
-                              : "bg-primary-100 text-primary-700"
-                          }`}
-                        >
-                          {getStatusLabel(task.status)}
-                        </span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">
+                            <span className="text-slate-600">검토:</span> {task.reviewer}
+                          </span>
+                          <span className={`font-mono font-medium ${getDateColor(task.dueDate)}`}>
+                            {formatDate(task.dueDate)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">검토자: {task.reviewer}</span>
-                        <span className={`font-medium ${getDateColor(task.dueDate)}`}>
-                          {formatDate(task.dueDate)}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
 
             {/* 승인 대기 */}
             {pendingApprovals.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900">⏳ 승인 대기 중</h2>
-                  <span className="text-sm text-warning-600 font-medium">
-                    {pendingApprovals.length}개 작업
+              <div className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-surface-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-5 bg-warning-400 rounded-full" />
+                    <h2 className="section-title">승인 대기</h2>
+                  </div>
+                  <span className="text-xs font-mono text-warning-400 bg-warning-400/10 px-2.5 py-1 rounded border border-warning-400/20">
+                    {pendingApprovals.length}건
                   </span>
                 </div>
-                <div className="space-y-3">
+                <div className="divide-y divide-surface-3">
                   {pendingApprovals.map((task) => (
                     <div
                       key={task.id}
                       onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)}
-                      className="p-4 border-2 border-warning-200 bg-warning-50 rounded-lg hover:border-warning-400 transition-all cursor-pointer"
+                      className="px-6 py-4 border-l-2 border-l-warning-400 hover:bg-surface-3/50 transition-all duration-200 cursor-pointer group"
                     >
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-700">
-                          완료됨
-                        </span>
-                        <span className="text-xs text-gray-500">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="badge-success text-xs font-mono">완료</span>
+                        <span className="text-xs text-slate-600 font-mono">
                           {task.completedDate &&
                             new Date(task.completedDate).toLocaleDateString("ko-KR")}
                         </span>
                       </div>
-                      <h3 className="font-medium text-gray-900 mb-1">{task.title}</h3>
-                      <p className="text-sm text-gray-600">{task.department} · {task.stage.replace(/_/g, " ")}</p>
-                      <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-warning-200">
-                        <span className="text-gray-600">검토자: {task.reviewer}</span>
-                        <span className="text-warning-700 font-medium">승인 대기 중 ⏳</span>
+                      <h3 className="font-medium text-slate-200 group-hover:text-warning-400 transition-colors mb-1">
+                        {task.title}
+                      </h3>
+                      <p className="text-sm text-slate-500 font-mono">
+                        {task.department} / {task.stage.replace(/_/g, " ")}
+                      </p>
+                      <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-surface-3">
+                        <span className="text-slate-500">
+                          <span className="text-slate-600">검토:</span> {task.reviewer}
+                        </span>
+                        <span className="text-warning-400 font-mono font-medium flex items-center gap-1.5">
+                          <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="4" />
+                          </svg>
+                          승인 대기
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -278,46 +351,61 @@ export default function DashboardPage() {
             )}
 
             {/* 내 프로젝트 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">🚀 내 프로젝트</h2>
+            <div className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-surface-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-5 bg-primary-500 rounded-full" />
+                  <h2 className="section-title">프로젝트</h2>
+                </div>
                 <button
                   onClick={() => router.push("/projects")}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  className="btn-ghost text-xs font-mono flex items-center gap-1 hover:text-primary-400 transition-colors"
                 >
-                  전체 보기 →
+                  전체 보기
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
                 </button>
               </div>
-              <div className="space-y-3">
+              <div className="divide-y divide-surface-3">
                 {myProjects.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">참여 중인 프로젝트가 없습니다.</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <svg className="w-10 h-10 text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    <p className="text-sm">참여 중인 프로젝트가 없습니다</p>
+                  </div>
                 ) : (
                   myProjects.slice(0, 3).map((project) => (
                     <div
                       key={project.id}
                       onClick={() => router.push(`/project?id=${project.id}`)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer"
+                      className="px-6 py-4 hover:bg-surface-3/50 transition-all duration-200 cursor-pointer group"
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-medium text-gray-900 mb-1">{project.name}</h3>
-                          <p className="text-sm text-gray-600">
-                            {project.productType} · PM: {project.pm}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-medium text-slate-200 group-hover:text-primary-400 transition-colors truncate">
+                            {project.name}
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-0.5 font-mono">
+                            {project.productType} / PM: {project.pm}
                           </p>
                         </div>
                         <span
-                          className={`w-3 h-3 rounded-full ${getRiskColor(project.riskLevel)}`}
+                          className={`ml-3 flex-shrink-0 w-2.5 h-2.5 rounded-full ring-2 ring-surface-2 ${getRiskColor(project.riskLevel)}`}
                           title={`위험도: ${project.riskLevel}`}
                         />
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-surface-3 rounded-full h-1.5 overflow-hidden">
                           <div
-                            className="bg-primary-600 h-2 rounded-full transition-all"
+                            className="bg-primary-500 h-full rounded-full transition-all duration-500"
                             style={{ width: `${project.progress}%` }}
                           />
                         </div>
-                        <span className="text-sm font-medium text-gray-700">{project.progress}%</span>
+                        <span className="text-xs font-mono font-medium text-slate-400 tabular-nums w-10 text-right">
+                          {project.progress}%
+                        </span>
                       </div>
                     </div>
                   ))
@@ -326,39 +414,60 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 우측: 알림 */}
+          {/* Right Column: Notifications */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">🔔 최근 알림</h2>
-              <div className="space-y-3">
+            <div className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden sticky top-8">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-5 bg-primary-500 rounded-full" />
+                  <h2 className="section-title text-base">알림</h2>
+                </div>
+                {unreadCount > 0 && (
+                  <span className="text-xs font-mono text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-full border border-primary-500/20">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <div className="divide-y divide-surface-3">
                 {notifications.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4 text-sm">알림이 없습니다.</p>
+                  <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+                    <svg className="w-8 h-8 text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                    </svg>
+                    <p className="text-xs">알림이 없습니다</p>
+                  </div>
                 ) : (
                   notifications.map((notif) => (
                     <div
                       key={notif.id}
-                      className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                      className={`px-5 py-3.5 transition-all duration-200 cursor-pointer group ${
                         notif.read
-                          ? "border-gray-200 bg-white"
-                          : "border-primary-200 bg-primary-50"
+                          ? "hover:bg-surface-3/40"
+                          : "bg-primary-500/5 hover:bg-primary-500/10"
                       }`}
                       onClick={() => handleNotifClick(notif)}
                     >
-                      <div className="flex items-start justify-between mb-1">
-                        <h4 className="text-sm font-medium text-gray-900">{notif.title}</h4>
+                      <div className="flex items-start gap-2.5">
                         {!notif.read && (
-                          <span className="w-2 h-2 bg-primary-600 rounded-full flex-shrink-0 mt-1" />
+                          <span className="w-1.5 h-1.5 bg-primary-400 rounded-full flex-shrink-0 mt-1.5 shadow-glow-sm" />
                         )}
+                        <div className={`flex-1 min-w-0 ${notif.read ? "ml-4" : ""}`}>
+                          <h4 className="text-sm font-medium text-slate-300 group-hover:text-slate-100 transition-colors truncate">
+                            {notif.title}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notif.message}</p>
+                          <p className="text-xs text-slate-600 font-mono mt-1.5">{formatTimeAgo(notif.createdAt)}</p>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">{notif.message}</p>
-                      <p className="text-xs text-gray-500">{formatTimeAgo(notif.createdAt)}</p>
                     </div>
                   ))
                 )}
               </div>
-              <button className="w-full mt-4 py-2 text-sm text-primary-600 hover:text-primary-700 font-medium">
-                모든 알림 보기
-              </button>
+              <div className="px-5 py-3 border-t border-surface-3">
+                <button className="w-full py-1.5 text-xs font-mono text-slate-500 hover:text-primary-400 transition-colors tracking-wider uppercase">
+                  모든 알림 보기
+                </button>
+              </div>
             </div>
           </div>
         </div>

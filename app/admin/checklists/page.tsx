@@ -317,37 +317,44 @@ export default function ChecklistAdminPage() {
 
   if (loading || !currentUser) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-surface-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-0">
       <Navigation />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">체크리스트 관리</h1>
-          <p className="text-gray-600">프로젝트 단계별, 부서별 체크리스트를 관리합니다.</p>
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-100 tracking-tight mb-1">
+            체크리스트 관리
+          </h1>
+          <p className="text-slate-400">
+            프로젝트 단계별, 부서별 체크리스트를 관리합니다.
+          </p>
         </div>
 
         {dataLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="grid grid-cols-12 gap-6">
-            {/* 좌측 트리 */}
-            <div className="col-span-4 bg-white rounded-xl border border-gray-200 p-4 h-[calc(100vh-200px)] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">단계 및 부서</h3>
+            {/* Left Panel - Tree View */}
+            <div className="col-span-4 bg-surface-2 border border-surface-3 rounded-2xl p-5 h-[calc(100vh-200px)] overflow-y-auto">
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-surface-3">
+                <h3 className="font-semibold text-slate-200 text-sm uppercase tracking-wider">
+                  단계 및 부서
+                </h3>
                 {canEditStage() && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1">
                     <button
                       onClick={() => setShowDepartmentModal(true)}
-                      className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                      className="btn-ghost p-1.5"
                       title="부서 추가"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -356,7 +363,7 @@ export default function ChecklistAdminPage() {
                     </button>
                     <button
                       onClick={() => setShowStageModal(true)}
-                      className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                      className="btn-ghost p-1.5"
                       title="단계 추가"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -367,24 +374,28 @@ export default function ChecklistAdminPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {stages.map((stage) => (
                   <div key={stage.id}>
                     <div className="flex items-center justify-between group">
                       <button
                         onClick={() => toggleStage(stage.id)}
-                        className="flex-1 flex items-center space-x-2 p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                        className="flex-1 flex items-center space-x-2 p-2.5 hover:bg-surface-3 rounded-lg transition-colors"
                       >
-                        <span className="text-gray-600">{expandedStages.has(stage.id) ? "▼" : "▶"}</span>
-                        <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
+                        <span className="text-slate-500 text-xs w-4 text-center">
+                          {expandedStages.has(stage.id) ? "\u25BC" : "\u25B6"}
+                        </span>
+                        <span className="font-medium text-slate-200 text-sm">{stage.name}</span>
                         {stage.type === "gate" && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">게이트</span>
+                          <span className="badge-primary text-[10px] px-2 py-0.5">
+                            게이트
+                          </span>
                         )}
                       </button>
                       {canEditStage() && (
                         <button
                           onClick={() => handleDeleteStage(stage.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 text-danger-400 hover:bg-danger-500/10 rounded opacity-0 group-hover:opacity-100 transition-all"
                           title="단계 삭제"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,7 +406,7 @@ export default function ChecklistAdminPage() {
                     </div>
 
                     {expandedStages.has(stage.id) && (
-                      <div className="ml-6 mt-1 space-y-1">
+                      <div className="ml-6 mt-1 space-y-0.5">
                         {departments.map((dept) => {
                           const isSelected = selectedStageId === stage.id && selectedDeptId === dept.id;
                           const hasEditPermission = canEdit(dept.id);
@@ -404,17 +415,19 @@ export default function ChecklistAdminPage() {
                               <button
                                 onClick={() => selectDepartment(stage.id, dept.id)}
                                 className={`flex-1 flex items-center justify-between p-2 rounded-lg transition-colors ${
-                                  isSelected ? "bg-primary-50 border border-primary-300" : "hover:bg-gray-50"
+                                  isSelected
+                                    ? "bg-primary-500/10 border border-primary-500/30"
+                                    : "hover:bg-surface-3 border border-transparent"
                                 } ${!hasEditPermission ? "opacity-50" : ""}`}
                               >
-                                <span className={`text-sm ${isSelected ? "text-primary-700 font-medium" : "text-gray-700"}`}>
+                                <span className={`text-sm ${isSelected ? "text-primary-300 font-medium" : "text-slate-400"}`}>
                                   {dept.name}
                                 </span>
                               </button>
                               {canEditStage() && (
                                 <button
                                   onClick={() => handleDeleteDepartment(dept.id)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                                  className="p-1 text-danger-400 hover:bg-danger-500/10 rounded opacity-0 group-hover:opacity-100 transition-all ml-1"
                                   title="부서 삭제"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,35 +445,42 @@ export default function ChecklistAdminPage() {
               </div>
             </div>
 
-            {/* 우측 편집 영역 */}
-            <div className="col-span-8 bg-white rounded-xl border border-gray-200 p-6 h-[calc(100vh-200px)] overflow-y-auto">
+            {/* Right Panel - Editor */}
+            <div className="col-span-8 bg-surface-2 border border-surface-3 rounded-2xl p-6 h-[calc(100vh-200px)] overflow-y-auto">
               {selectedStageId && selectedDeptId ? (
                 <>
-                  <div className="flex items-center justify-between mb-6">
+                  {/* Editor Header */}
+                  <div className="flex items-center justify-between mb-6 pb-4 border-b border-surface-3">
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">
-                        {selectedStage?.name} &gt; {selectedDept?.name}
+                      <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <span>{selectedStage?.name}</span>
+                        <span className="text-slate-500">&gt;</span>
+                        <span className="text-primary-400">{selectedDept?.name}</span>
                       </h2>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-slate-500 mt-1">
                         {items.length}개 항목
                         {!canEdit(selectedDeptId) && (
-                          <span className="ml-2 text-xs text-warning-600 bg-warning-50 px-2 py-0.5 rounded">읽기 전용</span>
+                          <span className="badge-warning ml-2 text-[10px]">읽기 전용</span>
                         )}
                       </p>
                     </div>
                     {canEdit(selectedDeptId) && (
                       <button
                         onClick={() => setShowAddModal(true)}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                        className="btn-primary"
                       >
                         + 항목 추가
                       </button>
                     )}
                   </div>
 
+                  {/* Checklist Items */}
                   <div className="space-y-3">
                     {items.length === 0 ? (
-                      <div className="text-center py-12 text-gray-500">
+                      <div className="text-center py-16 text-slate-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
                         체크 항목이 없습니다. 항목을 추가해주세요.
                       </div>
                     ) : (
@@ -475,23 +495,24 @@ export default function ChecklistAdminPage() {
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, index)}
                             onDragEnd={handleDragEnd}
-                            className={`flex items-start space-x-3 p-4 border rounded-lg transition-all ${
+                            className={`flex items-start space-x-3 p-4 rounded-xl transition-all ${
                               draggedItemId === item.id
-                                ? "opacity-50 border-primary-400"
+                                ? "opacity-50 border border-primary-500/50 bg-surface-1"
                                 : dragOverIndex === index
-                                ? "border-primary-400 bg-primary-50"
-                                : "border-gray-200 hover:border-gray-300"
+                                ? "border border-primary-500/50 bg-primary-500/5"
+                                : "bg-surface-1 border border-surface-3 hover:border-surface-4"
                             } ${editingItemId !== item.id && hasEditPermission ? "cursor-move" : ""} ${
                               !hasEditPermission ? "opacity-60" : ""
                             }`}
                           >
-                            <div className="flex items-center space-x-1 min-w-[48px]">
+                            {/* Drag handle + number */}
+                            <div className="flex items-center space-x-1.5 min-w-[48px] pt-0.5">
                               {editingItemId !== item.id && hasEditPermission && (
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16" />
                                 </svg>
                               )}
-                              <span className="text-gray-500 font-medium">{index + 1}.</span>
+                              <span className="text-slate-500 font-mono text-sm">{index + 1}.</span>
                             </div>
 
                             {editingItemId === item.id ? (
@@ -499,20 +520,20 @@ export default function ChecklistAdminPage() {
                                 <textarea
                                   value={editingContent}
                                   onChange={(e) => setEditingContent(e.target.value)}
-                                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  className="input-field w-full"
                                   rows={2}
                                 />
-                                <div className="flex items-center space-x-2 mt-2">
+                                <div className="flex items-center space-x-2 mt-3">
                                   <button
                                     onClick={saveEditItem}
                                     disabled={actionLoading}
-                                    className="px-3 py-1 bg-primary-600 text-white text-sm rounded hover:bg-primary-700 disabled:opacity-60"
+                                    className="btn-primary text-sm px-3 py-1.5"
                                   >
                                     저장
                                   </button>
                                   <button
                                     onClick={cancelEditItem}
-                                    className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+                                    className="btn-secondary text-sm px-3 py-1.5"
                                   >
                                     취소
                                   </button>
@@ -520,57 +541,57 @@ export default function ChecklistAdminPage() {
                               </div>
                             ) : (
                               <>
-                                <div className="flex-1">
-                                  <p className="text-gray-900">{item.content}</p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-slate-200 leading-relaxed">{item.content}</p>
                                   <div className="flex items-center space-x-2 mt-2">
                                     <button
                                       onClick={() => toggleItemRequired(item)}
                                       disabled={!hasEditPermission}
-                                      className={`text-xs px-2 py-0.5 rounded transition-opacity ${
+                                      className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-opacity ${
                                         hasEditPermission ? "cursor-pointer hover:opacity-80" : "cursor-not-allowed"
-                                      } ${item.isRequired ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}
+                                      } ${item.isRequired ? "badge-danger" : "badge-neutral"}`}
                                     >
                                       {item.isRequired ? "필수" : "선택"}
                                     </button>
                                   </div>
                                 </div>
                                 {hasEditPermission && (
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex items-center space-x-0.5 shrink-0">
                                     <button
                                       onClick={() => moveItem(index, "up")}
                                       disabled={index === 0 || actionLoading}
-                                      className="p-1 text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+                                      className="p-1.5 text-slate-500 hover:text-slate-300 disabled:text-slate-700 disabled:cursor-not-allowed rounded hover:bg-surface-3 transition-colors"
                                       title="위로"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
                                       </svg>
                                     </button>
                                     <button
                                       onClick={() => moveItem(index, "down")}
                                       disabled={index === items.length - 1 || actionLoading}
-                                      className="p-1 text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+                                      className="p-1.5 text-slate-500 hover:text-slate-300 disabled:text-slate-700 disabled:cursor-not-allowed rounded hover:bg-surface-3 transition-colors"
                                       title="아래로"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                                       </svg>
                                     </button>
                                     <button
                                       onClick={() => startEditItem(item.id, item.content)}
-                                      className="p-1 text-gray-600 hover:text-gray-900"
+                                      className="p-1.5 text-slate-500 hover:text-slate-300 rounded hover:bg-surface-3 transition-colors"
                                       title="수정"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
                                     </button>
                                     <button
                                       onClick={() => handleDeleteItem(item.id)}
-                                      className="p-1 text-red-600 hover:text-red-800"
+                                      className="p-1.5 text-danger-400 hover:bg-danger-500/10 rounded transition-colors"
                                       title="삭제"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                       </svg>
                                     </button>
@@ -584,16 +605,20 @@ export default function ChecklistAdminPage() {
                     )}
                   </div>
 
+                  {/* Footer */}
                   {canEdit(selectedDeptId) && items.length > 0 && (
-                    <div className="flex items-center justify-end space-x-3 mt-8 pt-6 border-t border-gray-200">
-                      <p className="text-sm text-gray-500 flex-1">
+                    <div className="flex items-center justify-end space-x-3 mt-8 pt-5 border-t border-surface-3">
+                      <p className="text-sm text-slate-500 flex-1">
                         변경사항은 자동으로 저장됩니다.
                       </p>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                  <svg className="w-16 h-16 mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
                   좌측에서 단계와 부서를 선택해주세요.
                 </div>
               )}
@@ -602,49 +627,59 @@ export default function ChecklistAdminPage() {
         )}
       </main>
 
-      {/* 항목 추가 모달 */}
+      {/* Add Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">새 체크리스트 항목 추가</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-surface-2 border border-surface-3 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-100 mb-5">새 체크리스트 항목 추가</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  항목 내용 <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  항목 내용 <span className="text-danger-400">*</span>
                 </label>
                 <textarea
                   value={newItemContent}
                   onChange={(e) => setNewItemContent(e.target.value)}
                   placeholder="예: NABC 문서가 작성되었는가?"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field w-full"
                   rows={3}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">유형</label>
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" checked={newItemIsRequired} onChange={() => setNewItemIsRequired(true)} className="mr-2" />
-                    <span className="text-sm text-gray-700">필수</span>
+                <label className="block text-sm font-medium text-slate-300 mb-2">유형</label>
+                <div className="flex items-center space-x-6">
+                  <label className="flex items-center cursor-pointer group">
+                    <input
+                      type="radio"
+                      checked={newItemIsRequired}
+                      onChange={() => setNewItemIsRequired(true)}
+                      className="mr-2 accent-primary-500"
+                    />
+                    <span className="text-sm text-slate-300 group-hover:text-slate-200">필수</span>
                   </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" checked={!newItemIsRequired} onChange={() => setNewItemIsRequired(false)} className="mr-2" />
-                    <span className="text-sm text-gray-700">선택</span>
+                  <label className="flex items-center cursor-pointer group">
+                    <input
+                      type="radio"
+                      checked={!newItemIsRequired}
+                      onChange={() => setNewItemIsRequired(false)}
+                      className="mr-2 accent-primary-500"
+                    />
+                    <span className="text-sm text-slate-300 group-hover:text-slate-200">선택</span>
                   </label>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end space-x-3 mt-6">
+            <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-surface-3">
               <button
                 onClick={() => { setShowAddModal(false); setNewItemContent(""); setNewItemIsRequired(true); }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="btn-ghost"
               >
                 취소
               </button>
               <button
                 onClick={saveNewItem}
                 disabled={actionLoading || !newItemContent.trim()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
+                className="btn-primary disabled:opacity-50"
               >
                 추가
               </button>
@@ -653,49 +688,59 @@ export default function ChecklistAdminPage() {
         </div>
       )}
 
-      {/* 단계 추가 모달 */}
+      {/* Add Stage Modal */}
       {showStageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">새 단계 추가</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-surface-2 border border-surface-3 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-100 mb-5">새 단계 추가</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  단계 이름 <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  단계 이름 <span className="text-danger-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={newStageName}
                   onChange={(e) => setNewStageName(e.target.value)}
                   placeholder="예: 12. 사후 관리"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field w-full"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">단계 유형</label>
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" checked={newStageType === "work"} onChange={() => setNewStageType("work")} className="mr-2" />
-                    <span className="text-sm text-gray-700">작업 단계</span>
+                <label className="block text-sm font-medium text-slate-300 mb-2">단계 유형</label>
+                <div className="flex items-center space-x-6">
+                  <label className="flex items-center cursor-pointer group">
+                    <input
+                      type="radio"
+                      checked={newStageType === "work"}
+                      onChange={() => setNewStageType("work")}
+                      className="mr-2 accent-primary-500"
+                    />
+                    <span className="text-sm text-slate-300 group-hover:text-slate-200">작업 단계</span>
                   </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" checked={newStageType === "gate"} onChange={() => setNewStageType("gate")} className="mr-2" />
-                    <span className="text-sm text-gray-700">게이트 미팅</span>
+                  <label className="flex items-center cursor-pointer group">
+                    <input
+                      type="radio"
+                      checked={newStageType === "gate"}
+                      onChange={() => setNewStageType("gate")}
+                      className="mr-2 accent-primary-500"
+                    />
+                    <span className="text-sm text-slate-300 group-hover:text-slate-200">게이트 미팅</span>
                   </label>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end space-x-3 mt-6">
+            <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-surface-3">
               <button
                 onClick={() => { setShowStageModal(false); setNewStageName(""); setNewStageType("work"); }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="btn-ghost"
               >
                 취소
               </button>
               <button
                 onClick={handleAddNewStage}
                 disabled={actionLoading || !newStageName.trim()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
+                className="btn-primary disabled:opacity-50"
               >
                 추가
               </button>
@@ -704,36 +749,36 @@ export default function ChecklistAdminPage() {
         </div>
       )}
 
-      {/* 부서 추가 모달 */}
+      {/* Add Department Modal */}
       {showDepartmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">새 부서 추가</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-surface-2 border border-surface-3 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-100 mb-5">새 부서 추가</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  부서 이름 <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  부서 이름 <span className="text-danger-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={newDepartmentName}
                   onChange={(e) => setNewDepartmentName(e.target.value)}
                   placeholder="예: 마케팅팀"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field w-full"
                 />
               </div>
             </div>
-            <div className="flex items-center justify-end space-x-3 mt-6">
+            <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-surface-3">
               <button
                 onClick={() => { setShowDepartmentModal(false); setNewDepartmentName(""); }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="btn-ghost"
               >
                 취소
               </button>
               <button
                 onClick={handleAddNewDepartment}
                 disabled={actionLoading || !newDepartmentName.trim()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
+                className="btn-primary disabled:opacity-50"
               >
                 추가
               </button>

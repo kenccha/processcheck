@@ -172,18 +172,18 @@ function TaskDetailContent() {
 
   if (loading || !currentUser) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-surface-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!task || !project) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-0 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">⏳</div>
-          <p className="text-gray-600">작업을 불러오는 중...</p>
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">작업을 불러오는 중...</p>
         </div>
       </div>
     );
@@ -199,67 +199,82 @@ function TaskDetailContent() {
 
   const getStatusColor = (status: ChecklistItem["status"]) => {
     switch (status) {
-      case "pending": return "bg-gray-100 text-gray-700 border-gray-300";
-      case "in_progress": return "bg-primary-100 text-primary-700 border-primary-300";
-      case "completed": return "bg-success-100 text-success-700 border-success-300";
-      case "rejected": return "bg-danger-100 text-danger-700 border-danger-300";
+      case "pending": return "bg-slate-500/15 text-slate-400 border-slate-500/20";
+      case "in_progress": return "bg-primary-500/15 text-primary-300 border-primary-500/20";
+      case "completed": return "bg-success-500/15 text-success-400 border-success-500/20";
+      case "rejected": return "bg-danger-500/15 text-danger-400 border-danger-500/20";
     }
   };
 
   const taskDueDate = new Date(task.dueDate);
+  const progress = getChecklistProgress();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-0">
       <Navigation />
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
-        <div className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
-          <button onClick={() => router.push("/projects")} className="hover:text-gray-900">프로젝트</button>
-          <span>/</span>
-          <button onClick={() => router.push(`/project?id=${projectId}`)} className="hover:text-gray-900 truncate max-w-xs">
+        <nav className="flex items-center space-x-2 text-sm text-slate-500 mb-8">
+          <button
+            onClick={() => router.push("/projects")}
+            className="hover:text-slate-300 transition-colors"
+          >
+            프로젝트
+          </button>
+          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5l7 7-7 7" />
+          </svg>
+          <button
+            onClick={() => router.push(`/project?id=${projectId}`)}
+            className="hover:text-slate-300 transition-colors truncate max-w-xs"
+          >
             {project.name}
           </button>
-          <span>/</span>
-          <span className="text-gray-900 font-medium">작업 상세</span>
-        </div>
+          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5l7 7-7 7" />
+          </svg>
+          <span className="text-slate-200 font-medium">작업 상세</span>
+        </nav>
 
-        {/* Task Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-3">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(task.status)}`}>
-                  {getStatusLabel(task.status)}
+        {/* Task Header Card */}
+        <div className="bg-surface-2 border border-surface-3 rounded-2xl p-8 mb-8">
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold tracking-wide border ${getStatusColor(task.status)}`}>
+                {getStatusLabel(task.status)}
+              </span>
+              {task.approvalStatus === "approved" && (
+                <span className="badge-success">
+                  승인 완료
                 </span>
-                {task.approvalStatus === "approved" && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-success-100 text-success-700 border border-success-300">
-                    ✓ 승인 완료
-                  </span>
-                )}
-                <span className="text-sm text-gray-600">{task.stage.replace(/_/g, " ")}</span>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{task.title}</h1>
-              <p className="text-lg text-gray-700 leading-relaxed">{task.description}</p>
+              )}
+              <span className="text-xs text-slate-500 font-mono uppercase tracking-widest">
+                {task.stage.replace(/_/g, " ")}
+              </span>
             </div>
+            <h1 className="text-3xl font-bold text-slate-100 tracking-tight">{task.title}</h1>
+            <p className="text-base text-slate-400 leading-relaxed max-w-3xl">{task.description}</p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+          <div className="divider my-6" />
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <div className="text-sm text-gray-600 mb-1">부서</div>
-              <div className="font-medium text-gray-900">{task.department}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1.5 font-medium">부서</div>
+              <div className="text-sm font-semibold text-slate-200">{task.department}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">담당자</div>
-              <div className="font-medium text-gray-900">{task.assignee}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1.5 font-medium">담당자</div>
+              <div className="text-sm font-semibold text-slate-200">{task.assignee}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">검토자</div>
-              <div className="font-medium text-gray-900">{task.reviewer}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1.5 font-medium">검토자</div>
+              <div className="text-sm font-semibold text-slate-200">{task.reviewer}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">마감일</div>
-              <div className={`font-medium ${taskDueDate < new Date() ? "text-danger-600" : "text-gray-900"}`}>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1.5 font-medium">마감일</div>
+              <div className={`text-sm font-semibold font-mono ${taskDueDate < new Date() ? "text-danger-400" : "text-slate-200"}`}>
                 {taskDueDate.toLocaleDateString("ko-KR")}
               </div>
             </div>
@@ -267,39 +282,41 @@ function TaskDetailContent() {
 
           {/* Rejection reason if rejected */}
           {task.status === "rejected" && task.rejectionReason && (
-            <div className="mt-4 p-4 bg-danger-50 border border-danger-200 rounded-lg">
-              <p className="text-sm font-medium text-danger-800 mb-1">반려 사유</p>
-              <p className="text-sm text-danger-700">{task.rejectionReason}</p>
+            <div className="mt-6 p-5 bg-danger-500/10 border border-danger-500/20 rounded-xl">
+              <p className="text-sm font-semibold text-danger-400 mb-1.5">반려 사유</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{task.rejectionReason}</p>
               {task.rejectedBy && (
-                <p className="text-xs text-danger-500 mt-1">
-                  반려자: {task.rejectedBy} • {task.rejectedAt && new Date(task.rejectedAt).toLocaleDateString("ko-KR")}
+                <p className="text-xs text-slate-500 mt-2">
+                  반려자: {task.rejectedBy} · {task.rejectedAt && new Date(task.rejectedAt).toLocaleDateString("ko-KR")}
                 </p>
               )}
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
             {/* Checklist Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">✅ 체크리스트</h2>
-                <div className="text-sm">
-                  <span className="font-semibold text-primary-600">{getChecklistProgress().completed}</span>
-                  <span className="text-gray-500">/{getChecklistProgress().total}</span>
-                  <span className="text-gray-400 ml-2">
-                    (필수: {getChecklistProgress().requiredCompleted}/{getChecklistProgress().requiredTotal})
+            <div className="bg-surface-2 border border-surface-3 rounded-2xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="section-title">체크리스트</h2>
+                <div className="text-sm font-mono">
+                  <span className="text-primary-400 font-bold">{progress.completed}</span>
+                  <span className="text-slate-500">/{progress.total}</span>
+                  <span className="text-slate-600 ml-3 text-xs">
+                    필수 <span className="text-primary-400 font-bold">{progress.requiredCompleted}</span>
+                    <span className="text-slate-500">/{progress.requiredTotal}</span>
                   </span>
                 </div>
               </div>
 
-              <div className="w-full h-2 bg-gray-200 rounded-full mb-6">
+              {/* Progress bar */}
+              <div className="w-full h-1.5 bg-surface-3 rounded-full mb-6 overflow-hidden">
                 <div
-                  className="h-full bg-primary-600 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-primary-600 to-primary-400 rounded-full transition-all duration-500 ease-out"
                   style={{
-                    width: `${(getChecklistProgress().completed / getChecklistProgress().total) * 100}%`,
+                    width: `${(progress.completed / progress.total) * 100}%`,
                   }}
                 />
               </div>
@@ -308,64 +325,66 @@ function TaskDetailContent() {
                 {checklist.map((item) => (
                   <label
                     key={item.id}
-                    className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-all ${
-                      item.checked ? "bg-primary-50 border-primary-300" : "bg-white border-gray-200 hover:border-gray-300"
-                    } ${!canComplete ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-200 ${
+                      item.checked
+                        ? "bg-primary-500/10 border-primary-500/30"
+                        : "bg-surface-1 border-surface-3 hover:border-surface-4"
+                    } ${!canComplete ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={() => handleChecklistToggle(item.id)}
-                      disabled={!canComplete}
-                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-sm ${item.checked ? "text-gray-900 font-medium" : "text-gray-700"}`}>
-                          {item.content}
-                        </span>
-                        {item.required && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-danger-100 text-danger-700">
-                            필수
-                          </span>
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() => handleChecklistToggle(item.id)}
+                        disabled={!canComplete}
+                        className="sr-only peer"
+                      />
+                      <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${
+                        item.checked
+                          ? "bg-primary-500 border-primary-500"
+                          : "border-surface-4 bg-surface-1"
+                      }`}>
+                        {item.checked && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
                         )}
                       </div>
                     </div>
-                    {item.checked && (
-                      <svg className="w-5 h-5 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className={`text-sm ${item.checked ? "text-slate-200 font-medium" : "text-slate-400"}`}>
+                        {item.content}
+                      </span>
+                      {item.required && (
+                        <span className="badge-danger text-[10px] py-0.5 px-1.5">필수</span>
+                      )}
+                    </div>
                   </label>
                 ))}
               </div>
 
               {canComplete && !isChecklistComplete() && (
-                <div className="mt-4 p-3 bg-warning-50 border border-warning-200 rounded-lg">
-                  <p className="text-sm text-warning-800">⚠️ 필수 체크리스트 항목을 모두 완료해야 작업을 완료할 수 있습니다.</p>
+                <div className="mt-5 p-4 bg-warning-500/10 border border-warning-500/20 rounded-xl">
+                  <p className="text-sm text-warning-400">필수 체크리스트 항목을 모두 완료해야 작업을 완료할 수 있습니다.</p>
                 </div>
               )}
               {canComplete && isChecklistComplete() && (
-                <div className="mt-4 p-3 bg-success-50 border border-success-200 rounded-lg">
-                  <p className="text-sm text-success-800">✅ 모든 필수 항목이 완료되었습니다. 작업을 완료할 수 있습니다.</p>
+                <div className="mt-5 p-4 bg-success-500/10 border border-success-500/20 rounded-xl">
+                  <p className="text-sm text-success-400">모든 필수 항목이 완료되었습니다. 작업을 완료할 수 있습니다.</p>
                 </div>
               )}
             </div>
 
             {/* Files Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">📎 첨부 파일</h2>
+            <div className="bg-surface-2 border border-surface-3 rounded-2xl p-8">
+              <h2 className="section-title mb-6">첨부 파일</h2>
               {canComplete && (
-                <div className="mb-4">
-                  <label className="block w-full p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary-500 hover:bg-gray-50 transition-all">
-                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                <div className="mb-6">
+                  <label className="group block w-full p-8 border-2 border-dashed border-surface-4 rounded-xl text-center cursor-pointer hover:border-primary-500/40 hover:bg-surface-1/50 transition-all duration-200">
+                    <svg className="w-10 h-10 mx-auto mb-3 text-slate-500 group-hover:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <p className="text-sm text-gray-600">클릭하여 파일 업로드 또는 드래그 앤 드롭</p>
+                    <p className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors">클릭하여 파일 업로드 또는 드래그 앤 드롭</p>
                     <input type="file" className="hidden" multiple />
                   </label>
                 </div>
@@ -375,50 +394,50 @@ function TaskDetailContent() {
               {task.files && task.files.length > 0 ? (
                 <div className="space-y-2">
                   {task.files.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                          <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <div key={file.id} className="flex items-center justify-between p-4 bg-surface-1 border border-surface-3 rounded-xl group hover:border-surface-4 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary-500/15 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {(file.size / 1024 / 1024).toFixed(1)} MB • {file.uploadedBy}
+                          <div className="text-sm font-medium text-slate-200">{file.name}</div>
+                          <div className="text-xs text-slate-500 font-mono">
+                            {(file.size / 1024 / 1024).toFixed(1)} MB · {file.uploadedBy}
                           </div>
                         </div>
                       </div>
-                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-600 hover:text-primary-600">
+                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-500 hover:text-primary-400 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                       </a>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">첨부된 파일이 없습니다.</p>
+                <p className="text-sm text-slate-500 text-center py-8">첨부된 파일이 없습니다.</p>
               )}
             </div>
 
             {/* Comments Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">💬 코멘트</h2>
+            <div className="bg-surface-2 border border-surface-3 rounded-2xl p-8">
+              <h2 className="section-title mb-6">코멘트</h2>
 
-              <div className="mb-6">
+              <div className="mb-8">
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="코멘트를 입력하세요..."
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+                  className="input-field resize-none"
                 />
-                <div className="flex justify-end mt-2">
+                <div className="flex justify-end mt-3">
                   <button
                     onClick={handleAddComment}
                     disabled={actionLoading || !comment.trim()}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                   >
                     코멘트 추가
                   </button>
@@ -431,25 +450,25 @@ function TaskDetailContent() {
                   [...task.comments]
                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                     .map((c) => (
-                      <div key={c.id} className="flex space-x-3">
-                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-medium text-primary-700">
+                      <div key={c.id} className="flex gap-3">
+                        <div className="w-9 h-9 bg-primary-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-primary-300">
                             {c.userName.charAt(0)}
                           </span>
                         </div>
                         <div className="flex-1">
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900">{c.userName}</span>
-                              <span className="text-xs text-gray-500">{formatTimeAgo(c.createdAt)}</span>
+                          <div className="bg-surface-1 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-slate-200">{c.userName}</span>
+                              <span className="text-xs text-slate-500 font-mono">{formatTimeAgo(c.createdAt)}</span>
                             </div>
-                            <p className="text-sm text-gray-700">{c.content}</p>
+                            <p className="text-sm text-slate-400 leading-relaxed">{c.content}</p>
                           </div>
                         </div>
                       </div>
                     ))
                 ) : (
-                  <p className="text-sm text-gray-500 text-center py-4">코멘트가 없습니다.</p>
+                  <p className="text-sm text-slate-500 text-center py-8">코멘트가 없습니다.</p>
                 )}
               </div>
             </div>
@@ -457,17 +476,16 @@ function TaskDetailContent() {
 
           {/* Right Column - Actions */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">작업 관리</h2>
+            <div className="bg-surface-2 border border-surface-3 rounded-2xl p-6 sticky top-8">
+              <h2 className="section-title mb-5">작업 관리</h2>
 
               {/* Feedback message */}
               {feedback && (
-                <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
+                <div className={`mb-5 p-4 rounded-xl text-sm font-medium ${
                   feedback.type === "success"
-                    ? "bg-success-50 border border-success-200 text-success-800"
-                    : "bg-danger-50 border border-danger-200 text-danger-800"
+                    ? "bg-success-500/10 border border-success-500/20 text-success-400"
+                    : "bg-danger-500/10 border border-danger-500/20 text-danger-400"
                 }`}>
-                  {feedback.type === "success" ? "✅ " : "❌ "}
                   {feedback.text}
                 </div>
               )}
@@ -478,19 +496,19 @@ function TaskDetailContent() {
                   <button
                     onClick={handleComplete}
                     disabled={!isChecklistComplete() || actionLoading}
-                    className={`w-full py-3 rounded-lg transition-colors font-medium flex items-center justify-center space-x-2 ${
+                    className={`w-full py-3 rounded-xl transition-all duration-200 font-medium flex items-center justify-center gap-2 ${
                       isChecklistComplete() && !actionLoading
-                        ? "bg-success-600 text-white hover:bg-success-700 cursor-pointer"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        ? "bg-success-600 text-white hover:bg-success-500 shadow-glow-sm cursor-pointer"
+                        : "bg-surface-3 text-slate-500 cursor-not-allowed"
                     }`}
                   >
                     {actionLoading ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <span>✅ 작업 완료</span>
+                      <span>작업 완료</span>
                     )}
                   </button>
-                  <p className="text-xs text-gray-500 text-center">
+                  <p className="text-xs text-slate-500 text-center">
                     {isChecklistComplete()
                       ? "완료 후 부서 관리자의 승인이 필요합니다"
                       : "체크리스트를 완료해주세요"}
@@ -500,37 +518,39 @@ function TaskDetailContent() {
 
               {/* Manager Actions */}
               {canApprove && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <button
                     onClick={handleApprove}
                     disabled={actionLoading}
-                    className="w-full py-3 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors font-medium flex items-center justify-center disabled:opacity-60"
+                    className="w-full py-3 bg-success-600 text-white rounded-xl hover:bg-success-500 transition-all duration-200 font-medium flex items-center justify-center disabled:opacity-50"
                   >
                     {actionLoading ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      "✅ 승인"
+                      "승인"
                     )}
                   </button>
 
-                  <div className="pt-3 border-t border-gray-200">
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">반려 사유</label>
+                  <div className="divider my-4" />
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-300 mb-2 block">반려 사유</label>
                     <textarea
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
                       placeholder="반려 사유를 입력하세요..."
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-danger-500 focus:border-danger-500 outline-none resize-none mb-2"
+                      className="input-field resize-none text-sm mb-3"
                     />
                     <button
                       onClick={handleReject}
                       disabled={actionLoading || !rejectionReason.trim()}
-                      className="w-full py-3 bg-danger-600 text-white rounded-lg hover:bg-danger-700 transition-colors font-medium flex items-center justify-center disabled:opacity-60"
+                      className="btn-danger w-full py-3 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {actionLoading ? (
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        "❌ 반려"
+                        "반려"
                       )}
                     </button>
                   </div>
@@ -539,93 +559,111 @@ function TaskDetailContent() {
 
               {/* Approved state */}
               {task.status === "completed" && task.approvalStatus === "approved" && (
-                <div className="text-center py-6">
-                  <div className="text-4xl mb-2">🎉</div>
-                  <p className="text-sm font-medium text-success-700">승인 완료</p>
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 mx-auto mb-3 bg-success-500/15 rounded-full flex items-center justify-center">
+                    <svg className="w-7 h-7 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-success-400">승인 완료</p>
                   {task.approvedBy && (
-                    <p className="text-xs text-gray-500 mt-1">승인자: {task.approvedBy}</p>
+                    <p className="text-xs text-slate-500 mt-1">승인자: {task.approvedBy}</p>
                   )}
                 </div>
               )}
 
               {/* View Only / other statuses */}
               {!canComplete && !canApprove && task.approvalStatus !== "approved" && (
-                <div className="text-center py-6 text-gray-500">
+                <div className="text-center py-8 text-slate-500">
                   {task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending") && (
                     <div>
-                      <div className="text-4xl mb-2">⏳</div>
-                      <p className="text-sm">승인 대기 중</p>
+                      <div className="w-14 h-14 mx-auto mb-3 bg-primary-500/10 rounded-full flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                      <p className="text-sm text-slate-400">승인 대기 중</p>
                     </div>
                   )}
                   {task.status === "rejected" && (
                     <div>
-                      <div className="text-4xl mb-2">❌</div>
-                      <p className="text-sm">반려됨</p>
-                      <p className="text-xs mt-2">재작업이 필요합니다</p>
+                      <div className="w-14 h-14 mx-auto mb-3 bg-danger-500/10 rounded-full flex items-center justify-center">
+                        <svg className="w-7 h-7 text-danger-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-slate-400">반려됨</p>
+                      <p className="text-xs text-slate-500 mt-1">재작업이 필요합니다</p>
                     </div>
                   )}
                   {task.status === "pending" && !isWorker && !isManager && (
                     <div>
-                      <div className="text-4xl mb-2">👀</div>
-                      <p className="text-sm">조회 전용</p>
+                      <div className="w-14 h-14 mx-auto mb-3 bg-surface-3 rounded-full flex items-center justify-center">
+                        <svg className="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-slate-400">조회 전용</p>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Task History */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">작업 히스토리</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-1.5" />
+              <div className="mt-6 pt-6 divider">
+                <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider mb-4">작업 히스토리</h3>
+                <div className="relative space-y-4">
+                  {/* Timeline line */}
+                  <div className="absolute left-[5px] top-2 bottom-2 w-px bg-surface-3" />
+
+                  <div className="relative flex items-start gap-3">
+                    <div className="w-[11px] h-[11px] bg-surface-4 rounded-full mt-0.5 z-10 ring-2 ring-surface-2" />
                     <div className="flex-1">
-                      <p className="text-xs text-gray-900 font-medium">작업 배정됨</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-slate-300 font-medium">작업 배정됨</p>
+                      <p className="text-xs text-slate-500 font-mono">
                         {new Date(new Date(task.dueDate).getTime() - 14 * 24 * 60 * 60 * 1000).toLocaleDateString("ko-KR")}
                       </p>
                     </div>
                   </div>
                   {task.status !== "pending" && (
-                    <div className="flex items-start space-x-2">
-                      <div className="w-2 h-2 bg-primary-600 rounded-full mt-1.5" />
+                    <div className="relative flex items-start gap-3">
+                      <div className="w-[11px] h-[11px] bg-primary-500 rounded-full mt-0.5 z-10 ring-2 ring-surface-2" />
                       <div className="flex-1">
-                        <p className="text-xs text-gray-900 font-medium">작업 시작됨</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-300 font-medium">작업 시작됨</p>
+                        <p className="text-xs text-slate-500 font-mono">
                           {new Date(new Date(task.dueDate).getTime() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString("ko-KR")}
                         </p>
                       </div>
                     </div>
                   )}
                   {task.completedDate && (
-                    <div className="flex items-start space-x-2">
-                      <div className="w-2 h-2 bg-success-600 rounded-full mt-1.5" />
+                    <div className="relative flex items-start gap-3">
+                      <div className="w-[11px] h-[11px] bg-success-500 rounded-full mt-0.5 z-10 ring-2 ring-surface-2" />
                       <div className="flex-1">
-                        <p className="text-xs text-gray-900 font-medium">작업 완료됨</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-300 font-medium">작업 완료됨</p>
+                        <p className="text-xs text-slate-500 font-mono">
                           {new Date(task.completedDate).toLocaleDateString("ko-KR")}
                         </p>
                       </div>
                     </div>
                   )}
                   {task.approvalStatus === "approved" && task.approvedAt && (
-                    <div className="flex items-start space-x-2">
-                      <div className="w-2 h-2 bg-success-600 rounded-full mt-1.5" />
+                    <div className="relative flex items-start gap-3">
+                      <div className="w-[11px] h-[11px] bg-success-500 rounded-full mt-0.5 z-10 ring-2 ring-surface-2" />
                       <div className="flex-1">
-                        <p className="text-xs text-gray-900 font-medium">승인 완료</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(task.approvedAt).toLocaleDateString("ko-KR")} • {task.approvedBy}
+                        <p className="text-xs text-slate-300 font-medium">승인 완료</p>
+                        <p className="text-xs text-slate-500 font-mono">
+                          {new Date(task.approvedAt).toLocaleDateString("ko-KR")} · {task.approvedBy}
                         </p>
                       </div>
                     </div>
                   )}
                   {task.status === "rejected" && task.rejectedAt && (
-                    <div className="flex items-start space-x-2">
-                      <div className="w-2 h-2 bg-danger-600 rounded-full mt-1.5" />
+                    <div className="relative flex items-start gap-3">
+                      <div className="w-[11px] h-[11px] bg-danger-500 rounded-full mt-0.5 z-10 ring-2 ring-surface-2" />
                       <div className="flex-1">
-                        <p className="text-xs text-gray-900 font-medium">반려됨</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(task.rejectedAt).toLocaleDateString("ko-KR")} • {task.rejectedBy}
+                        <p className="text-xs text-slate-300 font-medium">반려됨</p>
+                        <p className="text-xs text-slate-500 font-mono">
+                          {new Date(task.rejectedAt).toLocaleDateString("ko-KR")} · {task.rejectedBy}
                         </p>
                       </div>
                     </div>
@@ -642,7 +680,7 @@ function TaskDetailContent() {
 
 export default function TaskDetailPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-surface-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>}>
       <TaskDetailContent />
     </Suspense>
   );

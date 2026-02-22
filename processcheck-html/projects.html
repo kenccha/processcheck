@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>프로젝트 - ProcessCheck</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="page-wrapper bg-grid" style="background-color: var(--surface-0)">
+    <div id="nav-root"></div>
+    <main id="app" class="page-content">
+      <div class="spinner-overlay"><div class="spinner"></div><div class="spinner-text">로딩 중...</div></div>
+    </main>
+  </div>
+  <script type="module" src="js/pages/projects.js"></script>
+</body>
+</html>
