@@ -1,0 +1,864 @@
+// =============================================================================
+// Projects Page -- 7 view modes (cards, table, gantt, kanban, timeline, calendar, matrix)
+// =============================================================================
+
+import { guardPage } from "../auth.js";
+import { renderNav, renderSpinner } from "../components.js";
+import { subscribeProjects, subscribeAllChecklistItems } from "../firestore-service.js";
+import {
+  departments,
+  projectStages,
+  getStatusLabel,
+  getStatusBadgeClass,
+  formatStageName,
+  formatDate,
+  escapeHtml,
+  getRiskClass,
+  daysUntil,
+} from "../utils.js";
+
+// -- Guard --
+const user = guardPage();
+if (!user) throw new Error("Unauthorized");
+
+// -- DOM --
+const app = document.getElementById("app");
+const navRoot = document.getElementById("nav-root");
+
+// -- Render nav --
+const unsubNav = renderNav(navRoot);
+
+// -- State --
+let projects = [];
+let allTasks = [];
+let viewMode = "cards"; // cards | table | gantt | kanban | timeline | calendar | matrix
+let searchQuery = "";
+let statusFilter = "all"; // all | active | completed | on_hold
+let calendarYear = new Date().getFullYear();
+let calendarMonth = new Date().getMonth(); // 0-based
+
+// -- Subscriptions --
+const unsubProjects = subscribeProjects((data) => {
+  projects = data;
+  render();
+});
+
+const unsubTasks = subscribeAllChecklistItems((data) => {
+  allTasks = data;
+  render();
+});
+
+// -- Cleanup --
+window.addEventListener("beforeunload", () => {
+  if (unsubNav) unsubNav();
+  unsubProjects();
+  unsubTasks();
+});
+
+// =============================================================================
+// Filtering
+// =============================================================================
+
+function getFilteredProjects() {
+  return projects.filter((p) => {
+    // status filter
+    if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    // search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const nameMatch = (p.name || "").toLowerCase().includes(q);
+      const typeMatch = (p.productType || "").toLowerCase().includes(q);
+      if (!nameMatch && !typeMatch) return false;
+    }
+    return true;
+  });
+}
+
+// =============================================================================
+// Task stats helpers
+// =============================================================================
+
+function getProjectTasks(projectId) {
+  return allTasks.filter((t) => t.projectId === projectId);
+}
+
+function getTaskStats(projectId) {
+  const tasks = getProjectTasks(projectId);
+  const total = tasks.length;
+  const completed = tasks.filter((t) => t.status === "completed").length;
+  const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+  const delayed = tasks.filter((t) => {
+    if (t.status === "completed") return false;
+    const d = daysUntil(t.dueDate);
+    return d !== null && d < 0;
+  }).length;
+  return { total, completed, inProgress, delayed };
+}
+
+// =============================================================================
+// Gantt helpers
+// =============================================================================
+
+function getGanttRange(filteredProjects) {
+  if (filteredProjects.length === 0) {
+    const now = new Date();
+    return { minDate: now, maxDate: new Date(now.getTime() + 86400000 * 30), totalDays: 30 };
+  }
+  let min = Infinity;
+  let max = -Infinity;
+  for (const p of filteredProjects) {
+    const s = new Date(p.startDate).getTime();
+    const e = new Date(p.endDate).getTime();
+    if (s < min) min = s;
+    if (e > max) max = e;
+  }
+  const totalDays = Math.max(1, Math.ceil((max - min) / 86400000));
+  return { minDate: new Date(min), maxDate: new Date(max), totalDays };
+}
+
+function getBarPosition(project, minDate, totalDays) {
+  const minMs = minDate.getTime();
+  const startMs = new Date(project.startDate).getTime();
+  const endMs = new Date(project.endDate).getTime();
+  const leftPct = Math.max(0, ((startMs - minMs) / (totalDays * 86400000)) * 100);
+  const widthPct = Math.max(0.5, ((endMs - startMs) / (totalDays * 86400000)) * 100);
+  return { left: leftPct, width: Math.min(widthPct, 100 - leftPct) };
+}
+
+// =============================================================================
+// Calendar helpers
+// =============================================================================
+
+function getCalendarDays(year, month) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDow = firstDay.getDay(); // 0=Sun
+  const daysInMonth = lastDay.getDate();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const days = [];
+
+  // Previous month fill
+  const prevLast = new Date(year, month, 0);
+  for (let i = startDow - 1; i >= 0; i--) {
+    const d = new Date(year, month, -i);
+    days.push({ date: d, isCurrentMonth: false, isToday: false });
+  }
+
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(year, month, d);
+    dt.setHours(0, 0, 0, 0);
+    days.push({ date: dt, isCurrentMonth: true, isToday: dt.getTime() === today.getTime() });
+  }
+
+  // Next month fill (complete to 42 = 6 rows of 7)
+  while (days.length < 42) {
+    const d = new Date(year, month + 1, days.length - daysInMonth - startDow + 1);
+    days.push({ date: d, isCurrentMonth: false, isToday: false });
+  }
+
+  return days;
+}
+
+function sameDay(d1, d2) {
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
+// =============================================================================
+// View mode labels
+// =============================================================================
+
+const VIEW_MODES = [
+  { key: "cards", label: "카드" },
+  { key: "table", label: "테이블" },
+  { key: "gantt", label: "간트" },
+  { key: "kanban", label: "칸반" },
+  { key: "timeline", label: "타임라인" },
+  { key: "calendar", label: "캘린더" },
+  { key: "matrix", label: "매트릭스" },
+];
+
+// =============================================================================
+// Status filter labels
+// =============================================================================
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "전체 상태" },
+  { value: "active", label: "활성" },
+  { value: "completed", label: "완료" },
+  { value: "on_hold", label: "보류" },
+];
+
+function getProjectStatusLabel(status) {
+  switch (status) {
+    case "active": return "활성";
+    case "completed": return "완료";
+    case "on_hold": return "보류";
+    default: return status;
+  }
+}
+
+function getProjectStatusBadge(status) {
+  switch (status) {
+    case "active": return "badge-primary";
+    case "completed": return "badge-success";
+    case "on_hold": return "badge-warning";
+    default: return "badge-neutral";
+  }
+}
+
+// =============================================================================
+// Main render
+// =============================================================================
+
+function render() {
+  const filtered = getFilteredProjects();
+
+  app.innerHTML = `
+    <div class="container">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">프로젝트</h1>
+          <p class="text-sm text-soft mt-1">총 ${filtered.length}개 프로젝트</p>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex items-center gap-4 mb-6 flex-wrap">
+        <!-- Search -->
+        <div class="search-wrapper" style="flex:1;min-width:200px;max-width:320px">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input class="input-field" id="search-input" type="text" placeholder="프로젝트 검색..." value="${escapeHtml(searchQuery)}">
+        </div>
+
+        <!-- Status filter -->
+        <select class="input-field" id="status-filter" style="width:auto;min-width:120px">
+          ${STATUS_OPTIONS.map(
+            (o) => `<option value="${o.value}"${statusFilter === o.value ? " selected" : ""}>${o.label}</option>`
+          ).join("")}
+        </select>
+
+        <!-- View mode switcher -->
+        <div class="view-switcher">
+          ${VIEW_MODES.map(
+            (vm) =>
+              `<button class="view-switcher-btn${viewMode === vm.key ? " active" : ""}" data-view="${vm.key}">${vm.label}</button>`
+          ).join("")}
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div id="view-content">
+        ${renderViewContent(filtered)}
+      </div>
+    </div>
+  `;
+
+  bindControls();
+}
+
+function renderViewContent(filtered) {
+  switch (viewMode) {
+    case "cards":    return renderCards(filtered);
+    case "table":    return renderTable(filtered);
+    case "gantt":    return renderGantt(filtered);
+    case "kanban":   return renderKanban(filtered);
+    case "timeline": return renderTimeline(filtered);
+    case "calendar": return renderCalendar(filtered);
+    case "matrix":   return renderMatrix(filtered);
+    default:         return renderCards(filtered);
+  }
+}
+
+// =============================================================================
+// 1) Cards view
+// =============================================================================
+
+function renderCards(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  return `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      ${filtered
+        .map((p) => {
+          const stats = getTaskStats(p.id);
+          const riskClass = getRiskClass(p.riskLevel);
+          const progress = p.progress || 0;
+          return `
+          <div class="card-hover p-5 cursor-pointer animate-fade-in" data-project-id="${p.id}">
+            <div class="flex items-center justify-between mb-3">
+              <span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span>
+              <span class="risk-dot ${p.riskLevel || ""}" title="위험도: ${p.riskLevel || "N/A"}"></span>
+            </div>
+            <h3 class="font-semibold mb-1" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
+            <p class="text-xs text-soft mb-3">${escapeHtml(p.productType || "")}</p>
+            <div class="text-xs text-soft mb-1">PM: ${escapeHtml(p.pm || "-")}</div>
+            <div class="text-xs text-soft mb-3">${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</div>
+            <div class="text-xs text-soft mb-1">현재 단계: <span style="color:var(--primary-300)">${formatStageName(p.currentStage)}</span></div>
+            <div class="progress-bar mt-3 mb-2">
+              <div class="progress-fill ${riskClass === "danger" ? "danger" : riskClass === "warning" ? "warning" : "success"}" style="width:${progress}%"></div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-soft">
+              <span>${progress}%</span>
+              <span>완료 ${stats.completed}/${stats.total}</span>
+            </div>
+            <div class="flex gap-3 mt-3">
+              <div class="text-xs">
+                <span class="stat-value" style="font-size:0.875rem;color:var(--slate-200)">${stats.total}</span>
+                <span class="text-soft"> 전체</span>
+              </div>
+              <div class="text-xs">
+                <span style="font-size:0.875rem;font-weight:700;color:var(--success-400)">${stats.completed}</span>
+                <span class="text-soft"> 완료</span>
+              </div>
+              <div class="text-xs">
+                <span style="font-size:0.875rem;font-weight:700;color:var(--primary-400)">${stats.inProgress}</span>
+                <span class="text-soft"> 진행</span>
+              </div>
+              ${
+                stats.delayed > 0
+                  ? `<div class="text-xs">
+                      <span style="font-size:0.875rem;font-weight:700;color:var(--danger-400)">${stats.delayed}</span>
+                      <span class="text-soft"> 지연</span>
+                    </div>`
+                  : ""
+              }
+            </div>
+          </div>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+// =============================================================================
+// 2) Table view
+// =============================================================================
+
+function renderTable(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  return `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>프로젝트명</th>
+            <th>제품유형</th>
+            <th>상태</th>
+            <th>PM</th>
+            <th>현재단계</th>
+            <th>위험도</th>
+            <th>진행률</th>
+            <th>기간</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered
+            .map(
+              (p) => `
+            <tr class="cursor-pointer" data-project-id="${p.id}">
+              <td>
+                <span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
+              </td>
+              <td>${escapeHtml(p.productType || "-")}</td>
+              <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
+              <td>${escapeHtml(p.pm || "-")}</td>
+              <td class="text-xs">${formatStageName(p.currentStage)}</td>
+              <td><span class="risk-dot ${p.riskLevel || ""}"></span></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <div class="progress-bar" style="width:80px">
+                    <div class="progress-fill" style="width:${p.progress || 0}%"></div>
+                  </div>
+                  <span class="text-xs font-mono">${p.progress || 0}%</span>
+                </div>
+              </td>
+              <td class="text-xs whitespace-nowrap">${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// =============================================================================
+// 3) Gantt view
+// =============================================================================
+
+function renderGantt(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  const { minDate, maxDate, totalDays } = getGanttRange(filtered);
+  const todayMs = new Date().getTime();
+  const todayPct = Math.max(0, Math.min(100, ((todayMs - minDate.getTime()) / (totalDays * 86400000)) * 100));
+
+  // Month markers
+  const months = [];
+  const cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  while (cursor.getTime() <= maxDate.getTime()) {
+    const leftPct = Math.max(0, ((cursor.getTime() - minDate.getTime()) / (totalDays * 86400000)) * 100);
+    months.push({
+      label: `${cursor.getFullYear()}.${String(cursor.getMonth() + 1).padStart(2, "0")}`,
+      left: leftPct,
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return `
+    <div class="card p-4" style="overflow-x:auto">
+      <!-- Month header -->
+      <div style="position:relative;height:24px;margin-bottom:8px;margin-left:200px;min-width:600px">
+        ${months
+          .map(
+            (m) =>
+              `<span class="text-xs text-soft" style="position:absolute;left:${m.left}%;white-space:nowrap">${m.label}</span>`
+          )
+          .join("")}
+      </div>
+
+      <!-- Rows -->
+      <div style="min-width:800px">
+        ${filtered
+          .map((p) => {
+            const { left, width } = getBarPosition(p, minDate, totalDays);
+            const barClass = getRiskClass(p.riskLevel);
+            return `
+            <div class="gantt-row cursor-pointer" data-project-id="${p.id}">
+              <div class="gantt-label" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+              <div class="gantt-track">
+                <div class="gantt-bar ${barClass}" style="left:${left}%;width:${width}%" title="${escapeHtml(p.name)}: ${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}"></div>
+                <!-- Today marker -->
+                <div style="position:absolute;top:0;bottom:0;left:${todayPct}%;width:2px;background:var(--danger-400);opacity:0.6;z-index:1"></div>
+              </div>
+            </div>`;
+          })
+          .join("")}
+      </div>
+
+      <!-- Legend -->
+      <div class="flex items-center gap-4 mt-4 text-xs text-soft" style="margin-left:200px">
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--success-500)"></span> 안전</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--warning-500)"></span> 주의</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--danger-500)"></span> 위험</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:2px;height:12px;background:var(--danger-400);opacity:0.6"></span> 오늘</span>
+      </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// 4) Kanban view
+// =============================================================================
+
+function renderKanban(filtered) {
+  const columns = [
+    { key: "active", label: "활성", color: "var(--primary-400)" },
+    { key: "completed", label: "완료", color: "var(--success-400)" },
+    { key: "on_hold", label: "보류", color: "var(--warning-400)" },
+  ];
+
+  return `
+    <div class="kanban-board">
+      ${columns
+        .map((col) => {
+          const colProjects = filtered.filter((p) => p.status === col.key);
+          return `
+          <div class="kanban-column" style="flex:1;max-width:none">
+            <div class="kanban-column-header">
+              <div class="flex items-center gap-2">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col.color}"></span>
+                <span class="kanban-column-title">${col.label}</span>
+              </div>
+              <span class="kanban-column-count">${colProjects.length}</span>
+            </div>
+            <div class="kanban-column-body">
+              ${
+                colProjects.length === 0
+                  ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">프로젝트 없음</span></div>`
+                  : colProjects
+                      .map((p) => {
+                        const stats = getTaskStats(p.id);
+                        return `
+                        <div class="kanban-card" data-project-id="${p.id}">
+                          <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
+                            <span class="risk-dot ${p.riskLevel || ""}"></span>
+                          </div>
+                          <div class="text-xs text-soft mb-2">${escapeHtml(p.productType || "")}</div>
+                          <div class="text-xs text-soft mb-2">PM: ${escapeHtml(p.pm || "-")}</div>
+                          <div class="text-xs text-soft mb-2">단계: ${formatStageName(p.currentStage)}</div>
+                          <div class="progress-bar mb-1">
+                            <div class="progress-fill" style="width:${p.progress || 0}%"></div>
+                          </div>
+                          <div class="flex items-center justify-between text-xs text-soft">
+                            <span>${p.progress || 0}%</span>
+                            <span>${stats.completed}/${stats.total} 완료</span>
+                          </div>
+                        </div>`;
+                      })
+                      .join("")
+              }
+            </div>
+          </div>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+// =============================================================================
+// 5) Timeline view
+// =============================================================================
+
+function renderTimeline(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  // Sort by start date
+  const sorted = [...filtered].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+  return `
+    <div class="card p-6">
+      <div class="timeline">
+        ${sorted
+          .map((p) => {
+            const stats = getTaskStats(p.id);
+            const isCompleted = p.status === "completed";
+            const isActive = p.status === "active";
+            const dotClass = isCompleted ? "completed" : isActive ? "active" : "";
+            return `
+            <div class="timeline-item cursor-pointer" data-project-id="${p.id}">
+              <div class="timeline-dot ${dotClass}"></div>
+              <div class="card-hover p-4" style="margin-bottom:0.5rem">
+                <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span>
+                    <span class="risk-dot ${p.riskLevel || ""}"></span>
+                  </div>
+                  <span class="text-xs text-soft">${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</span>
+                </div>
+                <h3 class="font-semibold mb-1" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
+                <p class="text-xs text-soft mb-2">${escapeHtml(p.productType || "")} | PM: ${escapeHtml(p.pm || "-")}</p>
+                <div class="text-xs text-soft mb-2">현재 단계: <span style="color:var(--primary-300)">${formatStageName(p.currentStage)}</span></div>
+                <div class="progress-bar mb-1">
+                  <div class="progress-fill" style="width:${p.progress || 0}%"></div>
+                </div>
+                <div class="flex items-center justify-between text-xs text-soft">
+                  <span>${p.progress || 0}%</span>
+                  <span>완료 ${stats.completed}/${stats.total}${stats.delayed > 0 ? ` | 지연 ${stats.delayed}` : ""}</span>
+                </div>
+              </div>
+            </div>`;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// 6) Calendar view
+// =============================================================================
+
+function renderCalendar(filtered) {
+  const days = getCalendarDays(calendarYear, calendarMonth);
+  const monthLabel = `${calendarYear}년 ${calendarMonth + 1}월`;
+  const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+
+  // Collect events for each day
+  function getEventsForDay(date) {
+    const events = [];
+
+    // Project start/end dates
+    for (const p of filtered) {
+      const start = new Date(p.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(p.endDate);
+      end.setHours(0, 0, 0, 0);
+
+      if (sameDay(date, start)) {
+        events.push({
+          label: `[시작] ${p.name}`,
+          bg: "rgba(6,182,212,0.2)",
+          color: "var(--primary-300)",
+          projectId: p.id,
+        });
+      }
+      if (sameDay(date, end)) {
+        events.push({
+          label: `[종료] ${p.name}`,
+          bg: "rgba(239,68,68,0.2)",
+          color: "var(--danger-300)",
+          projectId: p.id,
+        });
+      }
+    }
+
+    // Task due dates
+    const projectIds = new Set(filtered.map((p) => p.id));
+    for (const t of allTasks) {
+      if (!projectIds.has(t.projectId)) continue;
+      const due = new Date(t.dueDate);
+      due.setHours(0, 0, 0, 0);
+      if (sameDay(date, due)) {
+        const statusColor =
+          t.status === "completed"
+            ? "rgba(34,197,94,0.2)"
+            : t.status === "in_progress"
+            ? "rgba(6,182,212,0.15)"
+            : "rgba(100,116,139,0.15)";
+        const textColor =
+          t.status === "completed"
+            ? "var(--success-400)"
+            : t.status === "in_progress"
+            ? "var(--primary-300)"
+            : "var(--slate-400)";
+        events.push({
+          label: t.title,
+          bg: statusColor,
+          color: textColor,
+          projectId: t.projectId,
+        });
+      }
+    }
+
+    return events;
+  }
+
+  return `
+    <div class="card p-4">
+      <!-- Calendar header -->
+      <div class="flex items-center justify-between mb-4">
+        <button class="btn-ghost btn-sm" id="cal-prev">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          이전
+        </button>
+        <h3 class="section-title">${monthLabel}</h3>
+        <button class="btn-ghost btn-sm" id="cal-next">
+          다음
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- Calendar grid -->
+      <div class="calendar-grid">
+        ${dayLabels.map((d) => `<div class="calendar-header-cell">${d}</div>`).join("")}
+        ${days
+          .map((day) => {
+            const events = getEventsForDay(day.date);
+            const cellClass = `calendar-cell${day.isCurrentMonth ? "" : " other-month"}${day.isToday ? " today" : ""}`;
+            return `
+            <div class="${cellClass}">
+              <div class="calendar-date">${day.date.getDate()}</div>
+              ${events
+                .slice(0, 3)
+                .map(
+                  (ev) =>
+                    `<span class="calendar-event" style="background:${ev.bg};color:${ev.color}" data-project-id="${ev.projectId}" title="${escapeHtml(ev.label)}">${escapeHtml(ev.label)}</span>`
+                )
+                .join("")}
+              ${events.length > 3 ? `<span class="text-xs text-soft" style="padding-left:0.375rem">+${events.length - 3}개 더</span>` : ""}
+            </div>`;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// 7) Matrix view (Department x Stage)
+// =============================================================================
+
+function renderMatrix(filtered) {
+  const projectIds = new Set(filtered.map((p) => p.id));
+  const relevantTasks = allTasks.filter((t) => projectIds.has(t.projectId));
+
+  // Build count map: dept -> stage -> { total, completed, inProgress, delayed }
+  const matrix = {};
+  for (const dept of departments) {
+    matrix[dept] = {};
+    for (const stage of projectStages) {
+      matrix[dept][stage] = { total: 0, completed: 0, inProgress: 0, delayed: 0 };
+    }
+  }
+
+  for (const t of relevantTasks) {
+    const dept = t.department;
+    const stage = t.stage;
+    if (!matrix[dept] || !matrix[dept][stage]) continue;
+    matrix[dept][stage].total++;
+    if (t.status === "completed") matrix[dept][stage].completed++;
+    else if (t.status === "in_progress") matrix[dept][stage].inProgress++;
+    const d = daysUntil(t.dueDate);
+    if (t.status !== "completed" && d !== null && d < 0) matrix[dept][stage].delayed++;
+  }
+
+  function getCellColor(cell) {
+    if (cell.total === 0) return "";
+    if (cell.delayed > 0) return "background:rgba(239,68,68,0.08)";
+    if (cell.inProgress > 0) return "background:rgba(6,182,212,0.08)";
+    if (cell.completed > 0 && cell.completed === cell.total) return "background:rgba(34,197,94,0.08)";
+    return "";
+  }
+
+  // Short stage labels for header
+  function shortStage(stage) {
+    const idx = stage.indexOf("_");
+    if (idx === -1) return stage;
+    const num = stage.substring(0, idx);
+    const name = stage.substring(idx + 1);
+    // Limit name length
+    return `${num}. ${name.length > 4 ? name.substring(0, 4) + ".." : name}`;
+  }
+
+  return `
+    <div class="matrix-table card">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:100px">부서 / 단계</th>
+            ${projectStages.map((s) => `<th title="${formatStageName(s)}">${shortStage(s)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${departments
+            .map(
+              (dept) => `
+            <tr>
+              <td>${escapeHtml(dept)}</td>
+              ${projectStages
+                .map((stage) => {
+                  const cell = matrix[dept][stage];
+                  const style = getCellColor(cell);
+                  if (cell.total === 0) {
+                    return `<td class="matrix-cell" style="${style}"><span class="text-dim">-</span></td>`;
+                  }
+                  return `
+                  <td class="matrix-cell" style="${style}" title="${dept} | ${formatStageName(stage)}: 전체 ${cell.total}, 완료 ${cell.completed}, 진행 ${cell.inProgress}, 지연 ${cell.delayed}">
+                    <div class="count" style="color:${cell.delayed > 0 ? "var(--danger-400)" : cell.inProgress > 0 ? "var(--primary-300)" : "var(--success-400)"}">${cell.total}</div>
+                    <div class="text-xs text-soft">${cell.completed}/${cell.total}</div>
+                  </td>`;
+                })
+                .join("")}
+            </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+
+      <!-- Legend -->
+      <div class="flex items-center gap-4 p-4 text-xs text-soft" style="border-top:1px solid var(--surface-3)">
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,0.15)"></span> 전체 완료</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(6,182,212,0.15)"></span> 진행 중</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,0.15)"></span> 지연 포함</span>
+      </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// Empty state
+// =============================================================================
+
+function renderEmpty() {
+  return `
+    <div class="empty-state" style="padding:4rem">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+      </svg>
+      <span class="empty-state-text">조건에 맞는 프로젝트가 없습니다</span>
+    </div>
+  `;
+}
+
+// =============================================================================
+// Bind event handlers
+// =============================================================================
+
+function bindControls() {
+  // Search
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value;
+      render();
+      // Restore focus and cursor position
+      const el = document.getElementById("search-input");
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }
+
+  // Status filter
+  const statusSelect = document.getElementById("status-filter");
+  if (statusSelect) {
+    statusSelect.addEventListener("change", (e) => {
+      statusFilter = e.target.value;
+      render();
+    });
+  }
+
+  // View mode switcher
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      viewMode = btn.dataset.view;
+      render();
+    });
+  });
+
+  // Project click -> navigate
+  document.querySelectorAll("[data-project-id]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      // Skip if clicked on a calendar event with its own handler
+      if (e.target.closest(".calendar-event")) return;
+      const id = el.dataset.projectId;
+      if (id) window.location.href = `project.html?id=${id}`;
+    });
+  });
+
+  // Calendar navigation
+  const calPrev = document.getElementById("cal-prev");
+  const calNext = document.getElementById("cal-next");
+  if (calPrev) {
+    calPrev.addEventListener("click", () => {
+      calendarMonth--;
+      if (calendarMonth < 0) {
+        calendarMonth = 11;
+        calendarYear--;
+      }
+      render();
+    });
+  }
+  if (calNext) {
+    calNext.addEventListener("click", () => {
+      calendarMonth++;
+      if (calendarMonth > 11) {
+        calendarMonth = 0;
+        calendarYear++;
+      }
+      render();
+    });
+  }
+
+  // Calendar event clicks
+  document.querySelectorAll(".calendar-event[data-project-id]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = el.dataset.projectId;
+      if (id) window.location.href = `project.html?id=${id}`;
+    });
+  });
+}

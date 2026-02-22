@@ -1,0 +1,208 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared Components — Nav, Spinner, Badges, etc.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import { getUser, logout } from "./auth.js";
+import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
+import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+
+const NAV_LINKS = [
+  {
+    href: "dashboard.html",
+    label: "대시보드",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1v-5zM4 14a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1v-5z"/></svg>`,
+  },
+  {
+    href: "projects.html",
+    label: "프로젝트",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`,
+  },
+  {
+    href: "admin-checklists.html",
+    label: "체크리스트",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
+  },
+];
+
+export function renderNav(container) {
+  const user = getUser();
+  if (!user) return;
+
+  const currentPage = window.location.pathname.split("/").pop() || "index.html";
+
+  container.innerHTML = `
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="flex items-center gap-8">
+          <button class="nav-logo" data-nav="dashboard.html">
+            <div class="nav-logo-icon"><span>PC</span></div>
+            <span class="nav-logo-text">Process<span class="accent">Check</span></span>
+          </button>
+          <div class="nav-links">
+            ${NAV_LINKS.map(link => {
+              const isActive = currentPage === link.href;
+              return `<button class="nav-link${isActive ? " active" : ""}" data-nav="${link.href}">
+                ${link.icon}${link.label}
+              </button>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="nav-right">
+          <button class="nav-bell" id="nav-bell-btn">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span class="nav-bell-dot hidden" id="nav-bell-dot"></span>
+          </button>
+          <div class="nav-user">
+            <div class="nav-user-info">
+              <div class="nav-user-name">${escapeHtml(user.name)}</div>
+              <div class="nav-user-role">${getRoleName(user.role)}</div>
+            </div>
+            <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+          <button class="nav-hamburger" id="nav-hamburger-btn">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="nav-mobile-menu" id="nav-mobile-menu">
+        ${NAV_LINKS.map(link => {
+          const isActive = currentPage === link.href;
+          return `<button class="nav-mobile-link${isActive ? " active" : ""}" data-nav="${link.href}">
+            ${link.icon}${link.label}
+          </button>`;
+        }).join("")}
+      </div>
+    </nav>
+    <div id="notif-panel-root"></div>
+  `;
+
+  // Bind navigation
+  container.querySelectorAll("[data-nav]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      window.location.href = btn.dataset.nav;
+    });
+  });
+
+  // Logout
+  container.querySelector("#nav-logout-btn").addEventListener("click", logout);
+
+  // Mobile hamburger
+  const hamburger = container.querySelector("#nav-hamburger-btn");
+  const mobileMenu = container.querySelector("#nav-mobile-menu");
+  hamburger.addEventListener("click", () => {
+    mobileMenu.classList.toggle("open");
+    const isOpen = mobileMenu.classList.contains("open");
+    hamburger.innerHTML = isOpen
+      ? `<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>`
+      : `<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>`;
+  });
+
+  // Notification subscription
+  let notifPanelOpen = false;
+  let notifications = [];
+  const bellBtn = container.querySelector("#nav-bell-btn");
+  const bellDot = container.querySelector("#nav-bell-dot");
+  const notifRoot = container.querySelector("#notif-panel-root");
+
+  const unsub = subscribeNotifications(user.id, (notifs) => {
+    notifications = notifs;
+    const unreadCount = notifs.filter(n => !n.read).length;
+    bellDot.classList.toggle("hidden", unreadCount === 0);
+    if (notifPanelOpen) renderNotifPanel();
+  });
+
+  function renderNotifPanel() {
+    if (!notifPanelOpen) {
+      notifRoot.innerHTML = "";
+      return;
+    }
+    notifRoot.innerHTML = `
+      <div class="notif-panel">
+        <div class="notif-panel-header">
+          <span class="notif-panel-title">알림</span>
+          <span class="text-xs text-soft">${notifications.filter(n => !n.read).length}개 읽지 않음</span>
+        </div>
+        <div class="notif-panel-body">
+          ${notifications.length === 0
+            ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">알림이 없습니다</span></div>`
+            : notifications.map(n => `
+              <div class="notif-item${n.read ? "" : " unread"}" data-notif-id="${n.id}" data-notif-link="${n.link || ""}">
+                <div class="notif-item-title">${escapeHtml(n.title)}</div>
+                <div class="notif-item-message">${escapeHtml(n.message)}</div>
+                <div class="notif-item-time">${timeAgo(n.createdAt)}</div>
+              </div>
+            `).join("")}
+        </div>
+      </div>
+    `;
+
+    notifRoot.querySelectorAll("[data-notif-id]").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.notifId;
+        markNotificationRead(id);
+        // link navigation could be added here
+      });
+    });
+  }
+
+  bellBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    notifPanelOpen = !notifPanelOpen;
+    renderNotifPanel();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (notifPanelOpen && !notifRoot.contains(e.target) && e.target !== bellBtn) {
+      notifPanelOpen = false;
+      renderNotifPanel();
+    }
+  });
+
+  // Return unsubscribe for cleanup
+  return unsub;
+}
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+
+export function renderSpinner(message = "로딩 중...") {
+  return `
+    <div class="spinner-overlay">
+      <div class="spinner"></div>
+      <div class="spinner-text">${escapeHtml(message)}</div>
+    </div>
+  `;
+}
+
+// ─── Badge Helper ────────────────────────────────────────────────────────────
+
+export function renderBadge(text, variant = "neutral") {
+  return `<span class="badge badge-${variant}">${escapeHtml(text)}</span>`;
+}
+
+// ─── Navigate Helper ─────────────────────────────────────────────────────────
+
+export function navigate(page, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  window.location.href = qs ? `${page}?${qs}` : page;
+}
+
+// ─── Import Map HTML Block ───────────────────────────────────────────────────
+// Use this in each HTML file's <head>:
+// <script type="importmap">
+// {
+//   "imports": {
+//     "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+//     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js"
+//   }
+// }
+// </script>

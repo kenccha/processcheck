@@ -707,11 +707,11 @@ export const formatStageName = (stage: ProjectStage): string => {
 export const getRiskColor = (level: "green" | "yellow" | "red"): string => {
   switch (level) {
     case "green":
-      return "bg-success-500";
+      return "bg-success-400";
     case "yellow":
-      return "bg-warning-500";
+      return "bg-warning-400";
     case "red":
-      return "bg-danger-500";
+      return "bg-danger-400";
   }
 };
 
