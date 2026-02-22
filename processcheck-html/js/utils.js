@@ -8,34 +8,47 @@ export const departments = [
   "CS팀", "경영관리팀", "글로벌임상팀", "디자인연구소", "인증팀",
 ];
 
-// 프로젝트 단계 목록
+// 프로젝트 단계 목록 (12개 개별 stage — 내부 데이터 키로만 사용)
 export const projectStages = [
-  "0_발의검토", "1_발의승인", "2_기획검토", "3_기획승인",
-  "4_WM제작", "5_WM승인회", "6_Tx단계", "7_Tx승인회",
-  "8_MasterGatePilot", "9_MSG승인회", "10_양산", "11_영업이관",
+  "발의검토", "발의승인", "기획검토", "기획승인",
+  "WM제작", "WM승인회", "Tx단계", "Tx승인회",
+  "MasterGatePilot", "MSG승인회", "양산", "영업이관",
 ];
+
+// 6개 Phase 그룹 (UI에서는 항상 이 단위로 표시)
+export const PHASE_GROUPS = [
+  { name: "발의", workStage: "발의검토", gateStage: "발의승인" },
+  { name: "기획", workStage: "기획검토", gateStage: "기획승인" },
+  { name: "WM", workStage: "WM제작", gateStage: "WM승인회" },
+  { name: "Tx", workStage: "Tx단계", gateStage: "Tx승인회" },
+  { name: "MSG", workStage: "MasterGatePilot", gateStage: "MSG승인회" },
+  { name: "양산/이관", workStage: "양산", gateStage: "영업이관" },
+];
+
+// 게이트 스테이지 목록 (기획조정실 승인 대상)
+export const GATE_STAGES = ["발의승인", "기획승인", "WM승인회", "Tx승인회", "MSG승인회", "영업이관"];
 
 // 단계명 포맷팅
 const stageMap = {
-  "0_발의검토": "0. 발의 검토",
-  "1_발의승인": "1. 발의 승인",
-  "2_기획검토": "2. 기획 검토",
-  "3_기획승인": "3. 기획 승인",
-  "4_WM제작": "4. W/M 제작",
-  "5_WM승인회": "5. W/M 승인회",
-  "6_Tx단계": "6. Tx 단계",
-  "7_Tx승인회": "7. Tx 승인회",
-  "8_MasterGatePilot": "8. Master Gate Pilot",
-  "9_MSG승인회": "9. MSG 승인회",
-  "10_양산": "10. 양산",
-  "11_영업이관": "11. 영업 이관",
+  "발의검토": "발의 검토",
+  "발의승인": "발의 승인",
+  "기획검토": "기획 검토",
+  "기획승인": "기획 승인",
+  "WM제작": "W/M 제작",
+  "WM승인회": "W/M 승인회",
+  "Tx단계": "Tx 단계",
+  "Tx승인회": "Tx 승인회",
+  "MasterGatePilot": "Master Gate Pilot",
+  "MSG승인회": "MSG 승인회",
+  "양산": "양산",
+  "영업이관": "영업 이관",
 };
 
 export function formatStageName(stage) {
   return stageMap[stage] || stage;
 }
 
-// 위험도 CSS class
+// 중요도 CSS class
 export function getRiskClass(level) {
   switch (level) {
     case "green":  return "success";
@@ -45,12 +58,12 @@ export function getRiskClass(level) {
   }
 }
 
-// 위험도 한글
+// 중요도 한글
 export function getRiskLabel(level) {
   switch (level) {
-    case "green":  return "안전";
-    case "yellow": return "주의";
-    case "red":    return "위험";
+    case "green":  return "보통";
+    case "yellow": return "중요";
+    case "red":    return "긴급";
     default:       return level;
   }
 }
@@ -82,8 +95,7 @@ export function getRoleName(role) {
   const map = {
     worker: "실무자",
     manager: "부서 관리자",
-    pm: "프로세스 관리자",
-    scheduler: "일정 관리자",
+    observer: "기획조정실",
   };
   return map[role] || role;
 }

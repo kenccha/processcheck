@@ -6,6 +6,7 @@ import Navigation from "@/components/Navigation";
 import { useRequireAuth } from "@/contexts/AuthContext";
 import {
   subscribeChecklistItemsByAssignee,
+  subscribeAllChecklistItems,
   subscribeProjects,
   subscribeNotifications,
   markNotificationRead,
@@ -33,13 +34,26 @@ export default function DashboardPage() {
     return unsub;
   }, []);
 
-  // 내 작업 실시간 구독 (assignee 기준)
+  // 역할별 작업 실시간 구독
   useEffect(() => {
     if (!currentUser) return;
-    const unsub = subscribeChecklistItemsByAssignee(currentUser.name, (items) => {
-      setAllTasks(items);
-    });
-    return unsub;
+    // 기획조정실(옵저버): 전체 태스크, 매니저: 전체(부서 필터는 파생에서), 실무자: assignee 기준
+    if (currentUser.role === "observer" || currentUser.role === "manager") {
+      const unsub = subscribeAllChecklistItems((items) => {
+        if (currentUser.role === "manager") {
+          // 매니저는 자기 부서 태스크만
+          setAllTasks(items.filter((t) => t.department === currentUser.department));
+        } else {
+          setAllTasks(items);
+        }
+      });
+      return unsub;
+    } else {
+      const unsub = subscribeChecklistItemsByAssignee(currentUser.name, (items) => {
+        setAllTasks(items);
+      });
+      return unsub;
+    }
   }, [currentUser]);
 
   // 알림 실시간 구독 (올바른 userId 사용 - 버그 수정)
@@ -53,40 +67,73 @@ export default function DashboardPage() {
 
   // 파생 데이터 계산
   useEffect(() => {
-    if (!allTasks.length) return;
+    if (!allTasks.length && currentUser?.role === "worker") return;
 
     const now = new Date();
     const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-    // 오늘 할 일: 마감일 3일 이내, pending/in_progress
-    const todayTasks = allTasks
-      .filter((item) => {
-        if (item.status !== "pending" && item.status !== "in_progress") return false;
-        const due = new Date(item.dueDate);
-        return due <= threeDaysLater;
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-    setMyTasks(todayTasks);
+    if (currentUser?.role === "observer") {
+      // 기획조정실: 모든 진행중/대기 태스크
+      const activeTasks = allTasks
+        .filter((item) => item.status === "pending" || item.status === "in_progress")
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      setMyTasks(activeTasks);
 
-    // 승인 대기: 내가 완료 처리했지만 아직 manager가 검토 안 한 것
-    // approvalStatus가 없거나 "pending"인 completed 항목
-    const approvals = allTasks.filter(
-      (item) =>
-        item.status === "completed" &&
-        (!item.approvalStatus || item.approvalStatus === "pending")
-    );
-    setPendingApprovals(approvals);
-  }, [allTasks]);
+      // 기획조정실: 전체 승인 대기
+      const approvals = allTasks.filter(
+        (item) => item.status === "completed" && (!item.approvalStatus || item.approvalStatus === "pending")
+      );
+      setPendingApprovals(approvals);
+    } else if (currentUser?.role === "manager") {
+      // 매니저: 부서 내 진행중/대기 태스크
+      const activeTasks = allTasks
+        .filter((item) => item.status === "pending" || item.status === "in_progress")
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      setMyTasks(activeTasks);
+
+      // 매니저: 부서 내 승인 대기 (내가 검토해야 하는 것)
+      const approvals = allTasks.filter(
+        (item) => item.status === "completed" && (!item.approvalStatus || item.approvalStatus === "pending")
+      );
+      setPendingApprovals(approvals);
+    } else {
+      // 실무자: 마감일 3일 이내
+      const todayTasks = allTasks
+        .filter((item) => {
+          if (item.status !== "pending" && item.status !== "in_progress") return false;
+          const due = new Date(item.dueDate);
+          return due <= threeDaysLater;
+        })
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      setMyTasks(todayTasks);
+
+      // 실무자: 내가 완료했지만 승인 안 된 것
+      const approvals = allTasks.filter(
+        (item) => item.status === "completed" && (!item.approvalStatus || item.approvalStatus === "pending")
+      );
+      setPendingApprovals(approvals);
+    }
+  }, [allTasks, currentUser]);
 
   // 내 프로젝트 계산
   useEffect(() => {
-    if (!allTasks.length || !allProjects.length) return;
-    const myProjectIds = new Set(allTasks.map((t) => t.projectId));
-    const active = allProjects.filter(
-      (p) => p.status === "active" && myProjectIds.has(p.id)
-    );
-    setMyProjects(active);
-  }, [allTasks, allProjects]);
+    if (!allProjects.length) return;
+    if (currentUser?.role === "observer") {
+      // 기획조정실: 자기가 PM인 프로젝트
+      const active = allProjects.filter(
+        (p) => p.status === "active" && p.pm === currentUser.name
+      );
+      setMyProjects(active);
+    } else {
+      // 매니저/실무자: 태스크 기반
+      if (!allTasks.length) return;
+      const myProjectIds = new Set(allTasks.map((t) => t.projectId));
+      const active = allProjects.filter(
+        (p) => p.status === "active" && myProjectIds.has(p.id)
+      );
+      setMyProjects(active);
+    }
+  }, [allTasks, allProjects, currentUser]);
 
   const handleNotifClick = async (notif: Notification) => {
     if (!notif.read) {
@@ -148,7 +195,7 @@ export default function DashboardPage() {
               {currentUser.name}
             </h1>
             <span className="text-sm font-mono text-slate-500 bg-surface-2 px-2.5 py-0.5 rounded border border-surface-3">
-              {currentUser.role === "pm" ? "PM (기획조정실)" : currentUser.role === "manager" ? "매니저" : "실무자"}
+              {currentUser.role === "observer" ? "기획조정실" : currentUser.role === "manager" ? "매니저" : "실무자"}
             </span>
           </div>
           <p className="text-slate-400 ml-5 pl-0.5">
@@ -174,7 +221,7 @@ export default function DashboardPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* 오늘 할 일 */}
-          <div className="animate-fade-in bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group">
+          <div onClick={() => document.getElementById("section-tasks")?.scrollIntoView({ behavior: "smooth" })} className="animate-fade-in bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group cursor-pointer">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">작업 대기</span>
               <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500/20 transition-colors">
@@ -187,7 +234,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 승인 대기 */}
-          <div className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-warning-400/30 transition-all duration-300 group">
+          <div onClick={() => document.getElementById("section-approvals")?.scrollIntoView({ behavior: "smooth" })} className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-warning-400/30 transition-all duration-300 group cursor-pointer">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">승인 대기</span>
               <div className="w-9 h-9 rounded-lg bg-warning-400/10 flex items-center justify-center group-hover:bg-warning-400/20 transition-colors">
@@ -200,7 +247,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 진행 중 프로젝트 */}
-          <div className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group">
+          <div onClick={() => router.push("/projects")} className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-primary-500/30 transition-all duration-300 group cursor-pointer">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">프로젝트</span>
               <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500/20 transition-colors">
@@ -213,7 +260,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 알림 */}
-          <div className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-danger-400/30 transition-all duration-300 group relative">
+          <div onClick={() => document.getElementById("section-notifications")?.scrollIntoView({ behavior: "smooth" })} className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg p-5 hover:border-danger-400/30 transition-all duration-300 group relative cursor-pointer">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-slate-500 uppercase tracking-wider font-mono">미확인 알림</span>
               <div className="w-9 h-9 rounded-lg bg-danger-400/10 flex items-center justify-center group-hover:bg-danger-400/20 transition-colors relative">
@@ -234,7 +281,7 @@ export default function DashboardPage() {
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* 오늘 할 일 */}
-            <div className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
+            <div id="section-tasks" className="animate-fade-in-delay-1 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-surface-3">
                 <div className="flex items-center gap-3">
                   <div className="w-1 h-5 bg-primary-500 rounded-full" />
@@ -274,7 +321,7 @@ export default function DashboardPage() {
                               {task.title}
                             </h3>
                             <p className="text-sm text-slate-500 mt-0.5 font-mono">
-                              {task.department} / {task.stage.replace(/_/g, " ")}
+                              {task.department} / {task.stage}
                             </p>
                           </div>
                           <span
@@ -304,7 +351,7 @@ export default function DashboardPage() {
 
             {/* 승인 대기 */}
             {pendingApprovals.length > 0 && (
-              <div className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
+              <div id="section-approvals" className="animate-fade-in-delay-2 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-surface-3">
                   <div className="flex items-center gap-3">
                     <div className="w-1 h-5 bg-warning-400 rounded-full" />
@@ -332,7 +379,7 @@ export default function DashboardPage() {
                         {task.title}
                       </h3>
                       <p className="text-sm text-slate-500 font-mono">
-                        {task.department} / {task.stage.replace(/_/g, " ")}
+                        {task.department} / {task.stage}
                       </p>
                       <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-surface-3">
                         <span className="text-slate-500">
@@ -417,7 +464,7 @@ export default function DashboardPage() {
 
           {/* Right Column: Notifications */}
           <div className="lg:col-span-1">
-            <div className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden sticky top-8">
+            <div id="section-notifications" className="animate-fade-in-delay-3 bg-surface-2 border border-surface-3 rounded-lg overflow-hidden sticky top-8">
               <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
                 <div className="flex items-center gap-3">
                   <div className="w-1 h-5 bg-primary-500 rounded-full" />

@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { guardPage } from "../auth.js";
-import { renderNav, renderSpinner } from "../components.js";
+import { renderNav, renderSpinner, initTheme } from "../components.js";
+initTheme();
 import {
   subscribeProjects,
   subscribeChecklistItems,
@@ -12,6 +13,8 @@ import {
 import {
   departments,
   projectStages,
+  PHASE_GROUPS,
+  GATE_STAGES,
   getStatusLabel,
   getStatusBadgeClass,
   formatStageName,
@@ -47,6 +50,7 @@ let changeRequests = [];
 let activeTab = "overview";
 let selectedStage = "";
 let selectedDepartment = "";
+let checklistFilter = ""; // "" | "in_progress" | "delayed" | "manager_pending" | "committee_pending"
 
 // --- Render nav ---
 const unsubNav = renderNav(navRoot);
@@ -206,7 +210,10 @@ function render() {
     return;
   }
 
-  const stageIndex = projectStages.indexOf(project.currentStage);
+  // Phase-based index
+  const phaseIndex = PHASE_GROUPS.findIndex(
+    (p) => p.workStage === project.currentStage || p.gateStage === project.currentStage
+  );
   const riskClass = getRiskClass(project.riskLevel);
 
   const totalTasks = checklistItems.length;
@@ -218,14 +225,19 @@ function render() {
     const days = daysUntil(t.dueDate);
     return days !== null && days < 0;
   }).length;
-  const pendingApproval = checklistItems.filter(
-    (t) => t.status === "in_progress" && t.approvalStatus === undefined
+  // Manager approval pending: work stage tasks completed, awaiting approval
+  const managerPending = checklistItems.filter(
+    (t) => !GATE_STAGES.includes(t.stage) && t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
+  ).length;
+  // Committee approval pending: gate stage tasks completed, awaiting approval
+  const committeePending = checklistItems.filter(
+    (t) => GATE_STAGES.includes(t.stage) && t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
   ).length;
 
   app.innerHTML = `
     <div class="container" style="padding-bottom: 3rem;">
       <!-- Project Header Card -->
-      ${renderProjectHeader(riskClass, stageIndex, totalTasks)}
+      ${renderProjectHeader(riskClass, phaseIndex, totalTasks)}
 
       <!-- Tabs -->
       <div class="tab-bar mb-4" style="margin-top: 1.5rem;">
@@ -237,7 +249,7 @@ function render() {
 
       <!-- Tab Content -->
       <div class="animate-fade-in">
-        ${activeTab === "overview" ? renderOverviewTab(totalTasks, inProgressTasks, delayedTasks, pendingApproval) : ""}
+        ${activeTab === "overview" ? renderOverviewTab(totalTasks, inProgressTasks, delayedTasks, managerPending, committeePending) : ""}
         ${activeTab === "checklist" ? renderChecklistTab() : ""}
         ${activeTab === "files" ? renderFilesTab() : ""}
         ${activeTab === "changes" ? renderChangesTab() : ""}
@@ -252,8 +264,9 @@ function render() {
 // Project Header
 // =============================================================================
 
-function renderProjectHeader(riskClass, stageIndex, totalTasks) {
+function renderProjectHeader(riskClass, phaseIndex, totalTasks) {
   const p = project;
+  const currentPhaseName = phaseIndex >= 0 ? PHASE_GROUPS[phaseIndex].name : formatStageName(p.currentStage);
   return `
     <div class="card p-6 animate-fade-in">
       <div class="flex flex-wrap gap-6" style="justify-content: space-between; align-items: flex-start;">
@@ -270,12 +283,12 @@ function renderProjectHeader(riskClass, stageIndex, totalTasks) {
             <span>PM: <strong style="color: var(--slate-200);">${escapeHtml(p.pm)}</strong></span>
             <span>${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</span>
           </div>
-          <!-- Current Stage -->
+          <!-- Current Phase -->
           <div style="margin-top: 1rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: var(--radius-lg);">
             <svg width="14" height="14" fill="none" stroke="var(--primary-400)" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            <span class="text-sm font-semibold" style="color: var(--primary-300);">현재 단계: ${formatStageName(p.currentStage)}</span>
+            <span class="text-sm font-semibold" style="color: var(--primary-300);">현재 단계: ${currentPhaseName}</span>
           </div>
         </div>
         <!-- Right: Progress -->
@@ -295,97 +308,166 @@ function renderProjectHeader(riskClass, stageIndex, totalTasks) {
 // Tab 1: Overview (개요)
 // =============================================================================
 
-function renderOverviewTab(totalTasks, inProgressTasks, delayedTasks, pendingApproval) {
+function renderOverviewTab(totalTasks, inProgressTasks, delayedTasks, managerPending, committeePending) {
   return `
-    <!-- Stat Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="stat-card">
+    <!-- Stat Cards (clickable, 5 cards) -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+      <div class="stat-card cursor-pointer card-hover" data-stat-filter="">
         <div class="stat-card-label">전체 작업</div>
         <div class="stat-card-row">
           <div class="stat-value" style="color: var(--slate-100);">${totalTasks}</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card cursor-pointer card-hover" data-stat-filter="in_progress">
         <div class="stat-card-label">진행 중</div>
         <div class="stat-card-row">
           <div class="stat-value" style="color: var(--primary-400);">${inProgressTasks}</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card cursor-pointer card-hover" data-stat-filter="delayed">
         <div class="stat-card-label">지연</div>
         <div class="stat-card-row">
           <div class="stat-value" style="color: ${delayedTasks > 0 ? "var(--danger-400)" : "var(--slate-100)"};">${delayedTasks}</div>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-card-label">승인 대기</div>
+      <div class="stat-card cursor-pointer card-hover" data-stat-filter="manager_pending">
+        <div class="stat-card-label">매니저 승인 대기</div>
         <div class="stat-card-row">
-          <div class="stat-value" style="color: var(--warning-400);">${pendingApproval}</div>
+          <div class="stat-value" style="color: var(--warning-400);">${managerPending}</div>
+        </div>
+      </div>
+      <div class="stat-card cursor-pointer card-hover" data-stat-filter="committee_pending">
+        <div class="stat-card-label">위원회 승인 대기</div>
+        <div class="stat-card-row">
+          <div class="stat-value" style="color: var(--warning-400);">${committeePending}</div>
         </div>
       </div>
     </div>
 
-    <!-- Stage Progress -->
-    <div class="card p-5 mb-6">
-      <h3 class="section-title mb-4">단계별 진행 상황</h3>
-      <div class="flex flex-col gap-3">
-        ${projectStages
-          .map((stage) => {
-            const progress = getStageProgress(stage);
-            const isCurrent = project.currentStage === stage;
-            const stageItems = checklistItems.filter((t) => t.stage === stage);
-            const hasItems = stageItems.length > 0;
-            return `
-              <div style="padding: 0.625rem 0.75rem; border-radius: var(--radius-lg); ${isCurrent ? "border: 1px solid rgba(6, 182, 212, 0.4); background: rgba(6, 182, 212, 0.04);" : "border: 1px solid transparent;"}">
-                <div class="flex items-center justify-between mb-1">
-                  <div class="flex items-center gap-2">
-                    ${isCurrent ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--primary-400);display:inline-block;"></span>' : ""}
-                    <span class="text-sm font-medium" style="color: ${isCurrent ? "var(--primary-300)" : "var(--slate-300)"};">${formatStageName(stage)}</span>
-                  </div>
-                  <span class="text-xs font-mono" style="color: ${hasItems ? "var(--slate-300)" : "var(--slate-600)"};">${progress}%</span>
-                </div>
-                <div class="progress-bar" style="height: 0.25rem;">
-                  <div class="progress-fill ${progress === 100 ? "success" : isCurrent ? "" : ""}" style="width: ${progress}%; ${isCurrent ? "background: var(--primary-400);" : progress === 100 ? "" : "background: var(--slate-500);"}"></div>
-                </div>
-              </div>
-            `;
-          })
-          .join("")}
-      </div>
-    </div>
-
-    <!-- Department Progress -->
-    <div class="card p-5 mb-6">
-      <h3 class="section-title mb-4">부서별 진행 상황</h3>
-      <div class="flex flex-col gap-3">
-        ${departments
-          .map((dept) => {
-            const progress = getDepartmentProgress(dept);
-            const deptItems = checklistItems.filter((t) => t.department === dept);
-            const hasItems = deptItems.length > 0;
-            return `
-              <div style="padding: 0.5rem 0;">
-                <div class="flex items-center justify-between mb-1">
-                  <span class="text-sm font-medium" style="color: var(--slate-300);">${escapeHtml(dept)}</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-dim">${deptItems.filter((t) => t.status === "completed").length}/${deptItems.length}</span>
-                    <span class="text-xs font-mono" style="color: ${hasItems ? "var(--slate-300)" : "var(--slate-600)"};">${progress}%</span>
-                  </div>
-                </div>
-                <div class="progress-bar" style="height: 0.25rem;">
-                  <div class="progress-fill ${progress === 100 ? "success" : ""}  " style="width: ${progress}%;"></div>
-                </div>
-              </div>
-            `;
-          })
-          .join("")}
-      </div>
-    </div>
+    <!-- Project Status Summary Card -->
+    ${renderSummaryCard()}
 
     <!-- Recent Activity -->
     <div class="card p-5">
       <h3 class="section-title mb-4">최근 활동</h3>
       ${renderRecentActivity()}
+    </div>
+  `;
+}
+
+function renderSummaryCard() {
+  const p = project;
+  const phaseIndex = PHASE_GROUPS.findIndex(
+    (ph) => ph.workStage === p.currentStage || ph.gateStage === p.currentStage
+  );
+  const currentPhase = phaseIndex >= 0 ? PHASE_GROUPS[phaseIndex] : null;
+  const isGateStage = currentPhase && GATE_STAGES.includes(p.currentStage);
+
+  // D-day calculation
+  const endDate = p.endDate ? new Date(p.endDate) : null;
+  const dDays = endDate ? daysUntil(endDate) : null;
+  const dDayLabel = dDays !== null ? (dDays < 0 ? `D+${Math.abs(dDays)} (지연)` : dDays === 0 ? "D-Day (오늘)" : `D-${dDays}`) : "-";
+
+  // Plan deviation: divide total project duration into 6 equal parts
+  const startDate = p.startDate ? new Date(p.startDate) : null;
+  let deviationLabel = "";
+  let deviationColor = "var(--success-400)";
+  if (startDate && endDate && phaseIndex >= 0) {
+    const totalMs = endDate.getTime() - startDate.getTime();
+    const elapsedMs = Date.now() - startDate.getTime();
+    const expectedPhase = Math.min(5, Math.floor((elapsedMs / totalMs) * 6));
+    const diff = phaseIndex - expectedPhase;
+    if (diff >= 1) {
+      deviationLabel = "앞서감";
+      deviationColor = "var(--success-400)";
+    } else if (diff === 0) {
+      deviationLabel = "정상";
+      deviationColor = "var(--success-400)";
+    } else if (diff === -1) {
+      deviationLabel = "약간 지연";
+      deviationColor = "var(--warning-400)";
+    } else {
+      deviationLabel = "심각 지연";
+      deviationColor = "var(--danger-400)";
+    }
+  }
+
+  // Bottleneck: in current phase, find departments with pending/in_progress tasks
+  const bottlenecks = [];
+  if (currentPhase) {
+    const phaseStages = [currentPhase.workStage, currentPhase.gateStage];
+    const phaseTasks = checklistItems.filter(t => phaseStages.includes(t.stage) && t.status !== "completed");
+    const deptCounts = {};
+    for (const t of phaseTasks) {
+      if (!deptCounts[t.department]) deptCounts[t.department] = { inProgress: 0, pending: 0 };
+      if (t.status === "in_progress") deptCounts[t.department].inProgress++;
+      else if (t.status === "pending") deptCounts[t.department].pending++;
+    }
+    for (const [dept, counts] of Object.entries(deptCounts)) {
+      const parts = [];
+      if (counts.inProgress > 0) parts.push(`${counts.inProgress}건 진행중`);
+      if (counts.pending > 0) parts.push(`${counts.pending}건 대기`);
+      bottlenecks.push(`${dept} ${parts.join(", ")}`);
+    }
+  }
+
+  return `
+    <div class="card p-5 mb-6">
+      <h3 class="section-title mb-4">프로젝트 상태 요약</h3>
+
+      <!-- Current Phase -->
+      <div class="flex items-center gap-2 mb-4">
+        <svg width="16" height="16" fill="none" stroke="var(--primary-400)" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <span class="text-base font-semibold" style="color:var(--primary-300)">${currentPhase ? currentPhase.name : "-"}</span>
+        <span class="text-sm text-soft">(${isGateStage ? "승인 위원회 진행 중" : "작업 진행 중"})</span>
+      </div>
+
+      <!-- Phase Progress Bar -->
+      <div class="flex items-center gap-1 mb-4" style="flex-wrap:wrap">
+        ${PHASE_GROUPS.map((ph, idx) => {
+          const isCompleted = idx < phaseIndex;
+          const isCurrent = idx === phaseIndex;
+          const isFuture = idx > phaseIndex;
+          const bg = isCompleted ? "var(--success-500)" : isCurrent ? "var(--primary-500)" : "var(--surface-4)";
+          const textColor = isCompleted ? "white" : isCurrent ? "white" : "var(--slate-500)";
+          return `
+            <div style="display:flex;align-items:center;gap:0.25rem">
+              <div style="padding:0.25rem 0.625rem;border-radius:var(--radius-lg);background:${bg};color:${textColor};font-size:0.75rem;font-weight:600;white-space:nowrap">
+                ${isCompleted ? "✔ " : isCurrent ? "▶ " : ""}${ph.name}
+              </div>
+              ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-600);font-size:0.75rem">→</span>' : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      <!-- Deadline + Plan Deviation -->
+      <div class="flex flex-wrap gap-6 mb-4">
+        <div>
+          <div class="text-xs text-dim mb-1">마감일</div>
+          <div class="text-sm font-semibold" style="color:var(--slate-200)">${formatDate(p.endDate)}</div>
+          <div class="text-xs font-mono" style="color:${dDays !== null && dDays < 0 ? "var(--danger-400)" : "var(--primary-400)"}">${dDayLabel}</div>
+        </div>
+        <div>
+          <div class="text-xs text-dim mb-1">계획 대비</div>
+          <div class="text-sm font-semibold" style="color:${deviationColor}">${deviationLabel || "-"}</div>
+          <div class="text-xs text-soft">현재 ${currentPhase ? currentPhase.name : "-"} (${phaseIndex + 1}/6 phase)</div>
+        </div>
+      </div>
+
+      <!-- Bottleneck -->
+      ${bottlenecks.length > 0 ? `
+        <div style="padding:0.75rem 1rem;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:var(--radius-lg)">
+          <div class="text-xs font-semibold mb-1" style="color:var(--warning-400)">병목</div>
+          <div class="text-sm" style="color:var(--slate-300)">${bottlenecks.join(" / ")}</div>
+        </div>
+      ` : `
+        <div style="padding:0.75rem 1rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius-lg)">
+          <div class="text-xs font-semibold" style="color:var(--success-400)">병목 없음 — 원활하게 진행 중</div>
+        </div>
+      `}
     </div>
   `;
 }
@@ -443,60 +525,57 @@ function renderRecentActivity() {
 
 function renderChecklistTab() {
   return `
-    <!-- Matrix -->
+    <!-- Matrix (6 phase) -->
     <div class="card p-4 mb-6">
-      <h3 class="section-title mb-3">부서 x 단계 매트릭스</h3>
+      <h3 class="section-title mb-3">부서 x 페이즈 매트릭스</h3>
       <div class="matrix-table">
         <table>
           <thead>
             <tr>
               <th style="min-width: 100px; text-align: left;">부서</th>
-              ${projectStages
-                .map(
-                  (stage) =>
-                    `<th style="padding: 0.5rem 0.25rem; font-size: 0.625rem; writing-mode: vertical-lr; text-orientation: mixed; transform: rotate(180deg); height: 6rem;" title="${formatStageName(stage)}">${formatStageName(stage)}</th>`
-                )
-                .join("")}
+              ${PHASE_GROUPS.map(phase =>
+                `<th style="min-width:100px">${phase.name}</th>`
+              ).join("")}
             </tr>
           </thead>
           <tbody>
-            ${departments
-              .map(
-                (dept) => `
-                <tr>
-                  <td style="font-size: 0.75rem; font-weight: 500; color: var(--slate-300); white-space: nowrap;">${escapeHtml(dept)}</td>
-                  ${projectStages
-                    .map((stage) => {
-                      const cell = getMatrixCellData(stage, dept);
-                      if (cell.status === "none") {
-                        return `<td class="matrix-cell" style="padding: 0.375rem;">
-                          <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:var(--surface-3);font-size:0.625rem;color:var(--slate-600);">-</span>
-                        </td>`;
-                      }
-                      return `<td class="matrix-cell" data-matrix-stage="${stage}" data-matrix-dept="${dept}" style="padding: 0.375rem;">
-                        <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${getMatrixCellColor(cell.status)};font-size:0.625rem;color:white;font-weight:700;" class="count">${cell.count}/${cell.total}</span>
-                      </td>`;
-                    })
-                    .join("")}
-                </tr>
-              `
-              )
-              .join("")}
+            ${departments.map(dept => `
+              <tr>
+                <td style="font-size: 0.75rem; font-weight: 500; color: var(--slate-300); white-space: nowrap;">${escapeHtml(dept)}</td>
+                ${PHASE_GROUPS.map(phase => {
+                  const workCell = getMatrixCellData(phase.workStage, dept);
+                  const gateTasks = checklistItems.filter(t => t.stage === phase.gateStage && t.department === dept);
+                  let gateStatus = "none";
+                  if (gateTasks.length > 0) {
+                    if (gateTasks.some(t => t.approvalStatus === "rejected" || t.status === "rejected")) gateStatus = "rejected";
+                    else if (gateTasks.every(t => t.approvalStatus === "approved")) gateStatus = "approved";
+                    else if (gateTasks.every(t => t.status === "completed")) gateStatus = "pending";
+                  }
+                  const gateInfo = { approved: { s: "✓", c: "var(--success-400)", bg: "rgba(34,197,94,0.15)" }, rejected: { s: "✗", c: "var(--danger-400)", bg: "rgba(239,68,68,0.15)" }, pending: { s: "⏳", c: "var(--warning-400)", bg: "rgba(245,158,11,0.15)" }, none: { s: "—", c: "var(--slate-600)", bg: "var(--surface-3)" } }[gateStatus];
+                  const hasWork = workCell.total > 0;
+                  const workColor = workCell.status === "completed" ? "var(--success-400)" : workCell.status === "in_progress" ? "var(--primary-400)" : hasWork ? "var(--slate-500)" : "var(--slate-600)";
+
+                  return `<td class="matrix-cell" data-matrix-phase="${phase.name}" data-matrix-dept="${dept}" style="padding: 0.375rem;">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:0.375rem">
+                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid ${workColor};font-size:0.55rem;color:${workColor};font-weight:700;font-family:'JetBrains Mono',monospace">${hasWork ? `${workCell.count}/${workCell.total}` : "-"}</span>
+                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:${gateInfo.bg};font-size:0.6rem;color:${gateInfo.c};font-weight:700">${gateInfo.s}</span>
+                    </div>
+                  </td>`;
+                }).join("")}
+              </tr>
+            `).join("")}
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters (phase-based) -->
     <div class="flex flex-wrap gap-3 mb-4">
       <select class="input-field" style="width: auto; min-width: 160px;" id="filter-stage">
         <option value="">전체 단계</option>
-        ${projectStages
-          .map(
-            (s) =>
-              `<option value="${s}" ${selectedStage === s ? "selected" : ""}>${formatStageName(s)}</option>`
-          )
-          .join("")}
+        ${PHASE_GROUPS.map(phase =>
+          `<option value="${phase.name}" ${selectedStage === phase.workStage || selectedStage === phase.gateStage ? "selected" : ""}>${phase.name}</option>`
+        ).join("")}
       </select>
       <select class="input-field" style="width: auto; min-width: 140px;" id="filter-dept">
         <option value="">전체 부서</option>
@@ -517,11 +596,32 @@ function renderChecklistTab() {
 function renderTaskList() {
   let filtered = [...checklistItems];
 
+  // Phase-based stage filter (filter by both work and gate stage of the phase)
   if (selectedStage) {
-    filtered = filtered.filter((t) => t.stage === selectedStage);
+    const phase = PHASE_GROUPS.find(p => p.name === selectedStage || p.workStage === selectedStage || p.gateStage === selectedStage);
+    if (phase) {
+      filtered = filtered.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
+    } else {
+      filtered = filtered.filter(t => t.stage === selectedStage);
+    }
   }
   if (selectedDepartment) {
     filtered = filtered.filter((t) => t.department === selectedDepartment);
+  }
+
+  // Apply checklist filter from stat card click
+  if (checklistFilter === "in_progress") {
+    filtered = filtered.filter(t => t.status === "in_progress");
+  } else if (checklistFilter === "delayed") {
+    filtered = filtered.filter(t => {
+      if (t.status === "completed") return false;
+      const d = daysUntil(t.dueDate);
+      return d !== null && d < 0;
+    });
+  } else if (checklistFilter === "manager_pending") {
+    filtered = filtered.filter(t => !GATE_STAGES.includes(t.stage) && t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending"));
+  } else if (checklistFilter === "committee_pending") {
+    filtered = filtered.filter(t => GATE_STAGES.includes(t.stage) && t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending"));
   }
 
   if (filtered.length === 0) {
@@ -706,15 +806,28 @@ function bindEvents() {
   app.querySelectorAll("[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
       activeTab = btn.dataset.tab;
+      checklistFilter = ""; // reset filter when changing tabs
       render();
     });
   });
 
-  // Matrix cell click
-  app.querySelectorAll("[data-matrix-stage]").forEach((cell) => {
+  // Stat card click → switch to checklist tab with filter
+  app.querySelectorAll("[data-stat-filter]").forEach((card) => {
+    card.addEventListener("click", () => {
+      checklistFilter = card.dataset.statFilter;
+      activeTab = "checklist";
+      selectedStage = "";
+      selectedDepartment = "";
+      render();
+    });
+  });
+
+  // Matrix cell click (phase-based)
+  app.querySelectorAll("[data-matrix-phase]").forEach((cell) => {
     cell.addEventListener("click", () => {
-      selectedStage = cell.dataset.matrixStage;
+      selectedStage = cell.dataset.matrixPhase;
       selectedDepartment = cell.dataset.matrixDept;
+      checklistFilter = "";
       activeTab = "checklist";
       render();
     });
@@ -725,6 +838,7 @@ function bindEvents() {
   if (stageFilter) {
     stageFilter.addEventListener("change", (e) => {
       selectedStage = e.target.value;
+      checklistFilter = "";
       render();
     });
   }
@@ -733,6 +847,7 @@ function bindEvents() {
   if (deptFilter) {
     deptFilter.addEventListener("change", (e) => {
       selectedDepartment = e.target.value;
+      checklistFilter = "";
       render();
     });
   }

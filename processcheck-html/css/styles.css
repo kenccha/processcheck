@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   ProcessCheck — Industrial Precision Dark Theme
+   ProcessCheck — Light/Dark Theme with CSS Custom Properties
    Plain CSS port of Tailwind config + globals.css
    ══════════════════════════════════════════════════════════════════════════════ */
 
@@ -7,14 +7,14 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* ── Design Tokens ── */
+/* ── Design Tokens: Light Mode (Default) ── */
 :root {
-  /* Surface */
-  --surface-0: #0a0e17;
-  --surface-1: #111827;
-  --surface-2: #1a2234;
-  --surface-3: #243047;
-  --surface-4: #2d3b54;
+  /* Surface (Light) */
+  --surface-0: #f8fafc;
+  --surface-1: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --surface-4: #cbd5e1;
 
   /* Primary (Cyan) */
   --primary-50:  #ecfeff;
@@ -58,7 +58,53 @@
   --danger-700: #b91c1c;
   --danger-800: #991b1b;
 
-  /* Slate (Text) */
+  /* Slate (Text — inverted for light) */
+  --slate-100: #1e293b;
+  --slate-200: #334155;
+  --slate-300: #475569;
+  --slate-400: #64748b;
+  --slate-500: #94a3b8;
+  --slate-600: #cbd5e1;
+  --slate-700: #e2e8f0;
+  --slate-800: #f1f5f9;
+
+  /* Foreground / Background */
+  --foreground: #1e293b;
+  --background: #f8fafc;
+
+  /* Shadows */
+  --shadow-glow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 10px rgba(6, 182, 212, 0.08);
+  --shadow-glow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 6px rgba(6, 182, 212, 0.05);
+  --shadow-inner-light: inset 0 1px 0 0 rgba(255,255,255,0.7);
+
+  /* Border Radius */
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  /* Light-mode specific overrides for semi-transparent colors */
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-hover: rgba(0, 0, 0, 0.04);
+  --card-hover-border: rgba(6, 182, 212, 0.25);
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --modal-backdrop: rgba(0, 0, 0, 0.3);
+  --grid-line: rgba(0, 0, 0, 0.04);
+  --selection-bg: rgba(6, 182, 212, 0.15);
+  --selection-color: #1e293b;
+}
+
+/* ── Design Tokens: Dark Mode ── */
+[data-theme="dark"] {
+  /* Surface (Dark) */
+  --surface-0: #0a0e17;
+  --surface-1: #111827;
+  --surface-2: #1a2234;
+  --surface-3: #243047;
+  --surface-4: #2d3b54;
+
+  /* Slate (Text — original dark mode values) */
   --slate-100: #f1f5f9;
   --slate-200: #e2e8f0;
   --slate-300: #cbd5e1;
@@ -77,10 +123,17 @@
   --shadow-glow-sm: 0 0 10px rgba(6, 182, 212, 0.1);
   --shadow-inner-light: inset 0 1px 0 0 rgba(255,255,255,0.05);
 
-  /* Border Radius */
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
+  /* Dark-mode specific overrides */
+  --nav-bg: rgba(17, 24, 39, 0.8);
+  --nav-hover: var(--nav-hover);
+  --card-hover-border: rgba(6, 182, 212, 0.3);
+  --scrollbar-track: #111827;
+  --scrollbar-thumb: #374151;
+  --scrollbar-thumb-hover: #4b5563;
+  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(255, 255, 255, 0.02);
+  --selection-bg: rgba(6, 182, 212, 0.3);
+  --selection-color: #e2e8f0;
 }
 
 /* ── Reset ── */
@@ -108,9 +161,9 @@ body {
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface-1); }
-::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ── Focus ── */
 *:focus-visible {
@@ -120,8 +173,8 @@ body {
 
 /* ── Selection ── */
 ::selection {
-  background: rgba(6, 182, 212, 0.3);
-  color: var(--slate-200);
+  background: var(--selection-bg);
+  color: var(--selection-color);
 }
 
 /* ── Links ── */
@@ -184,7 +237,7 @@ a:hover { color: var(--primary-300); }
   transition: all 0.2s ease;
 }
 .card-hover:hover {
-  border-color: rgba(6, 182, 212, 0.3);
+  border-color: var(--card-hover-border);
   box-shadow: var(--shadow-glow-sm);
 }
 
@@ -399,8 +452,8 @@ select.input-field {
 /* ── Background Utilities ── */
 .bg-grid {
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -469,10 +522,12 @@ select.input-field {
   .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
   .md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
   .md\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .md\:grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
 }
 @media (min-width: 1024px) {
   .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
   .lg\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .lg\:grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
   .lg\:col-span-1 { grid-column: span 1 / span 1; }
   .lg\:col-span-2 { grid-column: span 2 / span 2; }
   .lg\:col-span-3 { grid-column: span 3 / span 3; }
@@ -501,6 +556,7 @@ select.input-field {
 .mb-3 { margin-bottom: 0.75rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
 .ml-auto { margin-left: auto; }
 
 .w-full { width: 100%; }
@@ -549,7 +605,7 @@ select.input-field {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(17, 24, 39, 0.8);
+  background: var(--nav-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--surface-3);
@@ -635,7 +691,7 @@ select.input-field {
 }
 .nav-link:hover {
   color: var(--slate-200);
-  background: rgba(45, 59, 84, 0.5);
+  background: var(--nav-hover);
 }
 .nav-link.active {
   color: var(--primary-300);
@@ -667,7 +723,7 @@ select.input-field {
 }
 .nav-bell:hover {
   color: var(--slate-200);
-  background: rgba(45, 59, 84, 0.5);
+  background: var(--nav-hover);
 }
 .nav-bell svg { width: 1.25rem; height: 1.25rem; }
 
@@ -715,7 +771,7 @@ select.input-field {
 }
 .nav-logout:hover {
   color: var(--slate-300);
-  background: rgba(45, 59, 84, 0.5);
+  background: var(--nav-hover);
 }
 .nav-logout svg { width: 1rem; height: 1rem; }
 
@@ -731,7 +787,7 @@ select.input-field {
 }
 .nav-hamburger:hover {
   color: var(--slate-200);
-  background: rgba(45, 59, 84, 0.5);
+  background: var(--nav-hover);
 }
 .nav-hamburger svg { width: 1.25rem; height: 1.25rem; }
 @media (min-width: 768px) {
@@ -771,13 +827,40 @@ select.input-field {
 }
 .nav-mobile-link:hover {
   color: var(--slate-200);
-  background: rgba(45, 59, 84, 0.5);
+  background: var(--nav-hover);
 }
 .nav-mobile-link.active {
   color: var(--primary-300);
   background: rgba(6, 182, 212, 0.1);
 }
 .nav-mobile-link svg { width: 1rem; height: 1rem; }
+
+/* ── Theme Toggle ── */
+.nav-theme-toggle {
+  position: relative;
+  padding: 0.5rem;
+  color: var(--slate-400);
+  background: none;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-theme-toggle:hover {
+  color: var(--slate-200);
+  background: var(--nav-hover);
+}
+.nav-theme-toggle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  transition: transform 0.3s ease;
+}
+.nav-theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
 
 /* ── User info responsive ── */
 @media (max-width: 639px) {
@@ -853,7 +936,7 @@ tbody tr {
   transition: background 0.15s;
 }
 tbody tr:hover {
-  background: rgba(26, 34, 52, 0.5);
+  background: var(--nav-hover);
 }
 tbody tr:last-child td {
   border-bottom: none;
@@ -866,7 +949,7 @@ tbody tr:last-child td {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--modal-backdrop);
   backdrop-filter: blur(4px);
   z-index: 100;
   display: flex;

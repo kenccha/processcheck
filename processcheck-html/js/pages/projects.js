@@ -3,17 +3,21 @@
 // =============================================================================
 
 import { guardPage } from "../auth.js";
-import { renderNav, renderSpinner } from "../components.js";
+import { renderNav, renderSpinner, initTheme } from "../components.js";
+initTheme();
 import { subscribeProjects, subscribeAllChecklistItems } from "../firestore-service.js";
 import {
   departments,
   projectStages,
+  PHASE_GROUPS,
+  GATE_STAGES,
   getStatusLabel,
   getStatusBadgeClass,
   formatStageName,
   formatDate,
   escapeHtml,
   getRiskClass,
+  getRiskLabel,
   daysUntil,
 } from "../utils.js";
 
@@ -31,7 +35,9 @@ const unsubNav = renderNav(navRoot);
 // -- State --
 let projects = [];
 let allTasks = [];
-let viewMode = "cards"; // cards | table | gantt | kanban | timeline | calendar | matrix
+let projectTypeTab = "신규개발"; // "신규개발" | "설계변경"
+let viewMode = "table"; // table | matrix | cards | gantt | kanban | timeline | calendar
+let changeViewMode = "table"; // table | kanban (설계변경 전용)
 let searchQuery = "";
 let statusFilter = "all"; // all | active | completed | on_hold
 let calendarYear = new Date().getFullYear();
@@ -61,6 +67,9 @@ window.addEventListener("beforeunload", () => {
 
 function getFilteredProjects() {
   return projects.filter((p) => {
+    // project type tab filter
+    const pType = p.projectType || "신규개발";
+    if (pType !== projectTypeTab) return false;
     // status filter
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     // search filter
@@ -176,13 +185,18 @@ function sameDay(d1, d2) {
 // =============================================================================
 
 const VIEW_MODES = [
-  { key: "cards", label: "카드" },
   { key: "table", label: "테이블" },
+  { key: "matrix", label: "매트릭스" },
+  { key: "cards", label: "카드" },
   { key: "gantt", label: "간트" },
   { key: "kanban", label: "칸반" },
   { key: "timeline", label: "타임라인" },
   { key: "calendar", label: "캘린더" },
-  { key: "matrix", label: "매트릭스" },
+];
+
+const CHANGE_VIEW_MODES = [
+  { key: "table", label: "테이블" },
+  { key: "kanban", label: "칸반" },
 ];
 
 // =============================================================================
@@ -220,6 +234,9 @@ function getProjectStatusBadge(status) {
 
 function render() {
   const filtered = getFilteredProjects();
+  const isChangeTab = projectTypeTab === "설계변경";
+  const currentViewModes = isChangeTab ? CHANGE_VIEW_MODES : VIEW_MODES;
+  const currentView = isChangeTab ? changeViewMode : viewMode;
 
   app.innerHTML = `
     <div class="container">
@@ -229,6 +246,12 @@ function render() {
           <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">프로젝트</h1>
           <p class="text-sm text-soft mt-1">총 ${filtered.length}개 프로젝트</p>
         </div>
+      </div>
+
+      <!-- Project Type Tabs (신규개발 / 설계변경) -->
+      <div class="tab-bar mb-4">
+        <button class="tab-btn${projectTypeTab === "신규개발" ? " active" : ""}" data-type-tab="신규개발">신규개발</button>
+        <button class="tab-btn${projectTypeTab === "설계변경" ? " active" : ""}" data-type-tab="설계변경">설계변경</button>
       </div>
 
       <!-- Controls -->
@@ -248,16 +271,16 @@ function render() {
 
         <!-- View mode switcher -->
         <div class="view-switcher">
-          ${VIEW_MODES.map(
+          ${currentViewModes.map(
             (vm) =>
-              `<button class="view-switcher-btn${viewMode === vm.key ? " active" : ""}" data-view="${vm.key}">${vm.label}</button>`
+              `<button class="view-switcher-btn${currentView === vm.key ? " active" : ""}" data-view="${vm.key}">${vm.label}</button>`
           ).join("")}
         </div>
       </div>
 
       <!-- Content -->
       <div id="view-content">
-        ${renderViewContent(filtered)}
+        ${isChangeTab ? renderChangeViewContent(filtered) : renderViewContent(filtered)}
       </div>
     </div>
   `;
@@ -278,6 +301,123 @@ function renderViewContent(filtered) {
   }
 }
 
+function renderChangeViewContent(filtered) {
+  switch (changeViewMode) {
+    case "kanban":  return renderChangeKanban(filtered);
+    case "table":   return renderChangeTable(filtered);
+    default:        return renderChangeTable(filtered);
+  }
+}
+
+// =============================================================================
+// 설계변경 전용 테이블 뷰
+// =============================================================================
+
+function getChangeScaleLabel(scale) {
+  switch (scale) {
+    case "major": return "대규모";
+    case "medium": return "중간";
+    case "minor": return "경미";
+    default: return scale || "-";
+  }
+}
+
+function getChangeScaleBadge(scale) {
+  switch (scale) {
+    case "major": return "badge-danger";
+    case "medium": return "badge-warning";
+    case "minor": return "badge-neutral";
+    default: return "badge-neutral";
+  }
+}
+
+function renderChangeTable(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  return `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>프로젝트명</th>
+            <th>규모</th>
+            <th>상태</th>
+            <th>PM</th>
+            <th>중요도</th>
+            <th>진행률</th>
+            <th>요청일</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map(p => `
+            <tr class="cursor-pointer" data-project-id="${p.id}">
+              <td><span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span></td>
+              <td><span class="badge ${getChangeScaleBadge(p.changeScale)}">${getChangeScaleLabel(p.changeScale)}</span></td>
+              <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
+              <td>${escapeHtml(p.pm || "-")}</td>
+              <td><span class="risk-dot ${p.riskLevel || ""}"></span> ${getRiskLabel(p.riskLevel)}</td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <div class="progress-bar" style="width:80px">
+                    <div class="progress-fill" style="width:${p.progress || 0}%"></div>
+                  </div>
+                  <span class="text-xs font-mono">${p.progress || 0}%</span>
+                </div>
+              </td>
+              <td class="text-xs whitespace-nowrap">${formatDate(p.startDate)}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// =============================================================================
+// 설계변경 전용 칸반 뷰
+// =============================================================================
+
+function renderChangeKanban(filtered) {
+  const columns = [
+    { key: "active", label: "진행 중", color: "var(--primary-400)" },
+    { key: "completed", label: "완료", color: "var(--success-400)" },
+    { key: "on_hold", label: "보류", color: "var(--warning-400)" },
+  ];
+
+  return `
+    <div class="kanban-board">
+      ${columns.map(col => {
+        const colProjects = filtered.filter(p => p.status === col.key);
+        return `
+        <div class="kanban-column" style="flex:1;max-width:none">
+          <div class="kanban-column-header">
+            <div class="flex items-center gap-2">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col.color}"></span>
+              <span class="kanban-column-title">${col.label}</span>
+            </div>
+            <span class="kanban-column-count">${colProjects.length}</span>
+          </div>
+          <div class="kanban-column-body">
+            ${colProjects.length === 0
+              ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">프로젝트 없음</span></div>`
+              : colProjects.map(p => `
+                <div class="kanban-card" data-project-id="${p.id}">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
+                    <span class="badge ${getChangeScaleBadge(p.changeScale)}" style="font-size:0.625rem">${getChangeScaleLabel(p.changeScale)}</span>
+                  </div>
+                  <div class="text-xs text-soft mb-2">PM: ${escapeHtml(p.pm || "-")}</div>
+                  <div class="progress-bar mb-1">
+                    <div class="progress-fill" style="width:${p.progress || 0}%"></div>
+                  </div>
+                  <div class="text-xs text-soft">${p.progress || 0}%</div>
+                </div>`).join("")}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
 // =============================================================================
 // 1) Cards view
 // =============================================================================
@@ -296,7 +436,7 @@ function renderCards(filtered) {
           <div class="card-hover p-5 cursor-pointer animate-fade-in" data-project-id="${p.id}">
             <div class="flex items-center justify-between mb-3">
               <span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span>
-              <span class="risk-dot ${p.riskLevel || ""}" title="위험도: ${p.riskLevel || "N/A"}"></span>
+              <span class="risk-dot ${p.riskLevel || ""}" title="중요도: ${getRiskLabel(p.riskLevel)}"></span>
             </div>
             <h3 class="font-semibold mb-1" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
             <p class="text-xs text-soft mb-3">${escapeHtml(p.productType || "")}</p>
@@ -356,7 +496,7 @@ function renderTable(filtered) {
             <th>상태</th>
             <th>PM</th>
             <th>현재단계</th>
-            <th>위험도</th>
+            <th>중요도</th>
             <th>진행률</th>
             <th>기간</th>
           </tr>
@@ -448,9 +588,9 @@ function renderGantt(filtered) {
 
       <!-- Legend -->
       <div class="flex items-center gap-4 mt-4 text-xs text-soft" style="margin-left:200px">
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--success-500)"></span> 안전</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--warning-500)"></span> 주의</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--danger-500)"></span> 위험</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--success-500)"></span> 보통</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--warning-500)"></span> 중요</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:4px;border-radius:2px;background:var(--danger-500)"></span> 긴급</span>
         <span class="flex items-center gap-1"><span style="display:inline-block;width:2px;height:12px;background:var(--danger-400);opacity:0.6"></span> 오늘</span>
       </div>
     </div>
@@ -625,6 +765,7 @@ function renderCalendar(filtered) {
             : "var(--slate-400)";
         events.push({
           label: t.title,
+          assignee: t.assignee || "",
           bg: statusColor,
           color: textColor,
           projectId: t.projectId,
@@ -664,7 +805,7 @@ function renderCalendar(filtered) {
                 .slice(0, 3)
                 .map(
                   (ev) =>
-                    `<span class="calendar-event" style="background:${ev.bg};color:${ev.color}" data-project-id="${ev.projectId}" title="${escapeHtml(ev.label)}">${escapeHtml(ev.label)}</span>`
+                    `<span class="calendar-event" style="background:${ev.bg};color:${ev.color}" data-project-id="${ev.projectId}" title="${escapeHtml(ev.label)}${ev.assignee ? " (" + escapeHtml(ev.assignee) + ")" : ""}">${escapeHtml(ev.label)}${ev.assignee ? `<span style="font-size:0.55rem;opacity:0.7;margin-left:3px">${escapeHtml(ev.assignee)}</span>` : ""}</span>`
                 )
                 .join("")}
               ${events.length > 3 ? `<span class="text-xs text-soft" style="padding-left:0.375rem">+${events.length - 3}개 더</span>` : ""}
@@ -684,42 +825,66 @@ function renderMatrix(filtered) {
   const projectIds = new Set(filtered.map((p) => p.id));
   const relevantTasks = allTasks.filter((t) => projectIds.has(t.projectId));
 
-  // Build count map: dept -> stage -> { total, completed, inProgress, delayed }
+  // Build count map: dept -> phase -> { work: { total, completed, inProgress, delayed }, gate: { status } }
   const matrix = {};
   for (const dept of departments) {
     matrix[dept] = {};
-    for (const stage of projectStages) {
-      matrix[dept][stage] = { total: 0, completed: 0, inProgress: 0, delayed: 0 };
+    for (const phase of PHASE_GROUPS) {
+      matrix[dept][phase.name] = {
+        work: { total: 0, completed: 0, inProgress: 0, delayed: 0 },
+        gate: { status: "none" }, // none | pending | approved | rejected
+      };
     }
   }
 
   for (const t of relevantTasks) {
     const dept = t.department;
-    const stage = t.stage;
-    if (!matrix[dept] || !matrix[dept][stage]) continue;
-    matrix[dept][stage].total++;
-    if (t.status === "completed") matrix[dept][stage].completed++;
-    else if (t.status === "in_progress") matrix[dept][stage].inProgress++;
-    const d = daysUntil(t.dueDate);
-    if (t.status !== "completed" && d !== null && d < 0) matrix[dept][stage].delayed++;
+    if (!matrix[dept]) continue;
+    // Find which phase this task belongs to
+    for (const phase of PHASE_GROUPS) {
+      if (t.stage === phase.workStage) {
+        matrix[dept][phase.name].work.total++;
+        if (t.status === "completed") matrix[dept][phase.name].work.completed++;
+        else if (t.status === "in_progress") matrix[dept][phase.name].work.inProgress++;
+        const d = daysUntil(t.dueDate);
+        if (t.status !== "completed" && d !== null && d < 0) matrix[dept][phase.name].work.delayed++;
+        break;
+      }
+      if (t.stage === phase.gateStage) {
+        // Gate tasks — determine status
+        const gateData = matrix[dept][phase.name].gate;
+        if (t.approvalStatus === "rejected" || t.status === "rejected") {
+          gateData.status = "rejected";
+        } else if (t.approvalStatus === "approved") {
+          if (gateData.status !== "rejected") gateData.status = "approved";
+        } else if (t.status === "completed") {
+          if (gateData.status === "none") gateData.status = "pending";
+        } else if (t.status === "in_progress" || t.status === "pending") {
+          // task not yet completed, gate not yet ready
+          if (gateData.status === "none") gateData.status = "none";
+        }
+        break;
+      }
+    }
   }
 
-  function getCellColor(cell) {
-    if (cell.total === 0) return "";
-    if (cell.delayed > 0) return "background:rgba(239,68,68,0.08)";
-    if (cell.inProgress > 0) return "background:rgba(6,182,212,0.08)";
-    if (cell.completed > 0 && cell.completed === cell.total) return "background:rgba(34,197,94,0.08)";
-    return "";
+  // Get work circle color
+  function getWorkColor(work) {
+    if (work.total === 0) return "var(--slate-600)";
+    if (work.delayed > 0) return "var(--danger-400)";
+    if (work.completed === work.total) return "var(--success-400)";
+    if (work.inProgress > 0) return "var(--primary-400)";
+    return "var(--slate-500)";
   }
 
-  // Short stage labels for header
-  function shortStage(stage) {
-    const idx = stage.indexOf("_");
-    if (idx === -1) return stage;
-    const num = stage.substring(0, idx);
-    const name = stage.substring(idx + 1);
-    // Limit name length
-    return `${num}. ${name.length > 4 ? name.substring(0, 4) + ".." : name}`;
+  // Get gate circle info
+  function getGateInfo(gate) {
+    switch (gate.status) {
+      case "approved": return { symbol: "✓", color: "var(--success-400)", bg: "rgba(34,197,94,0.15)" };
+      case "rejected": return { symbol: "✗", color: "var(--danger-400)", bg: "rgba(239,68,68,0.15)" };
+      case "pending":  return { symbol: "⏳", color: "var(--warning-400)", bg: "rgba(245,158,11,0.15)" };
+      default:         return { symbol: "—", color: "var(--slate-600)", bg: "var(--surface-3)" };
+    }
   }
 
   return `
@@ -727,41 +892,52 @@ function renderMatrix(filtered) {
       <table>
         <thead>
           <tr>
-            <th style="min-width:100px">부서 / 단계</th>
-            ${projectStages.map((s) => `<th title="${formatStageName(s)}">${shortStage(s)}</th>`).join("")}
+            <th style="min-width:100px">부서 / 페이즈</th>
+            ${PHASE_GROUPS.map(phase => `<th style="min-width:100px">${phase.name}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
-          ${departments
-            .map(
-              (dept) => `
+          ${departments.map(dept => `
             <tr>
               <td>${escapeHtml(dept)}</td>
-              ${projectStages
-                .map((stage) => {
-                  const cell = matrix[dept][stage];
-                  const style = getCellColor(cell);
-                  if (cell.total === 0) {
-                    return `<td class="matrix-cell" style="${style}"><span class="text-dim">-</span></td>`;
-                  }
-                  return `
-                  <td class="matrix-cell" style="${style}" title="${dept} | ${formatStageName(stage)}: 전체 ${cell.total}, 완료 ${cell.completed}, 진행 ${cell.inProgress}, 지연 ${cell.delayed}">
-                    <div class="count" style="color:${cell.delayed > 0 ? "var(--danger-400)" : cell.inProgress > 0 ? "var(--primary-300)" : "var(--success-400)"}">${cell.total}</div>
-                    <div class="text-xs text-soft">${cell.completed}/${cell.total}</div>
-                  </td>`;
-                })
-                .join("")}
-            </tr>`
-            )
-            .join("")}
+              ${PHASE_GROUPS.map(phase => {
+                const cell = matrix[dept][phase.name];
+                const work = cell.work;
+                const gate = cell.gate;
+                const gateInfo = getGateInfo(gate);
+                const workColor = getWorkColor(work);
+                const hasWork = work.total > 0;
+                const hasBg = work.delayed > 0 ? "background:rgba(239,68,68,0.06)" : work.inProgress > 0 ? "background:rgba(6,182,212,0.06)" : (work.completed === work.total && work.total > 0) ? "background:rgba(34,197,94,0.06)" : "";
+
+                return `<td class="matrix-cell" style="${hasBg};padding:0.5rem 0.375rem" title="${dept} | ${phase.name}: 작업 ${work.completed}/${work.total}, 승인 ${gate.status}">
+                  <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem">
+                    <!-- Work circle -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
+                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${hasWork ? "rgba(0,0,0,0.15)" : "var(--surface-3)"};border:2px solid ${workColor};font-size:0.6rem;color:${workColor};font-weight:700;font-family:'JetBrains Mono',monospace">${hasWork ? `${work.completed}/${work.total}` : "-"}</span>
+                      <span style="font-size:0.5rem;color:var(--slate-600)">작업</span>
+                    </div>
+                    <!-- Gate circle -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
+                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${gateInfo.bg};font-size:0.7rem;color:${gateInfo.color};font-weight:700">${gateInfo.symbol}</span>
+                      <span style="font-size:0.5rem;color:var(--slate-600)">승인</span>
+                    </div>
+                  </div>
+                </td>`;
+              }).join("")}
+            </tr>`).join("")}
         </tbody>
       </table>
 
       <!-- Legend -->
-      <div class="flex items-center gap-4 p-4 text-xs text-soft" style="border-top:1px solid var(--surface-3)">
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,0.15)"></span> 전체 완료</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(6,182,212,0.15)"></span> 진행 중</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,0.15)"></span> 지연 포함</span>
+      <div class="flex items-center gap-4 p-4 text-xs text-soft flex-wrap" style="border-top:1px solid var(--surface-3)">
+        <span style="font-weight:600;color:var(--slate-300)">작업:</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--success-400)"></span> 완료</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--primary-400)"></span> 진행 중</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--danger-400)"></span> 지연</span>
+        <span style="margin-left:0.5rem;font-weight:600;color:var(--slate-300)">승인:</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(34,197,94,0.15)"></span> ✓승인</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(245,158,11,0.15)"></span> ⏳대기</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(239,68,68,0.15)"></span> ✗반려</span>
       </div>
     </div>
   `;
@@ -787,6 +963,14 @@ function renderEmpty() {
 // =============================================================================
 
 function bindControls() {
+  // Project type tab switcher (신규개발 / 설계변경)
+  document.querySelectorAll("[data-type-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      projectTypeTab = btn.dataset.typeTab;
+      render();
+    });
+  });
+
   // Search
   const searchInput = document.getElementById("search-input");
   if (searchInput) {
@@ -814,7 +998,11 @@ function bindControls() {
   // View mode switcher
   document.querySelectorAll("[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      viewMode = btn.dataset.view;
+      if (projectTypeTab === "설계변경") {
+        changeViewMode = btn.dataset.view;
+      } else {
+        viewMode = btn.dataset.view;
+      }
       render();
     });
   });

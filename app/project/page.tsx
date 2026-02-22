@@ -18,6 +18,7 @@ import {
   getRiskColor,
 } from "@/lib/mockData";
 import type { Project, ChecklistItem, ChangeRequest, ProjectStage, Department } from "@/lib/types";
+import { PHASE_GROUPS } from "@/lib/types";
 
 type TabType = "overview" | "checklist" | "files" | "changes";
 
@@ -118,31 +119,11 @@ function ProjectDetailContent() {
     return matchesStage && matchesDept;
   });
 
-  // 매트릭스 데이터
-  const getMatrixCellData = (stage: ProjectStage, dept: Department) => {
-    const tasks = checklistItems.filter(
-      (item) => item.stage === stage && item.department === dept
-    );
-    if (tasks.length === 0) return { status: "none", count: 0, total: 0 };
-    const completed = tasks.filter((t) => t.status === "completed").length;
-    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
-    if (completed === tasks.length) return { status: "completed", count: completed, total: tasks.length };
-    if (inProgress > 0) return { status: "in_progress", count: completed, total: tasks.length };
-    return { status: "pending", count: completed, total: tasks.length };
-  };
-
   const getDepartmentProgress = (dept: Department) => {
     const deptTasks = checklistItems.filter((item) => item.department === dept);
     if (deptTasks.length === 0) return 0;
     const completed = deptTasks.filter((item) => item.status === "completed").length;
     return Math.round((completed / deptTasks.length) * 100);
-  };
-
-  const getStageProgress = (stage: ProjectStage) => {
-    const stageTasks = checklistItems.filter((item) => item.stage === stage);
-    if (stageTasks.length === 0) return 0;
-    const completed = stageTasks.filter((item) => item.status === "completed").length;
-    return Math.round((completed / stageTasks.length) * 100);
   };
 
   const getMatrixCellColor = (status: string) => {
@@ -161,6 +142,28 @@ function ProjectDetailContent() {
       case "completed": return "bg-success-500/15 text-success-400 border-success-500/20";
       case "rejected": return "bg-danger-500/15 text-danger-400 border-danger-500/20";
     }
+  };
+
+  // 페이즈 병합 매트릭스 셀
+  const getPhaseCellData = (phaseIndex: number, dept: Department) => {
+    const phase = PHASE_GROUPS[phaseIndex];
+    const tasks = checklistItems.filter(
+      (item) => (item.stage === phase.workStage || item.stage === phase.gateStage) && item.department === dept
+    );
+    if (tasks.length === 0) return { status: "none", count: 0, total: 0 };
+    const completed = tasks.filter((t) => t.status === "completed").length;
+    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+    if (completed === tasks.length) return { status: "completed", count: completed, total: tasks.length };
+    if (inProgress > 0) return { status: "in_progress", count: completed, total: tasks.length };
+    return { status: "pending", count: completed, total: tasks.length };
+  };
+
+  const getPhaseProgress = (phaseIndex: number) => {
+    const phase = PHASE_GROUPS[phaseIndex];
+    const tasks = checklistItems.filter((item) => item.stage === phase.workStage || item.stage === phase.gateStage);
+    if (tasks.length === 0) return 0;
+    const completed = tasks.filter((t) => t.status === "completed").length;
+    return Math.round((completed / tasks.length) * 100);
   };
 
   const handleMatrixCellClick = (stage: ProjectStage, dept: Department) => {
@@ -216,7 +219,7 @@ function ProjectDetailContent() {
           <div className="p-4 bg-primary-500/10 rounded-xl border border-primary-500/30">
             <div className="text-sm font-medium text-primary-300 mb-1">현재 단계</div>
             <div className="text-lg font-semibold text-primary-300">
-              {project.currentStage.replace(/_/g, " - ")}
+              {project.currentStage}
             </div>
           </div>
         </div>
@@ -282,16 +285,16 @@ function ProjectDetailContent() {
               </div>
             </div>
 
-            {/* Stage Progress */}
+            {/* Phase Progress */}
             <div className="bg-surface-2 rounded-2xl border border-surface-3 p-6">
-              <h2 className="section-title mb-4">단계별 진행 상황</h2>
+              <h2 className="section-title mb-4">페이즈별 진행 상황</h2>
               <div className="space-y-4">
-                {projectStages.map((stage) => {
-                  const progress = getStageProgress(stage);
-                  const isCurrent = project.currentStage === stage;
+                {PHASE_GROUPS.map((phase, i) => {
+                  const progress = getPhaseProgress(i);
+                  const isCurrent = project.currentStage === phase.workStage || project.currentStage === phase.gateStage;
                   return (
                     <div
-                      key={stage}
+                      key={phase.name}
                       className={`p-3 rounded-xl transition-colors ${
                         isCurrent ? "bg-primary-500/10 border border-primary-500/30" : ""
                       }`}
@@ -299,7 +302,10 @@ function ProjectDetailContent() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <span className={`text-sm font-medium ${isCurrent ? "text-primary-300" : "text-slate-200"}`}>
-                            {stage.replace(/_/g, " - ")}
+                            {phase.name}
+                          </span>
+                          <span className="text-[10px] text-slate-600 font-mono">
+                            {phase.workStage} + {phase.gateStage}
                           </span>
                           {isCurrent && (
                             <span className="badge-primary">현재</span>
@@ -363,7 +369,7 @@ function ProjectDetailContent() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-200">{task.title}</p>
                         <p className="text-xs text-slate-500 mt-1">
-                          {task.assignee} / {task.department} / {task.stage.split("_")[0]}
+                          {task.assignee} / {task.department} / {task.stage}
                         </p>
                       </div>
                       <div className="flex-shrink-0 text-xs font-mono text-slate-500">
@@ -381,7 +387,7 @@ function ProjectDetailContent() {
         {/* Checklist Tab */}
         {activeTab === "checklist" && (
           <div className="space-y-6">
-            {/* Mini Matrix */}
+            {/* Mini Matrix — 6 Phase Groups */}
             <div className="bg-surface-2 rounded-2xl border border-surface-3 p-6">
               <h2 className="section-title mb-4">전체 진행 현황</h2>
               <div className="overflow-x-auto">
@@ -389,15 +395,15 @@ function ProjectDetailContent() {
                   <thead>
                     <tr>
                       <th className="border border-surface-3 bg-surface-2 p-2 text-left text-sm font-medium text-slate-200 sticky left-0 z-10">
-                        부서 / 단계
+                        부서 / 페이즈
                       </th>
-                      {projectStages.map((stage) => (
+                      {PHASE_GROUPS.map((phase, i) => (
                         <th
-                          key={stage}
-                          className="border border-surface-3 bg-surface-2 p-2 text-center text-xs font-medium text-slate-200 min-w-[60px]"
+                          key={phase.name}
+                          className="border border-surface-3 bg-surface-2 p-2 text-center text-xs font-medium text-slate-200 min-w-[80px]"
                         >
-                          {stage.split("_")[0]}
-                          <div className="text-xs font-mono text-slate-500 mt-1">{getStageProgress(stage)}%</div>
+                          {phase.name}
+                          <div className="text-xs font-mono text-slate-500 mt-1">{getPhaseProgress(i)}%</div>
                         </th>
                       ))}
                       <th className="border border-surface-3 bg-surface-2 p-2 text-center text-sm font-medium text-slate-200 sticky right-0">
@@ -411,22 +417,22 @@ function ProjectDetailContent() {
                         <td className="border border-surface-3 bg-surface-1 p-2 text-sm font-medium text-slate-200 sticky left-0 z-10">
                           {dept}
                         </td>
-                        {projectStages.map((stage) => {
-                          const cellData = getMatrixCellData(stage, dept);
+                        {PHASE_GROUPS.map((phase, phaseIdx) => {
+                          const cellData = getPhaseCellData(phaseIdx, dept);
                           return (
                             <td
-                              key={`${stage}-${dept}`}
-                              onClick={() => cellData.status !== "none" && handleMatrixCellClick(stage, dept)}
+                              key={`${phase.name}-${dept}`}
+                              onClick={() => cellData.status !== "none" && handleMatrixCellClick(phase.workStage, dept)}
                               className={`border border-surface-3 bg-surface-1 p-2 text-center hover:opacity-80 transition-opacity ${
                                 cellData.status !== "none" ? "cursor-pointer" : "cursor-default"
                               }`}
                             >
                               <div className="flex items-center justify-center">
                                 <div
-                                  className={`w-8 h-8 rounded-full ${getMatrixCellColor(cellData.status)} flex items-center justify-center`}
+                                  className={`w-10 h-10 rounded-lg ${getMatrixCellColor(cellData.status)} flex items-center justify-center`}
                                 >
                                   {cellData.status !== "none" ? (
-                                    <span className="text-xs text-white font-mono font-medium">
+                                    <span className="text-[11px] text-white font-mono font-medium">
                                       {cellData.count}/{cellData.total}
                                     </span>
                                   ) : (
@@ -475,7 +481,7 @@ function ProjectDetailContent() {
                   >
                     <option value="all">전체 단계</option>
                     {projectStages.map((stage) => (
-                      <option key={stage} value={stage}>{stage.replace(/_/g, " - ")}</option>
+                      <option key={stage} value={stage}>{stage}</option>
                     ))}
                   </select>
                 </div>
@@ -553,7 +559,7 @@ function ProjectDetailContent() {
                                     {getStatusLabel(task.status)}
                                   </span>
                                   <span className="text-xs text-slate-500">
-                                    {task.stage.replace(/_/g, " - ")}
+                                    {task.stage}
                                   </span>
                                   {task.status === "completed" && task.approvalStatus === "approved" && (
                                     <span className="badge-success">
@@ -809,12 +815,12 @@ function ProjectDetailContent() {
                     </div>
                   </div>
 
-                  {change.status === "in_review" && (
+                  {change.status === "in_review" && (currentUser.role === "observer" || currentUser.role === "manager") && (
                     <div className="flex space-x-3">
                       <button className="flex-1 btn-primary" onClick={() => updateChangeRequest(change.id, { status: "approved" })}>
                         승인
                       </button>
-                      <button className="flex-1 btn-danger" onClick={() => { const reason = prompt("반려 사유를 입력하세요:"); if (reason) updateChangeRequest(change.id, { status: "rejected" }); }}>
+                      <button className="flex-1 btn-danger" onClick={() => { const reason = prompt("반려 사유를 입력하세요:"); if (reason) updateChangeRequest(change.id, { status: "rejected", description: change.description + `\n[반려 사유: ${reason}]` }); }}>
                         반려
                       </button>
                     </div>

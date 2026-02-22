@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import {
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, deleteField,
   query, where, Timestamp, writeBatch, onSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
@@ -52,7 +52,7 @@ function getMockData() {
   const mockUsers = [
     { id: "user1", name: "김철수", email: "chulsoo@company.com", role: "worker", department: "개발팀" },
     { id: "user2", name: "이영희", email: "younghee@company.com", role: "manager", department: "개발팀" },
-    { id: "user3", name: "박민수", email: "minsu@company.com", role: "pm", department: "경영관리팀" },
+    { id: "user3", name: "박민수", email: "minsu@company.com", role: "observer", department: "경영관리팀" },
     { id: "user4", name: "최지영", email: "jiyoung@company.com", role: "worker", department: "품질팀" },
     { id: "user5", name: "정수현", email: "soohyun@company.com", role: "worker", department: "제조팀" },
     { id: "user6", name: "강민지", email: "minji@company.com", role: "manager", department: "품질팀" },
@@ -60,45 +60,83 @@ function getMockData() {
   ];
 
   const mockProjects = [
-    { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), pm: "박민수", riskLevel: "yellow", currentStage: "4_WM제작" },
-    { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), pm: "박민수", riskLevel: "green", currentStage: "6_Tx단계" },
-    { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), pm: "박민수", riskLevel: "green", currentStage: "2_기획검토" },
-    { id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "9_MSG승인회" },
-    { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), pm: "박민수", riskLevel: "green", currentStage: "11_영업이관" },
+    { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", projectType: "신규개발", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), pm: "박민수", riskLevel: "yellow", currentStage: "WM제작" },
+    { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", projectType: "신규개발", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), pm: "박민수", riskLevel: "green", currentStage: "Tx단계" },
+    { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", projectType: "신규개발", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), pm: "박민수", riskLevel: "green", currentStage: "기획검토" },
+    { id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계", projectType: "설계변경", changeScale: "major", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
+    { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", projectType: "신규개발", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
+    // 설계변경 프로젝트
+    { id: "proj6", name: "센서 교체 (혈압계)", productType: "혈압계", projectType: "설계변경", changeScale: "minor", status: "completed", progress: 100, startDate: new Date("2026-01-10"), endDate: new Date("2026-01-25"), pm: "이영희", riskLevel: "green", currentStage: "영업이관" },
+    { id: "proj7", name: "배터리 규격 변경", productType: "체성분 분석기", projectType: "설계변경", changeScale: "major", status: "active", progress: 20, startDate: new Date("2026-01-15"), endDate: new Date("2026-06-30"), pm: "박민수", riskLevel: "yellow", currentStage: "발의검토" },
+    { id: "proj8", name: "LCD 크기 조정", productType: "혈압계", projectType: "설계변경", changeScale: "medium", status: "active", progress: 40, startDate: new Date("2026-02-01"), endDate: new Date("2026-04-30"), pm: "이영희", riskLevel: "green", currentStage: "기획검토" },
+    { id: "proj9", name: "펌웨어 버전 업데이트", productType: "FRA", projectType: "설계변경", changeScale: "minor", status: "active", progress: 50, startDate: new Date("2026-02-10"), endDate: new Date("2026-03-15"), pm: "이영희", riskLevel: "green", currentStage: "발의검토" },
+    { id: "proj10", name: "외관 재질 변경", productType: "신장계", projectType: "설계변경", changeScale: "medium", status: "completed", progress: 100, startDate: new Date("2025-12-01"), endDate: new Date("2026-02-10"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
   ];
 
   const mockChecklistItems = [
-    { id: "task1", projectId: "proj1", stage: "4_WM제작", department: "개발팀", title: "스펙 정리 및 분석 완료", description: "제품 스펙을 최종 확정하고 기술 문서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(1) },
-    { id: "task2", projectId: "proj1", stage: "4_WM제작", department: "개발팀", title: "eBOM 작성", description: "설계 자재 명세서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: d(0) },
-    { id: "task3", projectId: "proj2", stage: "6_Tx단계", department: "개발팀", title: "기술 문서 검토", description: "최종 기술 문서를 검토하고 승인합니다.", assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: d(3) },
-    { id: "task4", projectId: "proj1", stage: "2_기획검토", department: "개발팀", title: "NABC 분석 완료", description: "Need, Approach, Benefit, Competition 분석", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-1) },
-    { id: "task5", projectId: "proj2", stage: "6_Tx단계", department: "개발팀", title: "성능 테스트 보고서 작성", description: "성능 테스트 결과를 정리하고 보고서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(2), completedDate: d(-1) },
-    { id: "task6", projectId: "proj1", stage: "4_WM제작", department: "품질팀", title: "신뢰성 테스트 계획 수립", description: "제품의 신뢰성 테스트 계획을 수립합니다.", assignee: "최지영", reviewer: "강민지", status: "in_progress", dueDate: d(5) },
-    { id: "task7", projectId: "proj2", stage: "6_Tx단계", department: "품질팀", title: "낙하 테스트 실시", description: "제품 낙하 테스트를 실시하고 결과를 분석합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(1) },
-    { id: "task8", projectId: "proj4", stage: "9_MSG승인회", department: "제조팀", title: "양산 라인 셋업", description: "양산을 위한 제조 라인 준비 및 테스트", assignee: "정수현", reviewer: "이영희", status: "in_progress", dueDate: d(0) },
-    { id: "task9", projectId: "proj4", stage: "8_MasterGatePilot", department: "제조팀", title: "시생산 결과 분석", description: "시생산 결과를 분석하고 개선사항을 도출합니다.", assignee: "정수현", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-2) },
-    { id: "task10", projectId: "proj2", stage: "6_Tx단계", department: "디자인연구소", title: "UI/UX 디자인 최종 검토", description: "사용자 인터페이스 및 경험 디자인 최종 검토", assignee: "홍길동", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-3) },
-    { id: "task11", projectId: "proj1", stage: "4_WM제작", department: "구매팀", title: "부품 공급업체 선정", description: "주요 부품의 공급업체를 선정하고 계약합니다.", assignee: "박영수", reviewer: "김부장", status: "pending", dueDate: d(7) },
-    { id: "task12", projectId: "proj3", stage: "2_기획검토", department: "영업팀", title: "시장 조사 및 분석", description: "목표 시장을 조사하고 경쟁사를 분석합니다.", assignee: "이상민", reviewer: "최과장", status: "in_progress", dueDate: d(5) },
-    { id: "task13", projectId: "proj1", stage: "4_WM제작", department: "인증팀", title: "인증 전략 수립", description: "각국 인증 요구사항을 분석하고 전략을 수립합니다.", assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: d(7) },
-    { id: "task14", projectId: "proj4", stage: "9_MSG승인회", department: "개발팀", title: "최종 도면 승인", description: "양산을 위한 최종 도면을 검토하고 승인합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(-1) },
-    { id: "task15", projectId: "proj1", stage: "0_발의검토", department: "개발팀", title: "제품 컨셉 정의", description: "신제품 컨셉과 목표를 정의합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-7) },
-    { id: "task16", projectId: "proj1", stage: "0_발의검토", department: "품질팀", title: "품질 목표 수립", description: "제품의 품질 목표와 기준을 수립합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-7), completedDate: d(-7) },
-    { id: "task17", projectId: "proj1", stage: "0_발의검토", department: "영업팀", title: "시장 기회 분석", description: "목표 시장과 경쟁 환경을 분석합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
-    { id: "task18", projectId: "proj1", stage: "0_발의검토", department: "경영관리팀", title: "사업성 검토", description: "ROI 및 수익성을 분석합니다.", assignee: "정재무", reviewer: "김부장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
-    { id: "task19", projectId: "proj1", stage: "2_기획검토", department: "영업팀", title: "가격 전략 수립", description: "제품 가격 전략을 수립합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
-    { id: "task20", projectId: "proj1", stage: "4_WM제작", department: "개발팀", title: "시제품 제작", description: "1차 시제품을 제작합니다.", assignee: "박영수", reviewer: "이영희", status: "pending", dueDate: d(7) },
-    { id: "task21", projectId: "proj1", stage: "4_WM제작", department: "제조팀", title: "제작 공정 검토", description: "시제품 제작 공정을 검토합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
-    { id: "task22", projectId: "proj1", stage: "6_Tx단계", department: "품질팀", title: "내구성 테스트", description: "제품 내구성 테스트를 실시합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(7) },
-    { id: "task23", projectId: "proj1", stage: "6_Tx단계", department: "디자인연구소", title: "외관 디자인 확정", description: "제품 외관 디자인을 확정합니다.", assignee: "홍길동", reviewer: "박디자인", status: "pending", dueDate: d(7) },
-    { id: "task24", projectId: "proj1", stage: "8_MasterGatePilot", department: "제조팀", title: "양산 공정 계획", description: "양산을 위한 제조 공정을 계획합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
-    { id: "task25", projectId: "proj1", stage: "8_MasterGatePilot", department: "구매팀", title: "자재 조달 계획", description: "양산 자재 조달 계획을 수립합니다.", assignee: "박구매", reviewer: "최구매", status: "pending", dueDate: d(7) },
-    { id: "task26", projectId: "proj1", stage: "8_MasterGatePilot", department: "제조팀", title: "시생산 실시", description: "시생산을 실시하고 문제점을 파악합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
-    { id: "task27", projectId: "proj1", stage: "9_MSG승인회", department: "품질팀", title: "최종 품질 검증", description: "양산 전 최종 품질을 검증합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(7) },
-    { id: "task28", projectId: "proj1", stage: "10_양산", department: "제조팀", title: "양산 가동", description: "본격적인 양산을 시작합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
-    { id: "task29", projectId: "proj1", stage: "11_영업이관", department: "영업팀", title: "판매 시작 준비", description: "제품 판매를 위한 준비를 합니다.", assignee: "이상민", reviewer: "최과장", status: "pending", dueDate: d(7) },
-    { id: "task30", projectId: "proj1", stage: "11_영업이관", department: "CS팀", title: "A/S 체계 구축", description: "고객 서비스 및 A/S 체계를 구축합니다.", assignee: "김서비스", reviewer: "박CS", status: "pending", dueDate: d(7) },
-    { id: "task31", projectId: "proj1", stage: "4_WM제작", department: "인증팀", title: "인증 요구사항 검토", description: "각국 인증 요구사항을 검토합니다.", assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: d(5) },
+    { id: "task1", projectId: "proj1", stage: "WM제작", department: "개발팀", title: "스펙 정리 및 분석 완료", description: "제품 스펙을 최종 확정하고 기술 문서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(1) },
+    { id: "task2", projectId: "proj1", stage: "WM제작", department: "개발팀", title: "eBOM 작성", description: "설계 자재 명세서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: d(0) },
+    { id: "task3", projectId: "proj2", stage: "Tx단계", department: "개발팀", title: "기술 문서 검토", description: "최종 기술 문서를 검토하고 승인합니다.", assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: d(3) },
+    { id: "task4", projectId: "proj1", stage: "기획검토", department: "개발팀", title: "NABC 분석 완료", description: "Need, Approach, Benefit, Competition 분석", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-1) },
+    { id: "task5", projectId: "proj2", stage: "Tx단계", department: "개발팀", title: "성능 테스트 보고서 작성", description: "성능 테스트 결과를 정리하고 보고서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(2), completedDate: d(-1) },
+    { id: "task6", projectId: "proj1", stage: "WM제작", department: "품질팀", title: "신뢰성 테스트 계획 수립", description: "제품의 신뢰성 테스트 계획을 수립합니다.", assignee: "최지영", reviewer: "강민지", status: "in_progress", dueDate: d(5) },
+    { id: "task7", projectId: "proj2", stage: "Tx단계", department: "품질팀", title: "낙하 테스트 실시", description: "제품 낙하 테스트를 실시하고 결과를 분석합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(1) },
+    { id: "task8", projectId: "proj4", stage: "MSG승인회", department: "제조팀", title: "양산 라인 셋업", description: "양산을 위한 제조 라인 준비 및 테스트", assignee: "정수현", reviewer: "이영희", status: "in_progress", dueDate: d(0) },
+    { id: "task9", projectId: "proj4", stage: "MasterGatePilot", department: "제조팀", title: "시생산 결과 분석", description: "시생산 결과를 분석하고 개선사항을 도출합니다.", assignee: "정수현", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-2) },
+    { id: "task10", projectId: "proj2", stage: "Tx단계", department: "디자인연구소", title: "UI/UX 디자인 최종 검토", description: "사용자 인터페이스 및 경험 디자인 최종 검토", assignee: "홍길동", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-3) },
+    { id: "task11", projectId: "proj1", stage: "WM제작", department: "구매팀", title: "부품 공급업체 선정", description: "주요 부품의 공급업체를 선정하고 계약합니다.", assignee: "박영수", reviewer: "김부장", status: "pending", dueDate: d(7) },
+    { id: "task12", projectId: "proj3", stage: "기획검토", department: "영업팀", title: "시장 조사 및 분석", description: "목표 시장을 조사하고 경쟁사를 분석합니다.", assignee: "이상민", reviewer: "최과장", status: "in_progress", dueDate: d(5) },
+    { id: "task13", projectId: "proj1", stage: "WM제작", department: "인증팀", title: "인증 전략 수립", description: "각국 인증 요구사항을 분석하고 전략을 수립합니다.", assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: d(7) },
+    { id: "task14", projectId: "proj4", stage: "MSG승인회", department: "개발팀", title: "최종 도면 승인", description: "양산을 위한 최종 도면을 검토하고 승인합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(-1) },
+    { id: "task15", projectId: "proj1", stage: "발의검토", department: "개발팀", title: "제품 컨셉 정의", description: "신제품 컨셉과 목표를 정의합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-7) },
+    { id: "task16", projectId: "proj1", stage: "발의검토", department: "품질팀", title: "품질 목표 수립", description: "제품의 품질 목표와 기준을 수립합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-7), completedDate: d(-7) },
+    { id: "task17", projectId: "proj1", stage: "발의검토", department: "영업팀", title: "시장 기회 분석", description: "목표 시장과 경쟁 환경을 분석합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
+    { id: "task18", projectId: "proj1", stage: "발의검토", department: "경영관리팀", title: "사업성 검토", description: "ROI 및 수익성을 분석합니다.", assignee: "정재무", reviewer: "김부장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
+    { id: "task19", projectId: "proj1", stage: "기획검토", department: "영업팀", title: "가격 전략 수립", description: "제품 가격 전략을 수립합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-7), completedDate: d(-7) },
+    { id: "task20", projectId: "proj1", stage: "WM제작", department: "개발팀", title: "시제품 제작", description: "1차 시제품을 제작합니다.", assignee: "박영수", reviewer: "이영희", status: "pending", dueDate: d(7) },
+    { id: "task21", projectId: "proj1", stage: "WM제작", department: "제조팀", title: "제작 공정 검토", description: "시제품 제작 공정을 검토합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task22", projectId: "proj1", stage: "Tx단계", department: "품질팀", title: "내구성 테스트", description: "제품 내구성 테스트를 실시합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(7) },
+    { id: "task23", projectId: "proj1", stage: "Tx단계", department: "디자인연구소", title: "외관 디자인 확정", description: "제품 외관 디자인을 확정합니다.", assignee: "홍길동", reviewer: "박디자인", status: "pending", dueDate: d(7) },
+    { id: "task24", projectId: "proj1", stage: "MasterGatePilot", department: "제조팀", title: "양산 공정 계획", description: "양산을 위한 제조 공정을 계획합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task25", projectId: "proj1", stage: "MasterGatePilot", department: "구매팀", title: "자재 조달 계획", description: "양산 자재 조달 계획을 수립합니다.", assignee: "박구매", reviewer: "최구매", status: "pending", dueDate: d(7) },
+    { id: "task26", projectId: "proj1", stage: "MasterGatePilot", department: "제조팀", title: "시생산 실시", description: "시생산을 실시하고 문제점을 파악합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task27", projectId: "proj1", stage: "MSG승인회", department: "품질팀", title: "최종 품질 검증", description: "양산 전 최종 품질을 검증합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(7) },
+    { id: "task28", projectId: "proj1", stage: "양산", department: "제조팀", title: "양산 가동", description: "본격적인 양산을 시작합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task29", projectId: "proj1", stage: "영업이관", department: "영업팀", title: "판매 시작 준비", description: "제품 판매를 위한 준비를 합니다.", assignee: "이상민", reviewer: "최과장", status: "pending", dueDate: d(7) },
+    { id: "task30", projectId: "proj1", stage: "영업이관", department: "CS팀", title: "A/S 체계 구축", description: "고객 서비스 및 A/S 체계를 구축합니다.", assignee: "김서비스", reviewer: "박CS", status: "pending", dueDate: d(7) },
+    { id: "task31", projectId: "proj1", stage: "WM제작", department: "인증팀", title: "인증 요구사항 검토", description: "각국 인증 요구사항을 검토합니다.", assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: d(5) },
+    // Gate stage tasks
+    { id: "task32", projectId: "proj1", stage: "발의승인", department: "개발팀", title: "발의 심사 자료 준비", description: "발의 승인을 위한 심사 자료를 준비합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-30), completedDate: d(-28), approvalStatus: "approved" },
+    { id: "task33", projectId: "proj1", stage: "발의승인", department: "품질팀", title: "발의 품질 기준 검토", description: "발의 단계 품질 기준을 검토합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-30), completedDate: d(-28), approvalStatus: "approved" },
+    { id: "task34", projectId: "proj1", stage: "기획승인", department: "개발팀", title: "기획 발표 자료 작성", description: "기획 승인회 발표 자료를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-20), completedDate: d(-18), approvalStatus: "approved" },
+    { id: "task35", projectId: "proj1", stage: "기획승인", department: "영업팀", title: "기획 시장성 검증", description: "기획 단계 시장성을 검증합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-20), completedDate: d(-18), approvalStatus: "approved" },
+    { id: "task36", projectId: "proj1", stage: "WM승인회", department: "개발팀", title: "W/M 검증 결과 보고", description: "W/M 검증 결과를 보고합니다.", assignee: "김철수", reviewer: "이영희", status: "pending", dueDate: d(14) },
+    { id: "task37", projectId: "proj1", stage: "WM승인회", department: "품질팀", title: "W/M 품질 검증", description: "W/M 단계 품질을 검증합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(14) },
+    { id: "task38", projectId: "proj1", stage: "Tx승인회", department: "품질팀", title: "Tx 시험 성적서 취합", description: "Tx 단계 시험 성적서를 취합합니다.", assignee: "최지영", reviewer: "강민지", status: "pending", dueDate: d(30) },
+    { id: "task39", projectId: "proj1", stage: "Tx승인회", department: "인증팀", title: "인증 시험 보고서", description: "인증 시험 보고서를 작성합니다.", assignee: "김인증", reviewer: "박인증", status: "pending", dueDate: d(30) },
+    // Department coverage tasks
+    { id: "task40", projectId: "proj1", stage: "WM제작", department: "글로벌임상팀", title: "해외 임상 계획 수립", description: "해외 임상 시험 계획을 수립합니다.", assignee: "이글로벌", reviewer: "김임상", status: "pending", dueDate: d(10) },
+    { id: "task41", projectId: "proj1", stage: "기획검토", department: "CS팀", title: "서비스 요구사항 정의", description: "고객 서비스 요구사항을 정의합니다.", assignee: "김서비스", reviewer: "박CS", status: "completed", dueDate: d(-14), completedDate: d(-12) },
+    { id: "task42", projectId: "proj2", stage: "Tx단계", department: "제조팀", title: "시험 생산 준비", description: "시험 생산 라인을 준비합니다.", assignee: "정수현", reviewer: "김제조", status: "in_progress", dueDate: d(3) },
+    { id: "task43", projectId: "proj2", stage: "Tx단계", department: "구매팀", title: "시험 자재 조달", description: "시험 생산에 필요한 자재를 조달합니다.", assignee: "박구매", reviewer: "최구매", status: "pending", dueDate: d(5) },
+    { id: "task44", projectId: "proj3", stage: "기획검토", department: "개발팀", title: "기술 타당성 검토", description: "FRA 신모델의 기술 타당성을 검토합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(5) },
+    { id: "task45", projectId: "proj3", stage: "기획검토", department: "제조팀", title: "제조 타당성 검토", description: "FRA 신모델의 제조 타당성을 검토합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task46", projectId: "proj4", stage: "MasterGatePilot", department: "개발팀", title: "양산 도면 확정", description: "양산을 위한 최종 도면을 확정합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-7), completedDate: d(-5) },
+    { id: "task47", projectId: "proj4", stage: "MasterGatePilot", department: "품질팀", title: "양산 품질 기준 설정", description: "양산 품질 기준을 설정합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-7), completedDate: d(-5) },
+    // 설계변경 프로젝트 tasks
+    { id: "task48", projectId: "proj6", stage: "발의검토", department: "개발팀", title: "센서 호환성 확인", description: "교체 센서의 호환성을 확인합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-25), completedDate: d(-24) },
+    { id: "task49", projectId: "proj6", stage: "발의승인", department: "품질팀", title: "품질 영향 검토", description: "센서 교체에 따른 품질 영향을 검토합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-23), completedDate: d(-22), approvalStatus: "approved" },
+    { id: "task50", projectId: "proj7", stage: "발의검토", department: "개발팀", title: "변경 사유서 작성", description: "배터리 규격 변경 사유서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(3) },
+    { id: "task51", projectId: "proj7", stage: "발의검토", department: "제조팀", title: "제조 영향 분석", description: "배터리 변경에 따른 제조 영향을 분석합니다.", assignee: "정수현", reviewer: "김제조", status: "pending", dueDate: d(7) },
+    { id: "task52", projectId: "proj8", stage: "기획검토", department: "개발팀", title: "LCD 규격 변경서", description: "LCD 크기 조정 규격 변경서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "completed", dueDate: d(-10), completedDate: d(-8) },
+    { id: "task53", projectId: "proj8", stage: "기획검토", department: "품질팀", title: "표시부 시인성 검증", description: "변경된 LCD의 시인성을 검증합니다.", assignee: "최지영", reviewer: "강민지", status: "in_progress", dueDate: d(3) },
+    { id: "task54", projectId: "proj8", stage: "기획승인", department: "경영관리팀", title: "비용 영향 검토", description: "LCD 변경에 따른 비용 영향을 검토합니다.", assignee: "정재무", reviewer: "김부장", status: "pending", dueDate: d(10) },
+    { id: "task55", projectId: "proj9", stage: "발의검토", department: "개발팀", title: "펌웨어 변경 내역서", description: "펌웨어 변경 내역서를 작성합니다.", assignee: "김철수", reviewer: "이영희", status: "in_progress", dueDate: d(2) },
+    { id: "task56", projectId: "proj10", stage: "기획검토", department: "디자인연구소", title: "외관 디자인 변경", description: "외관 재질에 맞는 디자인을 변경합니다.", assignee: "홍길동", reviewer: "박디자인", status: "completed", dueDate: d(-20), completedDate: d(-18) },
+    { id: "task57", projectId: "proj10", stage: "기획승인", department: "품질팀", title: "재질 안전성 검증", description: "변경된 재질의 안전성을 검증합니다.", assignee: "최지영", reviewer: "강민지", status: "completed", dueDate: d(-15), completedDate: d(-14), approvalStatus: "approved" },
+    // proj5 완료 tasks
+    { id: "task58", projectId: "proj5", stage: "영업이관", department: "영업팀", title: "판매 채널 확보", description: "판매 채널을 확보합니다.", assignee: "이상민", reviewer: "최과장", status: "completed", dueDate: d(-60), completedDate: d(-55) },
+    { id: "task59", projectId: "proj5", stage: "양산", department: "제조팀", title: "양산 안정화", description: "양산 프로세스를 안정화합니다.", assignee: "정수현", reviewer: "김제조", status: "completed", dueDate: d(-70), completedDate: d(-65) },
   ];
 
   const now = new Date();
@@ -168,20 +206,14 @@ export async function seedDatabaseIfEmpty() {
       });
     }
 
-    // Template Stages
+    // Template Stages (6 Phases — 작업+승인 쌍으로 병합)
     const stages = [
-      { id: "stage-0", name: "0. 발의 검토", order: 0, type: "work" },
-      { id: "stage-1", name: "1. 발의 승인", order: 1, type: "gate" },
-      { id: "stage-2", name: "2. 기획 검토", order: 2, type: "work" },
-      { id: "stage-3", name: "3. 기획 승인", order: 3, type: "gate" },
-      { id: "stage-4", name: "4. W/M 제작", order: 4, type: "work" },
-      { id: "stage-5", name: "5. W/M 승인회", order: 5, type: "gate" },
-      { id: "stage-6", name: "6. Tx 단계", order: 6, type: "work" },
-      { id: "stage-7", name: "7. Tx 승인회", order: 7, type: "gate" },
-      { id: "stage-8", name: "8. Master Gate Pilot", order: 8, type: "work" },
-      { id: "stage-9", name: "9. MSG 승인회", order: 9, type: "gate" },
-      { id: "stage-10", name: "10. 양산", order: 10, type: "work" },
-      { id: "stage-11", name: "11. 영업 이관", order: 11, type: "work" },
+      { id: "phase0", name: "발의", order: 0, workStageName: "발의검토", gateStageName: "발의승인" },
+      { id: "phase1", name: "기획", order: 1, workStageName: "기획검토", gateStageName: "기획승인" },
+      { id: "phase2", name: "WM", order: 2, workStageName: "WM제작", gateStageName: "WM승인회" },
+      { id: "phase3", name: "Tx", order: 3, workStageName: "Tx단계", gateStageName: "Tx승인회" },
+      { id: "phase4", name: "MSG", order: 4, workStageName: "MasterGatePilot", gateStageName: "MSG승인회" },
+      { id: "phase5", name: "양산/이관", order: 5, workStageName: "양산", gateStageName: "영업이관" },
     ];
     for (const s of stages) {
       batch.set(doc(db, "templateStages", s.id), { ...s, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() });
@@ -189,33 +221,33 @@ export async function seedDatabaseIfEmpty() {
 
     // Template Departments
     const depts = [
-      { id: "dept-dev", name: "개발팀", order: 0 },
-      { id: "dept-quality", name: "품질팀", order: 1 },
-      { id: "dept-sales", name: "영업팀", order: 2 },
-      { id: "dept-mfg", name: "제조팀", order: 3 },
-      { id: "dept-purchase", name: "구매팀", order: 4 },
-      { id: "dept-cs", name: "CS팀", order: 5 },
-      { id: "dept-mgmt", name: "경영관리팀", order: 6 },
-      { id: "dept-clinical", name: "글로벌임상팀", order: 7 },
-      { id: "dept-design", name: "디자인연구소", order: 8 },
-      { id: "dept-cert", name: "인증팀", order: 9 },
+      { id: "dept1", name: "개발팀", order: 0 },
+      { id: "dept2", name: "품질팀", order: 1 },
+      { id: "dept3", name: "영업팀", order: 2 },
+      { id: "dept4", name: "제조팀", order: 3 },
+      { id: "dept5", name: "구매팀", order: 4 },
+      { id: "dept6", name: "CS팀", order: 5 },
+      { id: "dept7", name: "경영관리팀", order: 6 },
+      { id: "dept8", name: "글로벌임상팀", order: 7 },
+      { id: "dept9", name: "디자인연구소", order: 8 },
+      { id: "dept10", name: "인증팀", order: 9 },
     ];
     for (const d of depts) {
       batch.set(doc(db, "templateDepartments", d.id), { ...d, createdBy: "system", createdAt: Timestamp.now() });
     }
 
-    // Template Items
+    // Template Items (stageId는 페이즈 ID 참조)
     const tItems = [
-      { id: "ti-1", stageId: "stage-0", departmentId: "dept-dev", content: "NABC 문서가 작성되었는가?", order: 0, isRequired: true },
-      { id: "ti-2", stageId: "stage-0", departmentId: "dept-dev", content: "Needs(필요성) 항목이 작성되었는가?", order: 1, isRequired: true },
-      { id: "ti-3", stageId: "stage-0", departmentId: "dept-sales", content: "시장 니즈 조사 자료가 있는가?", order: 0, isRequired: true },
-      { id: "ti-4", stageId: "stage-2", departmentId: "dept-dev", content: "요구사항 문서 작성 완료", order: 0, isRequired: true },
-      { id: "ti-5", stageId: "stage-2", departmentId: "dept-dev", content: "기술 스펙 문서 작성 완료", order: 1, isRequired: true },
-      { id: "ti-6", stageId: "stage-2", departmentId: "dept-dev", content: "관련 부서 검토 완료", order: 2, isRequired: true },
-      { id: "ti-7", stageId: "stage-2", departmentId: "dept-dev", content: "예산 검토 완료", order: 3, isRequired: false },
-      { id: "ti-8", stageId: "stage-2", departmentId: "dept-dev", content: "일정 검토 완료", order: 4, isRequired: true },
-      { id: "ti-9", stageId: "stage-4", departmentId: "dept-dev", content: "설계 도면 완성 여부 확인", order: 0, isRequired: true },
-      { id: "ti-10", stageId: "stage-4", departmentId: "dept-quality", content: "품질 계획서가 수립되었는가?", order: 0, isRequired: true },
+      { id: "ti-1", stageId: "phase0", departmentId: "dept1", content: "NABC 문서가 작성되었는가?", order: 0, isRequired: true },
+      { id: "ti-2", stageId: "phase0", departmentId: "dept1", content: "Needs(필요성) 항목이 작성되었는가?", order: 1, isRequired: true },
+      { id: "ti-3", stageId: "phase0", departmentId: "dept3", content: "시장 니즈 조사 자료가 있는가?", order: 0, isRequired: true },
+      { id: "ti-4", stageId: "phase1", departmentId: "dept1", content: "요구사항 문서 작성 완료", order: 0, isRequired: true },
+      { id: "ti-5", stageId: "phase1", departmentId: "dept1", content: "기술 스펙 문서 작성 완료", order: 1, isRequired: true },
+      { id: "ti-6", stageId: "phase1", departmentId: "dept1", content: "관련 부서 검토 완료", order: 2, isRequired: true },
+      { id: "ti-7", stageId: "phase1", departmentId: "dept1", content: "예산 검토 완료", order: 3, isRequired: false },
+      { id: "ti-8", stageId: "phase1", departmentId: "dept1", content: "일정 검토 완료", order: 4, isRequired: true },
+      { id: "ti-9", stageId: "phase2", departmentId: "dept1", content: "설계 도면 완성 여부 확인", order: 0, isRequired: true },
+      { id: "ti-10", stageId: "phase2", departmentId: "dept2", content: "품질 계획서가 수립되었는가?", order: 0, isRequired: true },
     ];
     for (const ti of tItems) {
       batch.set(doc(db, "templateItems", ti.id), { ...ti, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() });
@@ -324,6 +356,7 @@ export async function completeTask(taskId) {
   await updateDoc(doc(db, "checklistItems", taskId), {
     status: "completed",
     completedDate: Timestamp.now(),
+    approvalStatus: "pending",
   });
 }
 
@@ -342,6 +375,16 @@ export async function rejectTask(taskId, reviewerName, reason) {
     rejectedBy: reviewerName,
     rejectedAt: Timestamp.now(),
     rejectionReason: reason,
+  });
+}
+
+export async function restartTask(taskId) {
+  await updateDoc(doc(db, "checklistItems", taskId), {
+    status: "in_progress",
+    approvalStatus: deleteField(),
+    rejectedBy: deleteField(),
+    rejectedAt: deleteField(),
+    rejectionReason: deleteField(),
   });
 }
 
@@ -423,6 +466,19 @@ export async function getTemplateDepartments() {
 
 // ─── Template Items ─────────────────────────────────────────────────────────
 
+export function subscribeAllTemplateItems(callback) {
+  return onSnapshot(collection(db, "templateItems"), (snap) => {
+    const items = snap.docs
+      .map(d => ({
+        ...d.data(), id: d.id,
+        createdAt: toDate(d.data().createdAt),
+        lastModifiedAt: toDate(d.data().lastModifiedAt),
+      }))
+      .sort((a, b) => a.order - b.order);
+    callback(items);
+  });
+}
+
 export function subscribeTemplateItems(stageId, departmentId, callback) {
   const q = query(
     collection(db, "templateItems"),
@@ -473,10 +529,14 @@ export async function reorderTemplateItems(items) {
 }
 
 export async function addTemplateStage(data) {
+  // data: { name, workStageName, gateStageName, createdBy }
   const stagesSnap = await getDocs(collection(db, "templateStages"));
   const maxOrder = stagesSnap.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
   const ref = await addDoc(collection(db, "templateStages"), {
-    ...data,
+    name: data.name,
+    workStageName: data.workStageName,
+    gateStageName: data.gateStageName,
+    createdBy: data.createdBy,
     order: maxOrder + 1,
     createdAt: Timestamp.now(),
     lastModifiedBy: data.createdBy,

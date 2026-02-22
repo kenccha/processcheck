@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ProcessCheck - 실무자를 위한 프로세스 관리 시스템</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
 
   <!-- Firebase import map (included for consistency; not used on this page) -->
   <script type="importmap">
@@ -26,7 +27,7 @@
       left: 0;
       right: 0;
       z-index: 50;
-      background: rgba(17, 24, 39, 0.85);
+      background: var(--nav-bg);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--surface-3);
@@ -62,7 +63,7 @@
     }
     .landing-nav-link:hover {
       color: var(--slate-200);
-      background: rgba(45, 59, 84, 0.5);
+      background: var(--nav-hover);
     }
 
     /* Hero section */
