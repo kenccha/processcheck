@@ -586,10 +586,10 @@ const templateDepartments = [
 ];
 
 // ─── 템플릿 항목 (193개 — ISO 13485/IEC 62304/FDA 기반) ────────────────────────
-const now = Timestamp.now();
+const tiNow = Timestamp.now();
 const ti = (id, stageId, departmentId, content, order, isRequired) => ({
   id, stageId, departmentId, content, order, isRequired,
-  createdBy: "시스템", createdAt: now, lastModifiedBy: "시스템", lastModifiedAt: now,
+  createdBy: "시스템", createdAt: tiNow, lastModifiedBy: "시스템", lastModifiedAt: tiNow,
 });
 const templateItems = [
   // ── Phase 0: 발의 (22개) ──
