@@ -54,6 +54,11 @@ processcheck-html/        # Plain HTML port (no build step)
   project.html            # Project detail (4 tabs)
   task.html               # Task detail
   admin-checklists.html   # Template admin
+  customers.html          # Customer management
+  customer-portal.html    # Customer portal (email auth)
+  sales.html              # Sales launch dashboard
+  manual.html             # User manual (no auth required)
+  img/                    # Manual screenshots (14 PNG files)
   css/styles.css          # All design tokens + components
   js/firebase-init.js     # Firebase config
   js/firestore-service.js # All Firestore CRUD + subscriptions
@@ -61,6 +66,8 @@ processcheck-html/        # Plain HTML port (no build step)
   js/utils.js             # Helper functions
   js/components.js        # Shared nav, spinner, badges
   js/pages/*.js           # Page-specific controllers
+docs/
+  manual.md               # User manual content (Korean, source of truth)
 ```
 
 ## Key Conventions
@@ -140,6 +147,23 @@ processcheck-html/        # Plain HTML port (no build step)
 - **`checklistItems`** (실제 작업): `stage`에 12개 개별 stage name 사용 (예: "WM제작", "WM승인회")
 - Stage name에 `N_` prefix 없음 — bare name만 사용 (예: "WM제작", NOT "4_WM제작")
 
+### 고객 (대리점/법인) 데이터 모델 (확정)
+- **고객**: 제품을 구매·유통하는 거래처 (대리점, 해외법인, 병원, 온라인 채널)
+- **`customers`** 컬렉션: name, type(dealer/subsidiary/hospital/online), region, contactName, salesRep, contractStatus, products[]
+- **`changeRequests`** 확장: `requestSource`(internal/customer), `customerId`, `customerName`, `customerContactName`, `customerRequestDetail` 필드 추가
+- **`launchChecklists`**: 출시 준비 체크리스트 (D-Day 기준), 거래처별 항목에 `customerId` 연결
+- **고객 포털 (확정)**: 대리점/법인이 자사 관련 프로젝트의 진행 단계를 확인할 수 있는 읽기 전용 뷰, 이메일 인증 필요
+- 상세 설계: `docs/sales-launch-design.md` 참조
+
+### 템플릿 → 프로젝트 체크리스트 생성 (확정)
+- **`applyTemplateToProject(projectId, projectType, changeScale?)`**: 193개 templateItems를 프로젝트 유형에 맞게 필터링하여 checklistItems 자동 생성
+- **신규개발**: 전체 193개 항목 생성
+- **설계변경 minor**: `isRequired`만 + 3개 phase만 (발의/Tx/양산이관) — 약 50~60개
+- **설계변경 medium**: `isRequired`만 + 전체 phase — 약 140~150개
+- **설계변경 major**: 전체 항목 (신규개발과 동일)
+- 프로젝트 상세 체크리스트 탭: 항목이 0개이면 "템플릿에서 체크리스트 생성" 버튼 표시
+- 시드 데이터: 각 프로젝트별 `applyTemplateToProject()` 호출 후 프로젝트 상태에 맞게 status 업데이트
+
 ### 승인 2단계 구조 (확정)
 프로젝트에는 **두 가지 승인 유형**이 존재:
 
@@ -187,6 +211,16 @@ processcheck-html/        # Plain HTML port (no build step)
 - 각 이벤트에 **담당자(assignee) 이름** 표시
 - 이전/다음 월 이동 가능
 
+### Manual Page Design (확정)
+- **인증 불필요**: 로그인 없이 누구나 접근 가능
+- **레이아웃**: 좌측 사이드바 TOC + 우측 메인 콘텐츠 (Notion Help / GitBook 스타일)
+- **ScrollSpy**: IntersectionObserver로 현재 섹션 자동 하이라이트
+- **검색**: 사이드바 상단 실시간 검색, 섹션 제목 기준 필터링
+- **모바일**: 사이드바 → 플로팅 TOC 버튼으로 전환
+- **콘텐츠 소스**: `docs/manual.md` (한국어, 10개 섹션 + 용어집)
+- **섹션 구조**: 시작하기, 프로젝트 관리, 작업 관리, 승인 워크플로우, 설계 변경, 출시 준비, 고객, 체크리스트 관리, 역할별 가이드, FAQ, 용어집
+- **자체 CSS**: `manual.js` 내 `<style>` 태그로 삽입 (`.manual-*` 클래스)
+
 ### Task & Importance
 - **Task statuses:** pending, in_progress, completed, rejected
 - **Approval statuses:** pending, approved, rejected
@@ -218,15 +252,28 @@ processcheck-html/        # Plain HTML port (no build step)
 - ~~캘린더 담당자 없음~~ → assignee 표시
 - ~~다크모드만~~ → 라이트모드(기본) + 다크모드 토글
 - ~~위험도~~ → 중요도로 명칭 변경 (보통/중요/긴급)
+- ~~템플릿 → 프로젝트 적용 기능 없음~~ → `applyTemplateToProject()` 구현 (193개 템플릿 기반)
+- ~~시드 데이터 수동 59개~~ → 템플릿 기반 자동 생성 (프로젝트별 유형/규모에 따라 차등)
+- ~~프로젝트 progress/riskLevel/currentStage 자동 계산 없음~~ → `recalculateProjectStats()` 구현 (completeTask/approveTask/rejectTask/restartTask 시 자동 호출)
+- ~~작업 완료/승인/반려 시 알림 없음~~ → 자동 알림 생성 (검토자/담당자에게 notifications 컬렉션)
+- ~~Gate 승인 시 포털 알림 없음~~ → approveTask에서 gate stage 시 고객 포털 알림 자동 생성
+- ~~변경요청 승인/반려 시 포털 알림 없음~~ → updateChangeRequest에서 고객 출처 변경요청 시 portalNotifications 자동 생성
+- ~~변경요청 등록 UI 없음~~ → 프로젝트 상세 설계변경 탭에 등록 모달 추가 (고객 출처 선택 + 고객 드롭다운)
+- ~~대시보드 고객 요청 카드 없음~~ → 5번째 stat 카드 "고객 요청" 추가 (requestSource=customer, status=in_review 카운트)
+- ~~고객 포털 인증 없음~~ → 이메일 인증 추가 (portalLoginEmail 일치 확인, portalEnabled 체크, sessionStorage)
 
 ### Remaining Gaps
 - 파일 업로드: UI만 있고 Firebase Storage 연동 없음
-- 태스크 생성: 생성 페이지/모달 없음 (시드 데이터만 존재)
-- 프로젝트 정렬(Sort) 미구현
-- 템플릿 → 프로젝트 적용 기능 없음
 - 태스크 승인 후 스테이지 자동 전환 없음
 - 변경 요청 부서별 개별 승인 흐름 없음
 - 프로젝트 progress/riskLevel/currentStage 자동 계산 없음
+
+### ✅ Recently Fixed (최근 수정)
+- ~~태스크 생성 모달 없음~~ → project-detail.js 체크리스트 탭에 "작업 추가" 모달 구현
+- ~~프로젝트 정렬 미구현~~ → projects.js 테이블 뷰에 정렬 기능 추가 (이름, 상태, PM, 진행률, 시작일)
+- ~~템플릿 적용 기능 없음~~ → project-detail.js 개요 탭에 "템플릿 적용" / "출시 준비 적용" 버튼 추가
+- ~~영업 대시보드 없음~~ → sales.html + js/pages/sales.js 신규 생성 (전체 프로젝트 출시 준비 대시보드)
+- ~~매뉴얼 스크린샷 없음~~ → Puppeteer로 14개 실제 스크린샷 캡처, manual.js에 이미지 렌더링
 
 ## Claude Code Automations
 

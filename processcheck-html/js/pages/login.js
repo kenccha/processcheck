@@ -22,6 +22,7 @@ seedDatabaseIfEmpty()
   .finally(() => {
     seedingView.style.display = "none";
     contentView.style.display = "";
+    window.__seedComplete = true;
   });
 
 // Card click → login → redirect

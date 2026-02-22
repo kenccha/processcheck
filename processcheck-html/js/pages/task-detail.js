@@ -174,7 +174,7 @@ function render() {
       <nav class="flex items-center gap-2 text-sm text-soft mb-6" style="margin-top:0.5rem">
         <a href="dashboard.html" style="color:var(--slate-400);text-decoration:none">프로젝트</a>
         <span style="color:var(--slate-600)">${ICONS.chevronRight}</span>
-        <a href="projects.html?id=${escapeHtml(projectId)}" style="color:var(--slate-400);text-decoration:none">${escapeHtml(project.name)}</a>
+        <a href="project.html?id=${escapeHtml(projectId)}" style="color:var(--slate-400);text-decoration:none">${escapeHtml(project.name)}</a>
         <span style="color:var(--slate-600)">${ICONS.chevronRight}</span>
         <span style="color:var(--slate-300)">작업 상세</span>
       </nav>

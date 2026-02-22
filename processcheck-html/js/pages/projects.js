@@ -42,6 +42,8 @@ let searchQuery = "";
 let statusFilter = "all"; // all | active | completed | on_hold
 let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth(); // 0-based
+let sortField = "startDate"; // name | status | pm | progress | startDate
+let sortDir = "desc"; // asc | desc
 
 // -- Subscriptions --
 const unsubProjects = subscribeProjects((data) => {
@@ -57,8 +59,8 @@ const unsubTasks = subscribeAllChecklistItems((data) => {
 // -- Cleanup --
 window.addEventListener("beforeunload", () => {
   if (unsubNav) unsubNav();
-  unsubProjects();
-  unsubTasks();
+  if (unsubProjects) unsubProjects();
+  if (unsubTasks) unsubTasks();
 });
 
 // =============================================================================
@@ -483,26 +485,51 @@ function renderCards(filtered) {
 // 2) Table view
 // =============================================================================
 
+function sortArrow(field) {
+  if (sortField !== field) return '<span style="opacity:0.3;font-size:10px;">&#9650;&#9660;</span>';
+  return sortDir === "asc"
+    ? '<span style="font-size:10px;">&#9650;</span>'
+    : '<span style="font-size:10px;">&#9660;</span>';
+}
+
+function applySorting(list) {
+  return [...list].sort((a, b) => {
+    let va, vb;
+    switch (sortField) {
+      case "name": va = (a.name || "").toLowerCase(); vb = (b.name || "").toLowerCase(); break;
+      case "status": va = a.status || ""; vb = b.status || ""; break;
+      case "pm": va = (a.pm || "").toLowerCase(); vb = (b.pm || "").toLowerCase(); break;
+      case "progress": va = a.progress || 0; vb = b.progress || 0; break;
+      case "startDate": va = new Date(a.startDate).getTime(); vb = new Date(b.startDate).getTime(); break;
+      default: va = new Date(a.startDate).getTime(); vb = new Date(b.startDate).getTime();
+    }
+    if (va < vb) return sortDir === "asc" ? -1 : 1;
+    if (va > vb) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
 function renderTable(filtered) {
   if (filtered.length === 0) return renderEmpty();
+  const sorted = applySorting(filtered);
 
   return `
     <div class="table-wrapper">
       <table>
         <thead>
           <tr>
-            <th>프로젝트명</th>
+            <th class="sortable-th" data-sort="name" style="cursor:pointer;user-select:none;">프로젝트명 ${sortArrow("name")}</th>
             <th>제품유형</th>
-            <th>상태</th>
-            <th>PM</th>
+            <th class="sortable-th" data-sort="status" style="cursor:pointer;user-select:none;">상태 ${sortArrow("status")}</th>
+            <th class="sortable-th" data-sort="pm" style="cursor:pointer;user-select:none;">PM ${sortArrow("pm")}</th>
             <th>현재단계</th>
             <th>중요도</th>
-            <th>진행률</th>
-            <th>기간</th>
+            <th class="sortable-th" data-sort="progress" style="cursor:pointer;user-select:none;">진행률 ${sortArrow("progress")}</th>
+            <th class="sortable-th" data-sort="startDate" style="cursor:pointer;user-select:none;">기간 ${sortArrow("startDate")}</th>
           </tr>
         </thead>
         <tbody>
-          ${filtered
+          ${sorted
             .map(
               (p) => `
             <tr class="cursor-pointer" data-project-id="${p.id}">
@@ -1002,6 +1029,21 @@ function bindControls() {
         changeViewMode = btn.dataset.view;
       } else {
         viewMode = btn.dataset.view;
+      }
+      render();
+    });
+  });
+
+  // Table sort
+  document.querySelectorAll(".sortable-th[data-sort]").forEach((th) => {
+    th.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const field = th.dataset.sort;
+      if (sortField === field) {
+        sortDir = sortDir === "asc" ? "desc" : "asc";
+      } else {
+        sortField = field;
+        sortDir = "asc";
       }
       render();
     });
