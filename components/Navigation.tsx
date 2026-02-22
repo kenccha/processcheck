@@ -47,20 +47,20 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* 로고 + 메뉴 */}
           <div className="flex items-center space-x-8">
-            <a href="/dashboard" className="flex items-center space-x-2">
+            <button onClick={() => router.push("/dashboard")} className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">PC</span>
               </div>
               <span className="text-xl font-semibold text-gray-900">ProcessCheck</span>
-            </a>
+            </button>
 
             <div className="hidden md:flex space-x-6">
               {navLinks.map((link) => {
                 const isActive = pathname.startsWith(link.href);
                 return (
-                  <a
+                  <button
                     key={link.href}
-                    href={link.href}
+                    onClick={() => router.push(link.href)}
                     className={`text-sm font-medium transition-colors pb-1 ${
                       isActive
                         ? "text-primary-600 border-b-2 border-primary-600"
@@ -68,7 +68,7 @@ export default function Navigation() {
                     }`}
                   >
                     {link.label}
-                  </a>
+                  </button>
                 );
               })}
             </div>

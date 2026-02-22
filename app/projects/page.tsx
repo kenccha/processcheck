@@ -227,7 +227,7 @@ export default function ProjectsPage() {
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                onClick={() => router.push(`/projects/${project.id}`)}
+                onClick={() => router.push(`/project?id=${project.id}`)}
                 className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary-300 hover:shadow-lg transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -282,7 +282,7 @@ export default function ProjectsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredProjects.map((project) => (
-                  <tr key={project.id} onClick={() => router.push(`/projects/${project.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                  <tr key={project.id} onClick={() => router.push(`/project?id=${project.id}`)} className="hover:bg-gray-50 cursor-pointer">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{project.name}</div>
                       <div className="text-xs text-gray-500">{project.productType}</div>
@@ -326,7 +326,7 @@ export default function ProjectsPage() {
                 return (
                   <div key={project.id} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <button onClick={() => router.push(`/projects/${project.id}`)} className="font-medium text-gray-900 hover:text-primary-600">
+                      <button onClick={() => router.push(`/project?id=${project.id}`)} className="font-medium text-gray-900 hover:text-primary-600">
                         {project.name}
                       </button>
                       <span className="text-gray-500">
@@ -354,7 +354,7 @@ export default function ProjectsPage() {
                 </div>
                 <div className="space-y-3">
                   {filteredTasks.filter((t) => t.status === column.key).map((task) => (
-                    <div key={task.id} onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)} className="p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer">
+                    <div key={task.id} onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)} className="p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer">
                       <div className="text-xs text-gray-500 mb-1">{task.department} · {formatStageName(task.stage)}</div>
                       <div className="text-sm font-medium text-gray-900 mb-2">{task.title}</div>
                       <div className="text-xs text-gray-500">마감: {new Date(task.dueDate).toLocaleDateString("ko-KR")}</div>
@@ -381,7 +381,7 @@ export default function ProjectsPage() {
                   </div>
                   <div className="flex-1 pb-6">
                     <div className="text-xs text-gray-500 mb-1">{new Date(task.dueDate).toLocaleDateString("ko-KR")} · {task.department}</div>
-                    <button onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)} className="text-sm font-semibold text-gray-900 hover:text-primary-600">
+                    <button onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)} className="text-sm font-semibold text-gray-900 hover:text-primary-600">
                       {task.title}
                     </button>
                     <div className="text-xs text-gray-500 mt-1">{formatStageName(task.stage)} · {getTaskStatusLabel(task.status)}</div>
@@ -415,7 +415,7 @@ export default function ProjectsPage() {
                       <div className="text-gray-700 font-medium mb-1">{cell.date.getDate()}</div>
                       <div className="space-y-1">
                         {cell.tasks.slice(0, 2).map((task) => (
-                          <button key={task.id} onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)} className="block text-left w-full truncate text-xs text-primary-700" title={task.title}>
+                          <button key={task.id} onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)} className="block text-left w-full truncate text-xs text-primary-700" title={task.title}>
                             {task.title}
                           </button>
                         ))}

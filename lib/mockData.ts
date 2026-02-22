@@ -616,7 +616,7 @@ export const mockNotifications: Notification[] = [
     type: "change_request",
     title: "설계 변경 요청 확인 필요",
     message: "[신장계] 배터리 규격 변경 - 영향도 검토 요청",
-    link: "/changes/change1",
+    link: "/projects/proj4",
     read: true,
     createdAt: oneDayAgo,
   },

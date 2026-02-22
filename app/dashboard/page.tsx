@@ -208,7 +208,7 @@ export default function DashboardPage() {
                   myTasks.map((task) => (
                     <div
                       key={task.id}
-                      onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)}
+                      onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)}
                       className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer"
                     >
                       <div className="flex items-start justify-between mb-2">
@@ -253,7 +253,7 @@ export default function DashboardPage() {
                   {pendingApprovals.map((task) => (
                     <div
                       key={task.id}
-                      onClick={() => router.push(`/projects/${task.projectId}/tasks/${task.id}`)}
+                      onClick={() => router.push(`/task?projectId=${task.projectId}&taskId=${task.id}`)}
                       className="p-4 border-2 border-warning-200 bg-warning-50 rounded-lg hover:border-warning-400 transition-all cursor-pointer"
                     >
                       <div className="flex items-center space-x-2 mb-1">
@@ -295,7 +295,7 @@ export default function DashboardPage() {
                   myProjects.slice(0, 3).map((project) => (
                     <div
                       key={project.id}
-                      onClick={() => router.push(`/projects/${project.id}`)}
+                      onClick={() => router.push(`/project?id=${project.id}`)}
                       className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-gray-50 transition-all cursor-pointer"
                     >
                       <div className="flex items-start justify-between mb-3">

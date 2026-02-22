@@ -449,9 +449,9 @@ export default function Home() {
             <div>
               <h4 className="text-white font-semibold mb-3">지원</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">문의하기</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">문서</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">FAQ</a></li>
+                <li><span className="hover:text-white transition-colors cursor-default">문의하기</span></li>
+                <li><span className="hover:text-white transition-colors cursor-default">문서</span></li>
+                <li><span className="hover:text-white transition-colors cursor-default">FAQ</span></li>
               </ul>
             </div>
           </div>
