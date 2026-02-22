@@ -1,5 +1,5 @@
-// 사용자 역할
-export type UserRole = "worker" | "manager" | "pm" | "scheduler";
+// 사용자 역할 (3 roles: 실무자, 매니저, PM/기획조정실)
+export type UserRole = "worker" | "manager" | "pm";
 
 // 사용자
 export interface User {
@@ -24,20 +24,36 @@ export type Department =
   | "디자인연구소"
   | "인증팀";
 
-// 프로젝트 단계
+// 프로젝트 단계 (6 Phase, 각각 작업+승인 쌍)
 export type ProjectStage =
-  | "0_발의검토"
-  | "1_발의승인"
-  | "2_기획검토"
-  | "3_기획승인"
-  | "4_WM제작"
-  | "5_WM승인회"
-  | "6_Tx단계"
-  | "7_Tx승인회"
-  | "8_MasterGatePilot"
-  | "9_MSG승인회"
-  | "10_양산"
-  | "11_영업이관";
+  | "발의검토"
+  | "발의승인"
+  | "기획검토"
+  | "기획승인"
+  | "WM제작"
+  | "WM승인회"
+  | "Tx단계"
+  | "Tx승인회"
+  | "MasterGatePilot"
+  | "MSG승인회"
+  | "양산"
+  | "영업이관";
+
+// Phase 그룹 (작업●+승인● 쌍으로 묶임)
+export interface PhaseGroup {
+  name: string;          // Phase 이름 (발의, 기획, WM, Tx, MSG, 양산/이관)
+  workStage: ProjectStage;
+  gateStage: ProjectStage;
+}
+
+export const PHASE_GROUPS: PhaseGroup[] = [
+  { name: "발의", workStage: "발의검토", gateStage: "발의승인" },
+  { name: "기획", workStage: "기획검토", gateStage: "기획승인" },
+  { name: "WM", workStage: "WM제작", gateStage: "WM승인회" },
+  { name: "Tx", workStage: "Tx단계", gateStage: "Tx승인회" },
+  { name: "MSG", workStage: "MasterGatePilot", gateStage: "MSG승인회" },
+  { name: "양산/이관", workStage: "양산", gateStage: "영업이관" },
+];
 
 // 작업 상태
 export type TaskStatus = "pending" | "in_progress" | "completed" | "rejected";

@@ -73,7 +73,7 @@ export const mockProjects: Project[] = [
     endDate: new Date("2026-08-31"),
     pm: "박민수",
     riskLevel: "yellow",
-    currentStage: "4_WM제작",
+    currentStage: "WM제작",
   },
   {
     id: "proj2",
@@ -85,7 +85,7 @@ export const mockProjects: Project[] = [
     endDate: new Date("2026-05-31"),
     pm: "박민수",
     riskLevel: "green",
-    currentStage: "6_Tx단계",
+    currentStage: "Tx단계",
   },
   {
     id: "proj3",
@@ -97,7 +97,7 @@ export const mockProjects: Project[] = [
     endDate: new Date("2026-12-31"),
     pm: "박민수",
     riskLevel: "green",
-    currentStage: "2_기획검토",
+    currentStage: "기획검토",
   },
   {
     id: "proj4",
@@ -109,7 +109,7 @@ export const mockProjects: Project[] = [
     endDate: new Date("2026-03-31"),
     pm: "박민수",
     riskLevel: "red",
-    currentStage: "9_MSG승인회",
+    currentStage: "MSG승인회",
   },
   {
     id: "proj5",
@@ -121,7 +121,7 @@ export const mockProjects: Project[] = [
     endDate: new Date("2025-12-31"),
     pm: "박민수",
     riskLevel: "green",
-    currentStage: "11_영업이관",
+    currentStage: "영업이관",
   },
 ];
 
@@ -140,7 +140,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task1",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "개발팀",
     title: "스펙 정리 및 분석 완료",
     description: "제품 스펙을 최종 확정하고 기술 문서를 작성합니다.",
@@ -152,7 +152,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task2",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "개발팀",
     title: "eBOM 작성",
     description: "설계 자재 명세서를 작성합니다.",
@@ -164,7 +164,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task3",
     projectId: "proj2",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "개발팀",
     title: "기술 문서 검토",
     description: "최종 기술 문서를 검토하고 승인합니다.",
@@ -173,12 +173,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     status: "pending",
     dueDate: in3Days,
   },
-  
+
   // 김철수의 승인 대기 중인 작업
   {
     id: "task4",
     projectId: "proj1",
-    stage: "2_기획검토",
+    stage: "기획검토",
     department: "개발팀",
     title: "NABC 분석 완료",
     description: "Need, Approach, Benefit, Competition 분석",
@@ -191,7 +191,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task5",
     projectId: "proj2",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "개발팀",
     title: "성능 테스트 보고서 작성",
     description: "성능 테스트 결과를 정리하고 보고서를 작성합니다.",
@@ -201,12 +201,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     dueDate: in2Days,
     completedDate: yesterday,
   },
-  
+
   // 최지영의 작업 (품질팀)
   {
     id: "task6",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "품질팀",
     title: "신뢰성 테스트 계획 수립",
     description: "제품의 신뢰성 테스트 계획을 수립합니다.",
@@ -218,7 +218,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task7",
     projectId: "proj2",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "품질팀",
     title: "낙하 테스트 실시",
     description: "제품 낙하 테스트를 실시하고 결과를 분석합니다.",
@@ -227,12 +227,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     status: "pending",
     dueDate: tomorrow,
   },
-  
+
   // 정수현의 작업 (제조팀)
   {
     id: "task8",
     projectId: "proj4",
-    stage: "9_MSG승인회",
+    stage: "MSG승인회",
     department: "제조팀",
     title: "양산 라인 셋업",
     description: "양산을 위한 제조 라인 준비 및 테스트",
@@ -244,7 +244,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task9",
     projectId: "proj4",
-    stage: "8_MasterGatePilot",
+    stage: "MasterGatePilot",
     department: "제조팀",
     title: "시생산 결과 분석",
     description: "시생산 결과를 분석하고 개선사항을 도출합니다.",
@@ -254,12 +254,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     dueDate: weekAgo,
     completedDate: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
   },
-  
+
   // 홍길동의 작업 (디자인연구소)
   {
     id: "task10",
     projectId: "proj2",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "디자인연구소",
     title: "UI/UX 디자인 최종 검토",
     description: "사용자 인터페이스 및 경험 디자인 최종 검토",
@@ -269,12 +269,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     dueDate: weekAgo,
     completedDate: new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000),
   },
-  
-  // 기타 부서 작업들 (김철수가 아닌 다른 사람들)
+
+  // 기타 부서 작업들
   {
     id: "task11",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "구매팀",
     title: "부품 공급업체 선정",
     description: "주요 부품의 공급업체를 선정하고 계약합니다.",
@@ -286,7 +286,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task12",
     projectId: "proj3",
-    stage: "2_기획검토",
+    stage: "기획검토",
     department: "영업팀",
     title: "시장 조사 및 분석",
     description: "목표 시장을 조사하고 경쟁사를 분석합니다.",
@@ -298,7 +298,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task13",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "인증팀",
     title: "인증 전략 수립",
     description: "각국 인증 요구사항을 분석하고 전략을 수립합니다.",
@@ -307,12 +307,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     status: "pending",
     dueDate: in7Days,
   },
-  
+
   // 지연된 작업 (마감일 지남)
   {
     id: "task14",
     projectId: "proj4",
-    stage: "9_MSG승인회",
+    stage: "MSG승인회",
     department: "개발팀",
     title: "최종 도면 승인",
     description: "양산을 위한 최종 도면을 검토하고 승인합니다.",
@@ -321,12 +321,12 @@ export const mockChecklistItems: ChecklistItem[] = [
     status: "in_progress",
     dueDate: yesterday,
   },
-  
-  // proj1 추가 작업들 (12단계 커버)
+
+  // proj1 추가 작업들 (전체 단계 커버)
   {
     id: "task15",
     projectId: "proj1",
-    stage: "0_발의검토",
+    stage: "발의검토",
     department: "개발팀",
     title: "제품 컨셉 정의",
     description: "신제품 컨셉과 목표를 정의합니다.",
@@ -339,7 +339,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task16",
     projectId: "proj1",
-    stage: "0_발의검토",
+    stage: "발의검토",
     department: "품질팀",
     title: "품질 목표 수립",
     description: "제품의 품질 목표와 기준을 수립합니다.",
@@ -352,7 +352,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task17",
     projectId: "proj1",
-    stage: "0_발의검토",
+    stage: "발의검토",
     department: "영업팀",
     title: "시장 기회 분석",
     description: "목표 시장과 경쟁 환경을 분석합니다.",
@@ -365,7 +365,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task18",
     projectId: "proj1",
-    stage: "0_발의검토",
+    stage: "발의검토",
     department: "경영관리팀",
     title: "사업성 검토",
     description: "ROI 및 수익성을 분석합니다.",
@@ -378,7 +378,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task19",
     projectId: "proj1",
-    stage: "2_기획검토",
+    stage: "기획검토",
     department: "영업팀",
     title: "가격 전략 수립",
     description: "제품 가격 전략을 수립합니다.",
@@ -391,7 +391,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task20",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "개발팀",
     title: "시제품 제작",
     description: "1차 시제품을 제작합니다.",
@@ -403,7 +403,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task21",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "제조팀",
     title: "제작 공정 검토",
     description: "시제품 제작 공정을 검토합니다.",
@@ -415,7 +415,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task22",
     projectId: "proj1",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "품질팀",
     title: "내구성 테스트",
     description: "제품 내구성 테스트를 실시합니다.",
@@ -427,7 +427,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task23",
     projectId: "proj1",
-    stage: "6_Tx단계",
+    stage: "Tx단계",
     department: "디자인연구소",
     title: "외관 디자인 확정",
     description: "제품 외관 디자인을 확정합니다.",
@@ -439,7 +439,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task24",
     projectId: "proj1",
-    stage: "8_MasterGatePilot",
+    stage: "MasterGatePilot",
     department: "제조팀",
     title: "양산 공정 계획",
     description: "양산을 위한 제조 공정을 계획합니다.",
@@ -451,7 +451,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task25",
     projectId: "proj1",
-    stage: "8_MasterGatePilot",
+    stage: "MasterGatePilot",
     department: "구매팀",
     title: "자재 조달 계획",
     description: "양산 자재 조달 계획을 수립합니다.",
@@ -463,7 +463,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task26",
     projectId: "proj1",
-    stage: "8_MasterGatePilot",
+    stage: "MasterGatePilot",
     department: "제조팀",
     title: "시생산 실시",
     description: "시생산을 실시하고 문제점을 파악합니다.",
@@ -475,7 +475,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task27",
     projectId: "proj1",
-    stage: "9_MSG승인회",
+    stage: "MSG승인회",
     department: "품질팀",
     title: "최종 품질 검증",
     description: "양산 전 최종 품질을 검증합니다.",
@@ -487,7 +487,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task28",
     projectId: "proj1",
-    stage: "10_양산",
+    stage: "양산",
     department: "제조팀",
     title: "양산 가동",
     description: "본격적인 양산을 시작합니다.",
@@ -499,7 +499,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task29",
     projectId: "proj1",
-    stage: "11_영업이관",
+    stage: "영업이관",
     department: "영업팀",
     title: "판매 시작 준비",
     description: "제품 판매를 위한 준비를 합니다.",
@@ -511,7 +511,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task30",
     projectId: "proj1",
-    stage: "11_영업이관",
+    stage: "영업이관",
     department: "CS팀",
     title: "A/S 체계 구축",
     description: "고객 서비스 및 A/S 체계를 구축합니다.",
@@ -523,7 +523,7 @@ export const mockChecklistItems: ChecklistItem[] = [
   {
     id: "task31",
     projectId: "proj1",
-    stage: "4_WM제작",
+    stage: "WM제작",
     department: "인증팀",
     title: "인증 요구사항 검토",
     description: "각국 인증 요구사항을 검토합니다.",
@@ -652,6 +652,69 @@ export const mockNotifications: Notification[] = [
     read: false,
     createdAt: oneHourAgo,
   },
+  // PM(박민수) 알림 추가
+  {
+    id: "notif8",
+    userId: "user3",
+    type: "approval_request",
+    title: "승인 요청",
+    message: "[신규 체성분 분석기] 김철수님이 NABC 분석을 완료했습니다. 검토 필요.",
+    link: "/projects/proj1/tasks/task4",
+    read: false,
+    createdAt: oneHourAgo,
+  },
+  {
+    id: "notif9",
+    userId: "user3",
+    type: "deadline_approaching",
+    title: "⚠️ 프로젝트 위험 감지",
+    message: "[신장계 긴급 설계 변경] 마감일 임박 - 위험도 상승",
+    link: "/projects/proj4",
+    read: false,
+    createdAt: twoHoursAgo,
+  },
+  {
+    id: "notif10",
+    userId: "user3",
+    type: "change_request",
+    title: "설계 변경 요청 접수",
+    message: "[신장계] 배터리 규격 변경 요청이 접수되었습니다. 검토 필요.",
+    link: "/projects/proj4",
+    read: true,
+    createdAt: oneDayAgo,
+  },
+  // 매니저(이영희) 알림 추가
+  {
+    id: "notif11",
+    userId: "user2",
+    type: "approval_request",
+    title: "승인 대기",
+    message: "[신규 체성분 분석기] 김철수님의 NABC 분석이 승인을 기다리고 있습니다.",
+    link: "/projects/proj1/tasks/task4",
+    read: false,
+    createdAt: oneHourAgo,
+  },
+  {
+    id: "notif12",
+    userId: "user2",
+    type: "approval_request",
+    title: "승인 대기",
+    message: "[가정용 혈압계] 성능 테스트 보고서가 승인을 기다리고 있습니다.",
+    link: "/projects/proj2/tasks/task5",
+    read: false,
+    createdAt: twoHoursAgo,
+  },
+  // 강민지(매니저, 품질팀) 알림 추가
+  {
+    id: "notif13",
+    userId: "user6",
+    type: "task_assigned",
+    title: "부서 작업 알림",
+    message: "[신규 체성분 분석기] 신뢰성 테스트 계획 수립이 진행 중입니다.",
+    link: "/projects/proj1/tasks/task6",
+    read: false,
+    createdAt: threeHoursAgo,
+  },
 ];
 
 // 부서 목록
@@ -670,35 +733,35 @@ export const departments: Department[] = [
 
 // 프로젝트 단계 목록
 export const projectStages: ProjectStage[] = [
-  "0_발의검토",
-  "1_발의승인",
-  "2_기획검토",
-  "3_기획승인",
-  "4_WM제작",
-  "5_WM승인회",
-  "6_Tx단계",
-  "7_Tx승인회",
-  "8_MasterGatePilot",
-  "9_MSG승인회",
-  "10_양산",
-  "11_영업이관",
+  "발의검토",
+  "발의승인",
+  "기획검토",
+  "기획승인",
+  "WM제작",
+  "WM승인회",
+  "Tx단계",
+  "Tx승인회",
+  "MasterGatePilot",
+  "MSG승인회",
+  "양산",
+  "영업이관",
 ];
 
 // 단계명 포맷팅
 export const formatStageName = (stage: ProjectStage): string => {
   const stageMap: Record<ProjectStage, string> = {
-    "0_발의검토": "0. 발의 검토",
-    "1_발의승인": "1. 발의 승인",
-    "2_기획검토": "2. 기획 검토",
-    "3_기획승인": "3. 기획 승인",
-    "4_WM제작": "4. W/M 제작",
-    "5_WM승인회": "5. W/M 승인회",
-    "6_Tx단계": "6. Tx 단계",
-    "7_Tx승인회": "7. Tx 승인회",
-    "8_MasterGatePilot": "8. Master Gate Pilot",
-    "9_MSG승인회": "9. MSG 승인회",
-    "10_양산": "10. 양산",
-    "11_영업이관": "11. 영업 이관",
+    "발의검토": "발의 검토",
+    "발의승인": "발의 승인",
+    "기획검토": "기획 검토",
+    "기획승인": "기획 승인",
+    "WM제작": "W/M 제작",
+    "WM승인회": "W/M 승인회",
+    "Tx단계": "Tx 단계",
+    "Tx승인회": "Tx 승인회",
+    "MasterGatePilot": "Master Gate Pilot",
+    "MSG승인회": "MSG 승인회",
+    "양산": "양산",
+    "영업이관": "영업 이관",
   };
   return stageMap[stage] || stage;
 };

@@ -84,7 +84,7 @@ export default function ChecklistAdminPage() {
 
   const canEdit = (departmentId: string) => {
     if (!currentUser) return false;
-    if (currentUser.role === "pm" || currentUser.role === "scheduler") return true;
+    if (currentUser.role === "pm") return true;
     if (currentUser.role === "manager") {
       const dept = departments.find((d) => d.id === departmentId);
       return dept?.name === currentUser.department;
@@ -94,7 +94,7 @@ export default function ChecklistAdminPage() {
 
   const canEditStage = () => {
     if (!currentUser) return false;
-    return currentUser.role === "pm" || currentUser.role === "scheduler";
+    return currentUser.role === "pm";
   };
 
   const toggleStage = (stageId: string) => {

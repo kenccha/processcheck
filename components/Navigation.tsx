@@ -29,9 +29,8 @@ export default function Navigation() {
   const getRoleName = (role: string) => {
     const map: Record<string, string> = {
       worker: "실무자",
-      manager: "부서 관리자",
-      pm: "프로세스 관리자",
-      scheduler: "일정 관리자",
+      manager: "매니저",
+      pm: "PM (기획조정실)",
     };
     return map[role] || role;
   };

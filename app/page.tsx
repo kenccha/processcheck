@@ -49,9 +49,8 @@ export default function LoginPage() {
 
   const roles = [
     { value: "worker" as UserRole, label: "실무자", description: "체크리스트 작업 수행", icon: "👨‍💻" },
-    { value: "manager" as UserRole, label: "부서 관리자", description: "작업 검토 및 승인", icon: "👔" },
-    { value: "pm" as UserRole, label: "프로세스 관리자", description: "전체 프로세스 모니터링", icon: "📊" },
-    { value: "scheduler" as UserRole, label: "일정 관리자", description: "일정 및 마감일 관리", icon: "📅" },
+    { value: "manager" as UserRole, label: "매니저", description: "부서 작업 검토 및 승인", icon: "👔" },
+    { value: "pm" as UserRole, label: "PM (기획조정실)", description: "전체 프로젝트 관리·조율", icon: "📊" },
   ];
 
   if (seeding) {
