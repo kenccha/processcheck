@@ -59,6 +59,25 @@ export interface Project {
   currentStage: ProjectStage;
 }
 
+// 파일 첨부
+export interface FileAttachment {
+  id: string;
+  name: string;
+  url: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+  size: number;
+}
+
+// 태스크 코멘트
+export interface TaskComment {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: Date;
+}
+
 // 체크리스트 항목
 export interface ChecklistItem {
   id: string;
@@ -72,28 +91,16 @@ export interface ChecklistItem {
   status: TaskStatus;
   dueDate: Date;
   completedDate?: Date;
-  files?: File[];
-  comments?: Comment[];
+  files?: FileAttachment[];
+  comments?: TaskComment[];
   dependencies?: string[]; // 의존하는 다른 task ID들
-}
-
-// 파일
-export interface File {
-  id: string;
-  name: string;
-  url: string;
-  uploadedBy: string;
-  uploadedAt: Date;
-  size: number;
-}
-
-// 코멘트
-export interface Comment {
-  id: string;
-  userId: string;
-  userName: string;
-  content: string;
-  createdAt: Date;
+  // 승인 관련 (Firestore에서 추가)
+  approvalStatus?: "pending" | "approved" | "rejected";
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectedBy?: string;
+  rejectedAt?: Date;
+  rejectionReason?: string;
 }
 
 // 설계 변경
@@ -148,7 +155,6 @@ export interface ChecklistTemplateStage {
 
 export interface ChecklistTemplateDepartment {
   id: string;
-  stageId: string;
   name: string;
   order: number;
   createdBy: string;
@@ -174,6 +180,6 @@ export interface ChecklistTemplateHistory {
   action: "created" | "updated" | "deleted";
   modifiedBy: string;
   modifiedAt: Date;
-  previousValue: any;
-  newValue: any;
+  previousValue: unknown;
+  newValue: unknown;
 }
