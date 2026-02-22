@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [allTasks, setAllTasks] = useState<ChecklistItem[]>([]);
+  const [showAllNotifs, setShowAllNotifs] = useState(false);
 
   // 프로젝트 실시간 구독
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!currentUser?.id) return;
     const unsub = subscribeNotifications(currentUser.id, (notifs) => {
-      setNotifications(notifs.slice(0, 5));
+      setNotifications(notifs);
     });
     return unsub;
   }, [currentUser?.id]);
@@ -437,7 +438,7 @@ export default function DashboardPage() {
                     <p className="text-xs">알림이 없습니다</p>
                   </div>
                 ) : (
-                  notifications.map((notif) => (
+                  (showAllNotifs ? notifications : notifications.slice(0, 5)).map((notif) => (
                     <div
                       key={notif.id}
                       className={`px-5 py-3.5 transition-all duration-200 cursor-pointer group ${
@@ -464,8 +465,8 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="px-5 py-3 border-t border-surface-3">
-                <button className="w-full py-1.5 text-xs font-mono text-slate-500 hover:text-primary-400 transition-colors tracking-wider uppercase">
-                  모든 알림 보기
+                <button onClick={() => setShowAllNotifs(!showAllNotifs)} className="w-full py-1.5 text-xs font-mono text-slate-500 hover:text-primary-400 transition-colors tracking-wider uppercase">
+                  {showAllNotifs ? "최근 알림만 보기" : "모든 알림 보기"}
                 </button>
               </div>
             </div>
