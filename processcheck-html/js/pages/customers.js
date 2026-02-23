@@ -75,6 +75,7 @@ function render() {
   };
 
   app.innerHTML = `
+    <div class="container animate-fade-in">
     <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">고객 관리</h1>
@@ -229,6 +230,7 @@ function render() {
           <button class="btn btn-primary" id="modal-save">저장</button>
         </div>
       </div>
+    </div>
     </div>
   `;
 

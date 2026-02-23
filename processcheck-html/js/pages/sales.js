@@ -163,6 +163,7 @@ function render() {
     : [...SALES_CORE_CATEGORIES];
 
   app.innerHTML = `
+    <div class="container animate-fade-in">
     <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">영업 출시 준비 대시보드</h1>
@@ -305,6 +306,7 @@ function render() {
           <button class="btn btn-primary" id="confirm-submit">확인 처리</button>
         </div>
       </div>
+    </div>
     </div>
   `;
 
