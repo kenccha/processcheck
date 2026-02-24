@@ -681,6 +681,13 @@ export async function getUserByName(name) {
   return docToUser(snap.docs[0].id, snap.docs[0].data());
 }
 
+export async function getUserByEmail(email) {
+  const q = query(collection(db, "users"), where("email", "==", email));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return docToUser(snap.docs[0].id, snap.docs[0].data());
+}
+
 export async function getUsers() {
   const snap = await getDocs(collection(db, "users"));
   return snap.docs.map(d => docToUser(d.id, d.data()));

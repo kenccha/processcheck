@@ -1,8 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Auth — localStorage based session management
+// Auth — localStorage based session management + Microsoft OAuth
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { getUserByName, createUser } from "./firestore-service.js";
+import { OAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { auth } from "./firebase-init.js";
+import { getUserByName, getUserByEmail, createUser } from "./firestore-service.js";
 
 const STORAGE_KEY = "pc_user";
 
@@ -17,7 +19,7 @@ export function getUser() {
   }
 }
 
-// Login — find or create user in Firestore, save to localStorage
+// Login — find or create user in Firestore, save to localStorage (demo cards)
 export async function login(name, role) {
   let user = await getUserByName(name);
 
@@ -36,9 +38,53 @@ export async function login(name, role) {
   return sessionUser;
 }
 
+// Microsoft OAuth login
+export async function loginWithMicrosoft() {
+  const provider = new OAuthProvider("microsoft.com");
+
+  const result = await signInWithPopup(auth, provider);
+  const firebaseUser = result.user;
+
+  const email = firebaseUser.email;
+  const displayName = firebaseUser.displayName || email.split("@")[0];
+
+  // Check if user already exists in Firestore
+  const existingUser = await getUserByEmail(email);
+
+  if (existingUser) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingUser));
+    return { user: existingUser, isNewUser: false };
+  }
+
+  // New user: return auth info so login page can show role selection
+  return {
+    user: null,
+    isNewUser: true,
+    authInfo: { email, displayName },
+  };
+}
+
+// Complete registration for new Microsoft users
+export async function completeRegistration(authInfo, role, department) {
+  const newUser = await createUser({
+    name: authInfo.displayName,
+    email: authInfo.email,
+    role,
+    department,
+    authProvider: "microsoft",
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+  return newUser;
+}
+
 // Logout — clear session and redirect
-export function logout() {
+export async function logout() {
   localStorage.removeItem(STORAGE_KEY);
+  try {
+    await signOut(auth);
+  } catch {
+    // Ignore — user might not have used Firebase Auth
+  }
   window.location.href = "index.html";
 }
 

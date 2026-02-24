@@ -11,7 +11,8 @@
   {
     "imports": {
       "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
-      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js"
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
     }
   }
   </script>
@@ -214,6 +215,125 @@
 
     .user-card:hover .user-card-arrow { color: var(--slate-400); }
 
+    /* Divider */
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      color: var(--slate-600);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--surface-3);
+    }
+
+    /* Microsoft Login Button */
+    .ms-login-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.875rem 1.25rem;
+      border-radius: 1rem;
+      border: 1.5px solid var(--surface-3);
+      background: var(--surface-2);
+      color: var(--slate-200);
+      font-size: 0.9375rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .ms-login-btn:hover {
+      background: var(--surface-3);
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+    .ms-login-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Role Selection */
+    .role-form-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--slate-400);
+      margin-bottom: 0.5rem;
+    }
+
+    .role-select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      border: 1.5px solid var(--surface-3);
+      background: var(--surface-2);
+      color: var(--slate-200);
+      font-size: 0.875rem;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+    }
+    .role-select:focus {
+      outline: none;
+      border-color: var(--primary-500);
+    }
+
+    .role-complete-btn {
+      width: 100%;
+      padding: 0.875rem;
+      border-radius: 1rem;
+      border: none;
+      background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+      color: white;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .role-complete-btn:hover:not(:disabled) {
+      box-shadow: var(--shadow-glow);
+    }
+    .role-complete-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .role-cancel-btn {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 0.75rem;
+      border: 1.5px solid var(--surface-3);
+      background: transparent;
+      color: var(--slate-400);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .role-cancel-btn:hover {
+      background: var(--surface-2);
+      color: var(--slate-200);
+    }
+
+    /* Error message */
+    .login-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.8125rem;
+      color: var(--danger-400);
+      margin-top: 1rem;
+    }
+
     /* Footer */
     .login-footer {
       text-align: center;
@@ -331,6 +451,69 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
           </svg>
         </button>
+      </div>
+
+      <!-- Divider -->
+      <div class="login-divider animate-fade-in-delay-2" id="login-divider">
+        <span>또는</span>
+      </div>
+
+      <!-- Microsoft Login -->
+      <div class="animate-fade-in-delay-2" id="ms-login-wrap">
+        <button class="ms-login-btn" id="ms-login-btn">
+          <svg width="20" height="20" viewBox="0 0 23 23">
+            <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+            <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+            <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+            <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+          </svg>
+          <span>Microsoft 계정으로 로그인</span>
+        </button>
+      </div>
+
+      <!-- Role Selection (hidden, shown for new Microsoft users) -->
+      <div id="role-selection" style="display: none;">
+        <div class="login-logo-block" style="margin-bottom: 1.5rem;">
+          <h2 class="login-title" style="font-size: 1.5rem;">역할 및 부서 선택</h2>
+          <p class="login-subtitle" style="font-size: 0.8125rem;" id="ms-user-email"></p>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div>
+            <label class="role-form-label">역할 선택</label>
+            <select id="role-select" class="role-select">
+              <option value="">역할을 선택하세요</option>
+              <option value="worker">실무자 — 체크리스트 작업 수행</option>
+              <option value="manager">매니저 — 부서 작업 검토/승인</option>
+              <option value="observer">기획조정실 — 전체 모니터링</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="role-form-label">부서 선택</label>
+            <select id="dept-select" class="role-select">
+              <option value="">부서를 선택하세요</option>
+              <option value="개발팀">개발팀</option>
+              <option value="품질팀">품질팀</option>
+              <option value="영업팀">영업팀</option>
+              <option value="제조팀">제조팀</option>
+              <option value="구매팀">구매팀</option>
+              <option value="CS팀">CS팀</option>
+              <option value="경영관리팀">경영관리팀</option>
+              <option value="글로벌임상팀">글로벌임상팀</option>
+              <option value="디자인연구소">디자인연구소</option>
+              <option value="인증팀">인증팀</option>
+            </select>
+          </div>
+
+          <button class="role-complete-btn" id="complete-registration-btn" disabled>
+            시작하기
+          </button>
+
+          <button class="role-cancel-btn" id="cancel-registration-btn">
+            취소
+          </button>
+        </div>
       </div>
 
       <!-- Footer -->

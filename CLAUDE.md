@@ -14,7 +14,8 @@ ProcessCheck (개발 프로세스 관리 시스템) — an electronic product de
 
 ### HTML Port (`processcheck-html/`)
 - **No framework** — plain HTML + CSS + vanilla JavaScript ES modules
-- **Firebase SDK:** CDN via `<script type="importmap">` (v11.3.0)
+- **Firebase SDK:** CDN via `<script type="importmap">` (v11.3.0) — Firestore + Authentication
+- **Authentication:** Firebase Auth (Microsoft OAuth) + localStorage 기반 세션
 - **Styling:** Single `css/styles.css` with CSS custom properties, 라이트모드(기본)+다크모드 토글
 - **Dev server:** `cd processcheck-html && python3 -m http.server 8080`
 - **Purpose:** Simpler deployment without build step, same Firebase Firestore backend
@@ -82,13 +83,20 @@ docs/
 - Database auto-seeds on first load via `seedDatabaseIfEmpty()`
 
 ### Login Design (확정)
-- **이름 입력 필드 없음** — 로그인 화면에서 이름을 직접 입력하는 방식을 사용하지 않음
-- 3개의 샘플 사용자 카드 버튼으로 구성:
-  - 김철수 (실무자/worker) — 개발팀
-  - 이영희 (매니저/manager) — 개발팀
-  - 박민수 (기획조정실/observer) — 경영관리팀
-- 카드 클릭 → 즉시 해당 역할로 로그인 → 대시보드 이동
-- DB 시딩 중에는 스피너 표시, 완료 후 카드 노출
+- **2가지 로그인 방식 공존**:
+  1. **데모 카드 로그인**: 3개의 샘플 사용자 카드 버튼 (기존)
+     - 김철수 (실무자/worker) — 개발팀
+     - 이영희 (매니저/manager) — 개발팀
+     - 박민수 (기획조정실/observer) — 경영관리팀
+     - 카드 클릭 → 즉시 해당 역할로 로그인 → 대시보드 이동
+  2. **Microsoft OAuth 로그인**: Firebase Auth 연동
+     - "또는" 구분선 아래 "Microsoft 계정으로 로그인" 버튼
+     - `OAuthProvider("microsoft.com")` + `signInWithPopup` 사용
+     - 기존 사용자: 이메일로 Firestore 조회 → 바로 대시보드
+     - 신규 사용자: 역할(실무자/매니저/기획조정실) + 부서(10개) 선택 화면 → Firestore 등록
+     - `authProvider: "microsoft"` 필드로 데모 사용자와 구분
+- DB 시딩 중에는 스피너 표시, 완료 후 카드+버튼 노출
+- `logout()` 시 Firebase Auth `signOut()`도 함께 호출
 
 ### Dashboard Design (확정)
 - **통계 카드 4개 전부 클릭 가능**: 작업대기→섹션스크롤, 승인대기→섹션스크롤, 프로젝트→projects.html, 알림→섹션스크롤
@@ -274,6 +282,7 @@ docs/
 - ~~템플릿 적용 기능 없음~~ → project-detail.js 개요 탭에 "템플릿 적용" / "출시 준비 적용" 버튼 추가
 - ~~영업 대시보드 없음~~ → sales.html + js/pages/sales.js 신규 생성 (전체 프로젝트 출시 준비 대시보드)
 - ~~매뉴얼 스크린샷 없음~~ → Puppeteer로 14개 실제 스크린샷 캡처, manual.js에 이미지 렌더링
+- ~~실제 인증 없음~~ → Firebase Auth Microsoft OAuth 연동 (HTML 포트), 데모 카드와 공존, 신규 사용자 역할/부서 선택
 
 ## Claude Code Automations
 
