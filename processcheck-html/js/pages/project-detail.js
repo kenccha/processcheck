@@ -12,6 +12,7 @@ import {
   bulkApproveTasks,
   bulkUpdateAssignee,
   getUsers,
+  createChecklistItem,
 } from "../firestore-service.js";
 import {
   departments,
@@ -590,6 +591,19 @@ function renderChecklistTab() {
       </div>
     </div>
 
+    <!-- Quick Add Task Bar -->
+    <div class="quick-add-bar" style="margin-bottom:16px;display:flex;gap:8px;align-items:stretch">
+      <input type="text" id="quick-add-input" class="input-field" style="flex:1;font-size:0.85rem"
+        placeholder="빠른 입력: @담당자 #부서 !긴급 작업 내용 ~마감일 (예: @김철수 #개발팀 WM 도면 검토 ~2026-03-15)">
+      <button class="btn-primary btn-sm" id="quick-add-btn" style="white-space:nowrap;padding:0.5rem 1rem">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="display:inline;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        추가
+      </button>
+      <button class="btn-secondary btn-sm" id="open-add-modal-btn" style="white-space:nowrap;padding:0.5rem 0.75rem" title="상세 입력">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      </button>
+    </div>
+
     <!-- Filters (phase-based) -->
     <div class="flex flex-wrap gap-3 mb-4">
       <select class="input-field" style="width: auto; min-width: 160px;" id="filter-stage">
@@ -889,6 +903,22 @@ function bindEvents() {
     });
   });
 
+  // Quick Add Task
+  const quickAddBtn = app.querySelector("#quick-add-btn");
+  if (quickAddBtn) {
+    quickAddBtn.addEventListener("click", handleQuickAdd);
+  }
+  const quickAddInput = app.querySelector("#quick-add-input");
+  if (quickAddInput) {
+    quickAddInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleQuickAdd();
+    });
+  }
+  const openModalBtn = app.querySelector("#open-add-modal-btn");
+  if (openModalBtn) {
+    openModalBtn.addEventListener("click", showAddTaskModal);
+  }
+
   // Stat card click → switch to checklist tab with filter
   app.querySelectorAll("[data-stat-filter]").forEach((card) => {
     card.addEventListener("click", () => {
@@ -1066,4 +1096,251 @@ function updateBulkBar() {
   if (selectedCountEl) {
     selectedCountEl.textContent = selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개 선택)` : "";
   }
+}
+
+// ─── Quick Add Task (NLP Parsing + Smart Assignee) ──────────────────────────
+
+function parseQuickInput(text) {
+  const result = {
+    title: "",
+    assignee: "",
+    department: "",
+    importance: "green",
+    dueDate: null,
+    stage: PHASE_GROUPS[0].workStage,
+  };
+
+  let remaining = text;
+
+  // @담당자
+  const mentionMatch = remaining.match(/@([\uAC00-\uD7A3a-zA-Z]{2,10})/);
+  if (mentionMatch) {
+    result.assignee = mentionMatch[1];
+    remaining = remaining.replace(mentionMatch[0], "").trim();
+  }
+
+  // #부서
+  const deptMatch = remaining.match(/#([\uAC00-\uD7A3a-zA-Z\uc2e4]+)/);
+  if (deptMatch) {
+    const input = deptMatch[1];
+    const found = departments.find(d => d.includes(input) || input.includes(d.replace("팀", "")));
+    if (found) result.department = found;
+    remaining = remaining.replace(deptMatch[0], "").trim();
+  }
+
+  // !긴급 or !중요
+  if (remaining.includes("!긴급") || remaining.includes("!red")) {
+    result.importance = "red";
+    remaining = remaining.replace(/!긴급|!red/g, "").trim();
+  } else if (remaining.includes("!중요") || remaining.includes("!yellow")) {
+    result.importance = "yellow";
+    remaining = remaining.replace(/!중요|!yellow/g, "").trim();
+  }
+
+  // ~마감일 (YYYY-MM-DD or MM-DD)
+  const dateMatch = remaining.match(/~(\d{4}-\d{2}-\d{2}|\d{2}-\d{2})/);
+  if (dateMatch) {
+    let dateStr = dateMatch[1];
+    if (dateStr.length === 5) dateStr = `${new Date().getFullYear()}-${dateStr}`;
+    result.dueDate = new Date(dateStr);
+    remaining = remaining.replace(dateMatch[0], "").trim();
+  }
+
+  // Auto-detect stage from keywords
+  const stageKeywords = {
+    "발의": 0, "기획": 1, "WM": 2, "wm": 2, "Tx": 3, "tx": 3,
+    "MSG": 4, "msg": 4, "MasterGate": 4, "양산": 5, "이관": 5,
+  };
+  for (const [kw, idx] of Object.entries(stageKeywords)) {
+    if (remaining.includes(kw)) {
+      result.stage = PHASE_GROUPS[idx].workStage;
+      break;
+    }
+  }
+
+  result.title = remaining.trim();
+  return result;
+}
+
+function getSmartAssigneeSuggestions(department) {
+  if (!department || allUsers.length === 0) return [];
+  const deptUsers = allUsers.filter(u => u.department === department && u.role === "worker");
+  return deptUsers.map(u => {
+    const tasks = checklistItems.filter(t => t.assignee === u.name);
+    const active = tasks.filter(t => t.status === "in_progress" || t.status === "pending").length;
+    const overdue = tasks.filter(t => {
+      if (t.status === "completed") return false;
+      const d = daysUntil(t.dueDate);
+      return d !== null && d < 0;
+    }).length;
+    return { name: u.name, active, overdue, score: active + overdue * 2 };
+  }).sort((a, b) => a.score - b.score);
+}
+
+async function handleQuickAdd() {
+  const input = document.getElementById("quick-add-input");
+  if (!input || !input.value.trim()) return;
+
+  const parsed = parseQuickInput(input.value);
+  if (!parsed.title) {
+    alert("작업 내용을 입력해주세요");
+    return;
+  }
+
+  // Default department from user if not specified
+  if (!parsed.department) parsed.department = user.department || departments[0];
+
+  // Smart assignee: if not specified, suggest best one
+  if (!parsed.assignee) {
+    const suggestions = getSmartAssigneeSuggestions(parsed.department);
+    if (suggestions.length > 0) {
+      parsed.assignee = suggestions[0].name;
+    } else {
+      parsed.assignee = user.name;
+    }
+  }
+
+  // Default due date: 2 weeks from now
+  if (!parsed.dueDate) {
+    parsed.dueDate = new Date(Date.now() + 14 * 86400000);
+  }
+
+  try {
+    await createChecklistItem({
+      projectId,
+      title: parsed.title,
+      assignee: parsed.assignee,
+      department: parsed.department,
+      stage: parsed.stage,
+      importance: parsed.importance,
+      dueDate: parsed.dueDate,
+      status: "pending",
+    });
+    input.value = "";
+  } catch (err) {
+    alert("작업 생성 실패: " + err.message);
+  }
+}
+
+function showAddTaskModal() {
+  const dept = user.department || departments[0];
+  const suggestions = getSmartAssigneeSuggestions(dept);
+  const suggestHtml = suggestions.slice(0, 5).map(s =>
+    `<div class="smart-suggest-item" data-name="${escapeHtml(s.name)}" style="display:flex;justify-content:space-between;padding:6px 10px;cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem">
+      <span><strong>${escapeHtml(s.name)}</strong></span>
+      <span style="color:var(--text-muted)">${s.active}건 진행 ${s.overdue > 0 ? `<span style="color:var(--danger)">${s.overdue}건 지연</span>` : ""}</span>
+    </div>`
+  ).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "add-task-modal";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0;font-size:1.1rem">작업 추가</h3>
+        <button class="btn-ghost btn-sm" id="close-add-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="form-label">작업 내용 *</label>
+          <input type="text" id="modal-task-title" class="input-field" placeholder="작업 내용을 입력하세요">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="form-label">단계</label>
+            <select id="modal-task-stage" class="input-field">
+              ${PHASE_GROUPS.map(p => `<option value="${p.workStage}">${p.name} (작업)</option><option value="${p.gateStage}">${p.name} (승인)</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">부서</label>
+            <select id="modal-task-dept" class="input-field">
+              ${departments.map(d => `<option value="${d}" ${d === dept ? "selected" : ""}>${escapeHtml(d)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">담당자 ${suggestions.length > 0 ? '<span style="font-size:0.7rem;color:var(--primary)">(추천순)</span>' : ""}</label>
+          <input type="text" id="modal-task-assignee" class="input-field" placeholder="담당자 이름" value="${suggestions.length > 0 ? escapeHtml(suggestions[0].name) : ""}">
+          ${suggestHtml ? `<div class="smart-suggest-list" style="margin-top:4px;border:1px solid var(--border);border-radius:var(--radius-md);max-height:150px;overflow-y:auto">${suggestHtml}</div>` : ""}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="form-label">마감일</label>
+            <input type="date" id="modal-task-due" class="input-field" value="${new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)}">
+          </div>
+          <div>
+            <label class="form-label">중요도</label>
+            <select id="modal-task-importance" class="input-field">
+              <option value="green">보통</option>
+              <option value="yellow">중요</option>
+              <option value="red">긴급</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding-top:12px">
+        <button class="btn-ghost btn-sm" id="cancel-add-modal">취소</button>
+        <button class="btn-primary btn-sm" id="submit-add-modal">작업 생성</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Events
+  overlay.querySelector("#close-add-modal").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#cancel-add-modal").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  // Smart suggestion clicks
+  overlay.querySelectorAll(".smart-suggest-item").forEach(item => {
+    item.addEventListener("click", () => {
+      overlay.querySelector("#modal-task-assignee").value = item.dataset.name;
+    });
+    item.addEventListener("mouseenter", () => { item.style.background = "var(--surface-2, var(--surface-1))"; });
+    item.addEventListener("mouseleave", () => { item.style.background = ""; });
+  });
+
+  // Department change → refresh suggestions
+  overlay.querySelector("#modal-task-dept").addEventListener("change", (e) => {
+    const newSugs = getSmartAssigneeSuggestions(e.target.value);
+    const list = overlay.querySelector(".smart-suggest-list");
+    if (list && newSugs.length > 0) {
+      list.innerHTML = newSugs.slice(0, 5).map(s =>
+        `<div class="smart-suggest-item" data-name="${escapeHtml(s.name)}" style="display:flex;justify-content:space-between;padding:6px 10px;cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem">
+          <span><strong>${escapeHtml(s.name)}</strong></span>
+          <span style="color:var(--text-muted)">${s.active}건 진행 ${s.overdue > 0 ? `<span style="color:var(--danger)">${s.overdue}건 지연</span>` : ""}</span>
+        </div>`
+      ).join("");
+      list.querySelectorAll(".smart-suggest-item").forEach(item => {
+        item.addEventListener("click", () => {
+          overlay.querySelector("#modal-task-assignee").value = item.dataset.name;
+        });
+      });
+      if (newSugs.length > 0) overlay.querySelector("#modal-task-assignee").value = newSugs[0].name;
+    }
+  });
+
+  // Submit
+  overlay.querySelector("#submit-add-modal").addEventListener("click", async () => {
+    const title = overlay.querySelector("#modal-task-title").value.trim();
+    if (!title) { alert("작업 내용을 입력해주세요"); return; }
+
+    try {
+      await createChecklistItem({
+        projectId,
+        title,
+        assignee: overlay.querySelector("#modal-task-assignee").value.trim() || user.name,
+        department: overlay.querySelector("#modal-task-dept").value,
+        stage: overlay.querySelector("#modal-task-stage").value,
+        importance: overlay.querySelector("#modal-task-importance").value,
+        dueDate: new Date(overlay.querySelector("#modal-task-due").value),
+        status: "pending",
+      });
+      overlay.remove();
+    } catch (err) {
+      alert("작업 생성 실패: " + err.message);
+    }
+  });
 }

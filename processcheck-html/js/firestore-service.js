@@ -1128,6 +1128,14 @@ export async function markNotificationRead(id) {
   await updateDoc(doc(db, "notifications", id), { read: true });
 }
 
+export async function markAllNotificationsRead(userId) {
+  const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+  await batch.commit();
+}
+
 export async function createNotification(data) {
   await addDoc(collection(db, "notifications"), {
     ...data,
