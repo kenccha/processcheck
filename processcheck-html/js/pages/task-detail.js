@@ -13,8 +13,16 @@ import {
   rejectTask,
   restartTask,
   addComment,
+  updateComment,
+  deleteComment,
+  addFileMetadata,
+  removeFileMetadata,
+  subscribeActivityLogs,
+  getUsers,
 } from "../firestore-service.js";
-import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES } from "../utils.js";
+import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES, parseMentions, renderSimpleMarkdown, getFileIcon, formatFileSize, validateFile, extractMentions } from "../utils.js";
+import { storage } from "../firebase-init.js";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 
 // ── Guard ────────────────────────────────────────────────────────────────────
 const user = guardPage();
@@ -50,6 +58,9 @@ let rejectionReason = "";
 let actionLoading = false;
 let feedback = null; // { type: "success" | "error", text: string }
 let feedbackTimer = null;
+let allUsers = [];
+let showMentionDropdown = false;
+let mentionQuery = "";
 
 // ── Subscriptions ────────────────────────────────────────────────────────────
 const unsubscribers = [];
@@ -65,6 +76,9 @@ const unsubItems = subscribeChecklistItems(projectId, (items) => {
   render();
 });
 unsubscribers.push(unsubItems);
+
+// Load all users for @mention support
+getUsers().then(users => { allUsers = users; });
 
 // ── Cleanup ──────────────────────────────────────────────────────────────────
 window.addEventListener("beforeunload", () => {
@@ -83,6 +97,49 @@ function showFeedback(type, text) {
     feedback = null;
     render();
   }, 4000);
+}
+
+function handleFileUpload(files) {
+  if (!files || files.length === 0 || !task) return;
+  const file = files[0];
+  const validation = validateFile(file);
+  if (!validation.valid) {
+    showFeedback("error", validation.error);
+    return;
+  }
+  const fileId = `file-${Date.now()}`;
+  const storageRef = ref(storage, `tasks/${task.projectId}/${task.id}/${fileId}_${file.name}`);
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  // Show progress
+  const progressEl = document.getElementById("upload-progress");
+  if (progressEl) progressEl.style.display = "block";
+
+  uploadTask.on("state_changed",
+    (snapshot) => {
+      const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      const bar = document.getElementById("upload-progress-bar");
+      if (bar) bar.style.width = pct + "%";
+    },
+    (error) => {
+      showFeedback("error", "파일 업로드 실패: " + error.message);
+      if (progressEl) progressEl.style.display = "none";
+    },
+    async () => {
+      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      await addFileMetadata(task.id, {
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url,
+        uploadedBy: user.name,
+        storagePath: storageRef.fullPath,
+      });
+      showFeedback("success", "파일 업로드 완료");
+      if (progressEl) progressEl.style.display = "none";
+    }
+  );
 }
 
 function getApprovalBadge(t) {
@@ -258,32 +315,36 @@ function render() {
           <!-- Attachments Section -->
           <div class="card p-6">
             <h2 class="section-title mb-4">첨부 파일</h2>
-            <div style="border:2px dashed var(--surface-4);border-radius:var(--radius-xl);padding:2rem;text-align:center;cursor:pointer;transition:border-color 0.2s" id="file-upload-area">
+            <div id="file-upload-area" style="border:2px dashed var(--surface-4);border-radius:var(--radius-xl);padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.2s">
+              <input type="file" id="file-input" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
               <div style="color:var(--slate-500);margin-bottom:0.5rem">${ICONS.upload}</div>
               <p class="text-sm text-soft">파일을 드래그하거나 클릭하여 업로드</p>
               <p class="text-xs text-dim mt-1">PDF, DOC, XLS, 이미지 등 (최대 10MB)</p>
             </div>
-            ${task.files && task.files.length > 0 ? `
-              <div class="flex flex-col gap-2 mt-4">
-                ${task.files.map((f) => `
-                  <div class="flex items-center gap-3" style="padding:0.625rem 1rem;background:var(--surface-1);border:1px solid var(--surface-3);border-radius:var(--radius-lg)">
-                    <span style="color:var(--slate-400)">${ICONS.file}</span>
-                    <span class="text-sm flex-1" style="color:var(--slate-300)">${escapeHtml(typeof f === "string" ? f : f.name || "파일")}</span>
-                  </div>
-                `).join("")}
-              </div>
-            ` : `
-              <div class="empty-state" style="padding:1rem">
-                <span class="empty-state-text">첨부된 파일이 없습니다</span>
-              </div>
-            `}
+            <div id="upload-progress" style="display:none;margin-top:8px">
+              <div class="progress-bar"><div id="upload-progress-bar" class="progress-fill progress-fill-primary" style="width:0%"></div></div>
+            </div>
+            <div id="file-list" class="mt-3">
+              ${(task.files || []).length > 0 ? task.files.map(f => `
+                <div class="flex items-center gap-3" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3)">
+                  <span>${getFileIcon(f.name || '')}</span>
+                  <a href="${escapeHtml(f.url || '#')}" target="_blank" class="text-sm" style="color:var(--primary-400);flex:1;text-decoration:none">${escapeHtml(f.name || '파일')}</a>
+                  <span class="text-xs" style="color:var(--slate-400)">${formatFileSize(f.size)}</span>
+                  <span class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.uploadedBy || '')}</span>
+                  ${f.uploadedBy === user.name ? `<button class="btn-ghost btn-xs" data-delete-file="${escapeHtml(f.id || '')}" data-file-path="${escapeHtml(f.storagePath || '')}">삭제</button>` : ''}
+                </div>
+              `).join("") : `
+                <div class="text-xs" style="color:var(--slate-400);padding:8px">업로드된 파일이 없습니다</div>
+              `}
+            </div>
           </div>
 
           <!-- Comments Section -->
           <div class="card p-6">
             <h2 class="section-title mb-4">코멘트</h2>
-            <div class="flex flex-col gap-3 mb-4">
-              <textarea class="input-field" id="comment-input" placeholder="코멘트를 입력하세요..." rows="3"></textarea>
+            <div class="flex flex-col gap-3 mb-4" style="position:relative">
+              <textarea class="input-field" id="comment-input" placeholder="코멘트를 입력하세요... (@로 멘션)" rows="3"></textarea>
+              <div id="mention-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-lg);max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.3)"></div>
               <div class="flex justify-end">
                 <button class="btn-primary btn-sm" id="add-comment-btn" ${!comment.trim() ? "disabled" : ""}>
                   코멘트 추가
@@ -363,7 +424,14 @@ function renderComments() {
           <span class="comment-author">${escapeHtml(c.userName || "알 수 없음")}</span>
           <span class="comment-time">${timeAgo(c.createdAt)}</span>
         </div>
-        <div class="comment-text">${escapeHtml(c.content || "")}</div>
+        <div class="comment-text">${parseMentions(c.content || "", allUsers.map(u => u.name))}</div>
+        ${c.editedAt ? '<div class="text-xs" style="color:var(--slate-500);margin-top:2px">(수정됨)</div>' : ''}
+        ${c.userId === user.id ? `
+          <div class="flex gap-2 mt-1">
+            <button class="btn-ghost btn-xs" data-edit-comment="${c.id}">수정</button>
+            <button class="btn-ghost btn-xs" style="color:var(--danger-400)" data-delete-comment="${c.id}">삭제</button>
+          </div>
+        ` : ''}
       </div>
     </div>
   `).join("");
@@ -668,6 +736,57 @@ function bindEvents() {
       }
     });
   }
+
+  // File upload events
+  const uploadArea = document.getElementById("file-upload-area");
+  const fileInput = document.getElementById("file-input");
+  if (uploadArea && fileInput) {
+    uploadArea.addEventListener("click", () => fileInput.click());
+    uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.style.borderColor = "var(--primary-400)"; });
+    uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "var(--surface-3)"; });
+    uploadArea.addEventListener("drop", (e) => { e.preventDefault(); uploadArea.style.borderColor = "var(--surface-3)"; handleFileUpload(e.dataTransfer.files); });
+    fileInput.addEventListener("change", () => { handleFileUpload(fileInput.files); fileInput.value = ""; });
+  }
+
+  // File delete
+  app.querySelectorAll("[data-delete-file]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm("파일을 삭제하시겠습니까?")) return;
+      const fileId = btn.dataset.deleteFile;
+      const filePath = btn.dataset.filePath;
+      try {
+        if (filePath) {
+          const { deleteObject, ref: storageRef } = await import("firebase/storage");
+          await deleteObject(storageRef(storage, filePath));
+        }
+        await removeFileMetadata(task.id, fileId);
+        showFeedback("success", "파일 삭제 완료");
+      } catch(err) { showFeedback("error", "파일 삭제 실패"); }
+    });
+  });
+
+  // Comment edit
+  app.querySelectorAll("[data-edit-comment]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const cId = btn.dataset.editComment;
+      const existing = (task.comments || []).find(c => c.id === cId);
+      const newText = prompt("코멘트 수정:", existing?.content || "");
+      if (newText !== null && newText.trim()) {
+        await updateComment(task.id, cId, newText.trim());
+        showFeedback("success", "코멘트 수정 완료");
+      }
+    });
+  });
+
+  // Comment delete
+  app.querySelectorAll("[data-delete-comment]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("코멘트를 삭제하시겠습니까?")) return;
+      await deleteComment(task.id, btn.dataset.deleteComment);
+      showFeedback("success", "코멘트 삭제 완료");
+    });
+  });
 
   // Responsive left column sizing
   handleResponsiveLayout();

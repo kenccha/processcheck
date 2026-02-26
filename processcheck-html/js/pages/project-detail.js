@@ -9,6 +9,10 @@ import {
   subscribeProjects,
   subscribeChecklistItems,
   subscribeChangeRequests,
+  bulkApproveTasks,
+  bulkUpdateAssignee,
+  getUsers,
+  createChecklistItem,
 } from "../firestore-service.js";
 import {
   departments,
@@ -26,6 +30,10 @@ import {
   getRiskLabel,
   getProgressClass,
   timeAgo,
+  exportToCSV,
+  exportToPDF,
+  getFileIcon,
+  formatFileSize,
 } from "../utils.js";
 
 // --- Auth guard ---
@@ -51,9 +59,14 @@ let activeTab = "overview";
 let selectedStage = "";
 let selectedDepartment = "";
 let checklistFilter = ""; // "" | "in_progress" | "delayed" | "manager_pending" | "committee_pending"
+let selectedTaskIds = new Set();
+let allUsers = [];
 
 // --- Render nav ---
 const unsubNav = renderNav(navRoot);
+
+// --- Load users ---
+getUsers().then(u => { allUsers = u; });
 
 // --- Subscriptions ---
 const unsubs = [];
@@ -289,6 +302,15 @@ function renderProjectHeader(riskClass, phaseIndex, totalTasks) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
             <span class="text-sm font-semibold" style="color: var(--primary-300);">현재 단계: ${currentPhaseName}</span>
+          </div>
+          <!-- Export Buttons -->
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+            <button class="btn-ghost btn-sm" id="export-csv-btn" style="font-size:0.75rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV 내보내기
+            </button>
+            <button class="btn-ghost btn-sm" id="export-pdf-btn" style="font-size:0.75rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>PDF 보고서
+            </button>
           </div>
         </div>
         <!-- Right: Progress -->
@@ -569,6 +591,19 @@ function renderChecklistTab() {
       </div>
     </div>
 
+    <!-- Quick Add Task Bar -->
+    <div class="quick-add-bar" style="margin-bottom:16px;display:flex;gap:8px;align-items:stretch">
+      <input type="text" id="quick-add-input" class="input-field" style="flex:1;font-size:0.85rem"
+        placeholder="빠른 입력: @담당자 #부서 !긴급 작업 내용 ~마감일 (예: @김철수 #개발팀 WM 도면 검토 ~2026-03-15)">
+      <button class="btn-primary btn-sm" id="quick-add-btn" style="white-space:nowrap;padding:0.5rem 1rem">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="display:inline;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        추가
+      </button>
+      <button class="btn-secondary btn-sm" id="open-add-modal-btn" style="white-space:nowrap;padding:0.5rem 0.75rem" title="상세 입력">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      </button>
+    </div>
+
     <!-- Filters (phase-based) -->
     <div class="flex flex-wrap gap-3 mb-4">
       <select class="input-field" style="width: auto; min-width: 160px;" id="filter-stage">
@@ -588,8 +623,24 @@ function renderChecklistTab() {
       </select>
     </div>
 
+    <!-- Select All -->
+    <div class="flex items-center gap-3 mb-3">
+      <label class="flex items-center gap-2 text-sm" style="color:var(--slate-300)">
+        <input type="checkbox" id="select-all-tasks"> 전체 선택
+      </label>
+      <span class="text-xs" style="color:var(--slate-400)" id="selected-count">${selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개 선택)` : ""}</span>
+    </div>
+
     <!-- Task List grouped by department -->
     ${renderTaskList()}
+
+    <!-- Floating Bulk Action Bar -->
+    <div id="bulk-action-bar" class="card p-3 flex items-center gap-4" style="display:${selectedTaskIds.size > 0 ? "flex" : "none"};position:sticky;bottom:16px;z-index:10;background:var(--surface-1);border:1px solid var(--primary-400)">
+      <span class="text-sm font-semibold" id="bulk-count" style="color:var(--primary-400)">${selectedTaskIds.size}개 선택됨</span>
+      <button class="btn-primary btn-sm" id="bulk-approve-btn">일괄 승인</button>
+      <button class="btn-secondary btn-sm" id="bulk-assignee-btn">담당자 변경</button>
+      <button class="btn-ghost btn-sm" id="bulk-cancel-btn">선택 해제</button>
+    </div>
   `;
 }
 
@@ -660,6 +711,7 @@ function renderTaskList() {
               (task) => `
               <div class="card-hover" data-task-id="${task.id}" style="border:none; border-bottom: 1px solid var(--surface-3); border-radius: 0; padding: 1rem 1.25rem; cursor: pointer;">
                 <div class="flex items-start gap-3">
+                  <input type="checkbox" class="task-checkbox" data-task-checkbox="${task.id}" ${selectedTaskIds.has(task.id) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--primary-400);flex-shrink:0;margin-top:0.25rem">
                   <div style="flex: 1; min-width: 0;">
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
                       <span class="badge ${getStatusBadgeClass(task.status)}">${getStatusLabel(task.status)}</span>
@@ -693,25 +745,65 @@ function renderTaskList() {
 // =============================================================================
 
 function renderFilesTab() {
+  // Aggregate files from all checklist items
+  const allFiles = [];
+  for (const task of checklistItems) {
+    if (task.files && task.files.length > 0) {
+      for (const f of task.files) {
+        allFiles.push({ ...f, taskTitle: task.title, taskId: task.id, department: task.department, stage: task.stage });
+      }
+    }
+  }
+  allFiles.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+
   return `
     <div class="card p-6">
-      <!-- Upload Area Placeholder -->
-      <div style="border: 2px dashed var(--surface-4); border-radius: var(--radius-xl); padding: 3rem 2rem; text-align: center; transition: border-color 0.2s;">
-        <svg width="48" height="48" fill="none" stroke="var(--slate-600)" viewBox="0 0 24 24" style="margin: 0 auto 1rem;">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-        </svg>
-        <div class="text-sm font-medium" style="color: var(--slate-400); margin-bottom: 0.5rem;">파일을 여기에 드래그하거나 클릭하여 업로드</div>
-        <div class="text-xs text-dim">PDF, DOCX, XLSX, 이미지 파일 지원</div>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="section-title">프로젝트 파일 (${allFiles.length})</h3>
+        <span class="text-xs text-dim">작업별 업로드된 파일이 여기에 표시됩니다</span>
       </div>
 
-      <!-- Empty State -->
-      <div class="empty-state" style="padding: 3rem 1rem; margin-top: 2rem;">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-        </svg>
-        <span class="empty-state-text">업로드된 파일이 없습니다</span>
-        <span class="text-xs text-dim" style="margin-top: 0.5rem;">프로젝트 관련 문서와 파일을 업로드하세요</span>
-      </div>
+      ${allFiles.length === 0 ? `
+        <div class="empty-state" style="padding: 3rem 1rem;">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+          </svg>
+          <span class="empty-state-text">업로드된 파일이 없습니다</span>
+          <span class="text-xs text-dim" style="margin-top: 0.5rem;">작업 상세에서 파일을 업로드하면 여기에 표시됩니다</span>
+        </div>
+      ` : `
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>파일명</th>
+                <th>작업</th>
+                <th>부서</th>
+                <th>크기</th>
+                <th>업로더</th>
+                <th>업로드일</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allFiles.map(f => `
+                <tr class="card-hover" style="cursor:pointer" data-file-url="${escapeHtml(f.url || "")}">
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span>${getFileIcon(f.name)}</span>
+                      <span class="text-sm font-medium" style="color:var(--slate-200)">${escapeHtml(f.name)}</span>
+                    </div>
+                  </td>
+                  <td class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.taskTitle)}</td>
+                  <td class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.department)}</td>
+                  <td class="text-xs text-dim">${formatFileSize(f.size || 0)}</td>
+                  <td class="text-xs" style="color:var(--slate-300)">${escapeHtml(f.uploadedBy || "-")}</td>
+                  <td class="text-xs text-dim">${f.uploadedAt ? timeAgo(f.uploadedAt) : "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `}
     </div>
   `;
 }
@@ -811,6 +903,22 @@ function bindEvents() {
     });
   });
 
+  // Quick Add Task
+  const quickAddBtn = app.querySelector("#quick-add-btn");
+  if (quickAddBtn) {
+    quickAddBtn.addEventListener("click", handleQuickAdd);
+  }
+  const quickAddInput = app.querySelector("#quick-add-input");
+  if (quickAddInput) {
+    quickAddInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleQuickAdd();
+    });
+  }
+  const openModalBtn = app.querySelector("#open-add-modal-btn");
+  if (openModalBtn) {
+    openModalBtn.addEventListener("click", showAddTaskModal);
+  }
+
   // Stat card click → switch to checklist tab with filter
   app.querySelectorAll("[data-stat-filter]").forEach((card) => {
     card.addEventListener("click", () => {
@@ -875,5 +983,364 @@ function bindEvents() {
       const { updateChangeRequest } = await import("../firestore-service.js");
       await updateChangeRequest(btn.dataset.rejectCr, { status: "rejected" });
     });
+  });
+
+  // --- Bulk Operations ---
+  // Task checkboxes (stop propagation to prevent row click navigation)
+  app.querySelectorAll("[data-task-checkbox]").forEach((cb) => {
+    cb.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+    cb.addEventListener("change", (e) => {
+      const id = cb.dataset.taskCheckbox;
+      if (cb.checked) {
+        selectedTaskIds.add(id);
+      } else {
+        selectedTaskIds.delete(id);
+      }
+      updateBulkBar();
+    });
+  });
+
+  // Select all
+  const selectAllCb = app.querySelector("#select-all-tasks");
+  if (selectAllCb) {
+    selectAllCb.addEventListener("change", () => {
+      const checkboxes = app.querySelectorAll("[data-task-checkbox]");
+      if (selectAllCb.checked) {
+        checkboxes.forEach(cb => { cb.checked = true; selectedTaskIds.add(cb.dataset.taskCheckbox); });
+      } else {
+        checkboxes.forEach(cb => { cb.checked = false; });
+        selectedTaskIds.clear();
+      }
+      updateBulkBar();
+    });
+  }
+
+  // Bulk approve
+  const bulkApproveBtn = app.querySelector("#bulk-approve-btn");
+  if (bulkApproveBtn) {
+    bulkApproveBtn.addEventListener("click", async () => {
+      if (selectedTaskIds.size === 0) return;
+      if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
+      await bulkApproveTasks([...selectedTaskIds], user.name);
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // Bulk assignee change
+  const bulkAssigneeBtn = app.querySelector("#bulk-assignee-btn");
+  if (bulkAssigneeBtn) {
+    bulkAssigneeBtn.addEventListener("click", async () => {
+      if (selectedTaskIds.size === 0) return;
+      const names = allUsers.map(u => u.name);
+      const newAssignee = prompt(`새 담당자를 입력하세요:\n(${names.slice(0, 5).join(", ")}...)`);
+      if (!newAssignee) return;
+      await bulkUpdateAssignee([...selectedTaskIds], newAssignee);
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // Bulk cancel selection
+  const bulkCancelBtn = app.querySelector("#bulk-cancel-btn");
+  if (bulkCancelBtn) {
+    bulkCancelBtn.addEventListener("click", () => {
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // --- Export ---
+  const csvBtn = app.querySelector("#export-csv-btn");
+  if (csvBtn) {
+    csvBtn.addEventListener("click", () => {
+      const headers = ["제목", "단계", "부서", "담당자", "상태", "마감일", "승인상태"];
+      const data = checklistItems.map(t => [
+        t.title, t.stage, t.department, t.assignee || "", getStatusLabel(t.status),
+        formatDate(t.dueDate), t.approvalStatus || "-"
+      ]);
+      exportToCSV(data, headers, `${project.name}_체크리스트.csv`);
+    });
+  }
+
+  const pdfBtn = app.querySelector("#export-pdf-btn");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", () => {
+      const completed = checklistItems.filter(t => t.status === "completed").length;
+      const content = `프로젝트: ${project.name}\nPM: ${project.pm}\n진행률: ${project.progress}%\n전체 작업: ${checklistItems.length}\n완료: ${completed}\n현재 단계: ${project.currentStage}\n마감일: ${formatDate(project.endDate)}`;
+      exportToPDF(`${project.name} 보고서`, content);
+    });
+  }
+
+  // File row click -> open URL
+  app.querySelectorAll("[data-file-url]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const url = row.dataset.fileUrl;
+      if (url) window.open(url, "_blank");
+    });
+  });
+}
+
+function updateBulkBar() {
+  const bar = app.querySelector("#bulk-action-bar");
+  const countEl = app.querySelector("#bulk-count");
+  const selectedCountEl = app.querySelector("#selected-count");
+  if (bar) {
+    bar.style.display = selectedTaskIds.size > 0 ? "flex" : "none";
+  }
+  if (countEl) {
+    countEl.textContent = `${selectedTaskIds.size}개 선택됨`;
+  }
+  if (selectedCountEl) {
+    selectedCountEl.textContent = selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개 선택)` : "";
+  }
+}
+
+// ─── Quick Add Task (NLP Parsing + Smart Assignee) ──────────────────────────
+
+function parseQuickInput(text) {
+  const result = {
+    title: "",
+    assignee: "",
+    department: "",
+    importance: "green",
+    dueDate: null,
+    stage: PHASE_GROUPS[0].workStage,
+  };
+
+  let remaining = text;
+
+  // @담당자
+  const mentionMatch = remaining.match(/@([\uAC00-\uD7A3a-zA-Z]{2,10})/);
+  if (mentionMatch) {
+    result.assignee = mentionMatch[1];
+    remaining = remaining.replace(mentionMatch[0], "").trim();
+  }
+
+  // #부서
+  const deptMatch = remaining.match(/#([\uAC00-\uD7A3a-zA-Z\uc2e4]+)/);
+  if (deptMatch) {
+    const input = deptMatch[1];
+    const found = departments.find(d => d.includes(input) || input.includes(d.replace("팀", "")));
+    if (found) result.department = found;
+    remaining = remaining.replace(deptMatch[0], "").trim();
+  }
+
+  // !긴급 or !중요
+  if (remaining.includes("!긴급") || remaining.includes("!red")) {
+    result.importance = "red";
+    remaining = remaining.replace(/!긴급|!red/g, "").trim();
+  } else if (remaining.includes("!중요") || remaining.includes("!yellow")) {
+    result.importance = "yellow";
+    remaining = remaining.replace(/!중요|!yellow/g, "").trim();
+  }
+
+  // ~마감일 (YYYY-MM-DD or MM-DD)
+  const dateMatch = remaining.match(/~(\d{4}-\d{2}-\d{2}|\d{2}-\d{2})/);
+  if (dateMatch) {
+    let dateStr = dateMatch[1];
+    if (dateStr.length === 5) dateStr = `${new Date().getFullYear()}-${dateStr}`;
+    result.dueDate = new Date(dateStr);
+    remaining = remaining.replace(dateMatch[0], "").trim();
+  }
+
+  // Auto-detect stage from keywords
+  const stageKeywords = {
+    "발의": 0, "기획": 1, "WM": 2, "wm": 2, "Tx": 3, "tx": 3,
+    "MSG": 4, "msg": 4, "MasterGate": 4, "양산": 5, "이관": 5,
+  };
+  for (const [kw, idx] of Object.entries(stageKeywords)) {
+    if (remaining.includes(kw)) {
+      result.stage = PHASE_GROUPS[idx].workStage;
+      break;
+    }
+  }
+
+  result.title = remaining.trim();
+  return result;
+}
+
+function getSmartAssigneeSuggestions(department) {
+  if (!department || allUsers.length === 0) return [];
+  const deptUsers = allUsers.filter(u => u.department === department && u.role === "worker");
+  return deptUsers.map(u => {
+    const tasks = checklistItems.filter(t => t.assignee === u.name);
+    const active = tasks.filter(t => t.status === "in_progress" || t.status === "pending").length;
+    const overdue = tasks.filter(t => {
+      if (t.status === "completed") return false;
+      const d = daysUntil(t.dueDate);
+      return d !== null && d < 0;
+    }).length;
+    return { name: u.name, active, overdue, score: active + overdue * 2 };
+  }).sort((a, b) => a.score - b.score);
+}
+
+async function handleQuickAdd() {
+  const input = document.getElementById("quick-add-input");
+  if (!input || !input.value.trim()) return;
+
+  const parsed = parseQuickInput(input.value);
+  if (!parsed.title) {
+    alert("작업 내용을 입력해주세요");
+    return;
+  }
+
+  // Default department from user if not specified
+  if (!parsed.department) parsed.department = user.department || departments[0];
+
+  // Smart assignee: if not specified, suggest best one
+  if (!parsed.assignee) {
+    const suggestions = getSmartAssigneeSuggestions(parsed.department);
+    if (suggestions.length > 0) {
+      parsed.assignee = suggestions[0].name;
+    } else {
+      parsed.assignee = user.name;
+    }
+  }
+
+  // Default due date: 2 weeks from now
+  if (!parsed.dueDate) {
+    parsed.dueDate = new Date(Date.now() + 14 * 86400000);
+  }
+
+  try {
+    await createChecklistItem({
+      projectId,
+      title: parsed.title,
+      assignee: parsed.assignee,
+      department: parsed.department,
+      stage: parsed.stage,
+      importance: parsed.importance,
+      dueDate: parsed.dueDate,
+      status: "pending",
+    });
+    input.value = "";
+  } catch (err) {
+    alert("작업 생성 실패: " + err.message);
+  }
+}
+
+function showAddTaskModal() {
+  const dept = user.department || departments[0];
+  const suggestions = getSmartAssigneeSuggestions(dept);
+  const suggestHtml = suggestions.slice(0, 5).map(s =>
+    `<div class="smart-suggest-item" data-name="${escapeHtml(s.name)}" style="display:flex;justify-content:space-between;padding:6px 10px;cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem">
+      <span><strong>${escapeHtml(s.name)}</strong></span>
+      <span style="color:var(--text-muted)">${s.active}건 진행 ${s.overdue > 0 ? `<span style="color:var(--danger)">${s.overdue}건 지연</span>` : ""}</span>
+    </div>`
+  ).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "add-task-modal";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0;font-size:1.1rem">작업 추가</h3>
+        <button class="btn-ghost btn-sm" id="close-add-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="form-label">작업 내용 *</label>
+          <input type="text" id="modal-task-title" class="input-field" placeholder="작업 내용을 입력하세요">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="form-label">단계</label>
+            <select id="modal-task-stage" class="input-field">
+              ${PHASE_GROUPS.map(p => `<option value="${p.workStage}">${p.name} (작업)</option><option value="${p.gateStage}">${p.name} (승인)</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">부서</label>
+            <select id="modal-task-dept" class="input-field">
+              ${departments.map(d => `<option value="${d}" ${d === dept ? "selected" : ""}>${escapeHtml(d)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">담당자 ${suggestions.length > 0 ? '<span style="font-size:0.7rem;color:var(--primary)">(추천순)</span>' : ""}</label>
+          <input type="text" id="modal-task-assignee" class="input-field" placeholder="담당자 이름" value="${suggestions.length > 0 ? escapeHtml(suggestions[0].name) : ""}">
+          ${suggestHtml ? `<div class="smart-suggest-list" style="margin-top:4px;border:1px solid var(--border);border-radius:var(--radius-md);max-height:150px;overflow-y:auto">${suggestHtml}</div>` : ""}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="form-label">마감일</label>
+            <input type="date" id="modal-task-due" class="input-field" value="${new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)}">
+          </div>
+          <div>
+            <label class="form-label">중요도</label>
+            <select id="modal-task-importance" class="input-field">
+              <option value="green">보통</option>
+              <option value="yellow">중요</option>
+              <option value="red">긴급</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding-top:12px">
+        <button class="btn-ghost btn-sm" id="cancel-add-modal">취소</button>
+        <button class="btn-primary btn-sm" id="submit-add-modal">작업 생성</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Events
+  overlay.querySelector("#close-add-modal").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#cancel-add-modal").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  // Smart suggestion clicks
+  overlay.querySelectorAll(".smart-suggest-item").forEach(item => {
+    item.addEventListener("click", () => {
+      overlay.querySelector("#modal-task-assignee").value = item.dataset.name;
+    });
+    item.addEventListener("mouseenter", () => { item.style.background = "var(--surface-2, var(--surface-1))"; });
+    item.addEventListener("mouseleave", () => { item.style.background = ""; });
+  });
+
+  // Department change → refresh suggestions
+  overlay.querySelector("#modal-task-dept").addEventListener("change", (e) => {
+    const newSugs = getSmartAssigneeSuggestions(e.target.value);
+    const list = overlay.querySelector(".smart-suggest-list");
+    if (list && newSugs.length > 0) {
+      list.innerHTML = newSugs.slice(0, 5).map(s =>
+        `<div class="smart-suggest-item" data-name="${escapeHtml(s.name)}" style="display:flex;justify-content:space-between;padding:6px 10px;cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem">
+          <span><strong>${escapeHtml(s.name)}</strong></span>
+          <span style="color:var(--text-muted)">${s.active}건 진행 ${s.overdue > 0 ? `<span style="color:var(--danger)">${s.overdue}건 지연</span>` : ""}</span>
+        </div>`
+      ).join("");
+      list.querySelectorAll(".smart-suggest-item").forEach(item => {
+        item.addEventListener("click", () => {
+          overlay.querySelector("#modal-task-assignee").value = item.dataset.name;
+        });
+      });
+      if (newSugs.length > 0) overlay.querySelector("#modal-task-assignee").value = newSugs[0].name;
+    }
+  });
+
+  // Submit
+  overlay.querySelector("#submit-add-modal").addEventListener("click", async () => {
+    const title = overlay.querySelector("#modal-task-title").value.trim();
+    if (!title) { alert("작업 내용을 입력해주세요"); return; }
+
+    try {
+      await createChecklistItem({
+        projectId,
+        title,
+        assignee: overlay.querySelector("#modal-task-assignee").value.trim() || user.name,
+        department: overlay.querySelector("#modal-task-dept").value,
+        stage: overlay.querySelector("#modal-task-stage").value,
+        importance: overlay.querySelector("#modal-task-importance").value,
+        dueDate: new Date(overlay.querySelector("#modal-task-due").value),
+        status: "pending",
+      });
+      overlay.remove();
+    } catch (err) {
+      alert("작업 생성 실패: " + err.message);
+    }
   });
 }

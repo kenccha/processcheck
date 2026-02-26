@@ -789,6 +789,7 @@ export async function completeTask(taskId) {
     completedDate: Timestamp.now(),
     approvalStatus: "pending",
   });
+  try { await addActivityLog("complete_task", "", "", "", "task", taskId, { status: "completed" }); } catch(e) {}
 
   // 자동 알림: 검토자에게 승인 요청 + 프로젝트 통계 재계산
   try {
@@ -822,6 +823,7 @@ export async function approveTask(taskId, reviewerName) {
     approvedAt: Timestamp.now(),
     approvalStatus: "approved",
   });
+  try { await addActivityLog("approve_task", "", reviewerName, "", "task", taskId, { approver: reviewerName }); } catch(e) {}
 
   // 자동 알림: 담당자에게 승인 완료 + 프로젝트 통계 재계산 + 포털 알림
   try {
@@ -850,6 +852,72 @@ export async function approveTask(taskId, reviewerName) {
       if (t.stage && GATE_STAGES.includes(t.stage) && t.projectId) {
         await _createPortalNotificationsForProject(t.projectId, "phase_completed",
           `${t.stage} 완료`, `"${t.stage}" 단계가 승인 완료되었습니다.`);
+
+        // ── 워크플로우 자동화: Gate 승인 → 다음 Phase 자동 활성화 ──
+        const PHASE_ORDER = [
+          { gate: "발의승인", nextWork: "기획검토" },
+          { gate: "기획승인", nextWork: "WM제작" },
+          { gate: "WM승인회", nextWork: "Tx단계" },
+          { gate: "Tx승인회", nextWork: "MasterGatePilot" },
+          { gate: "MSG승인회", nextWork: "양산" },
+        ];
+        const nextPhase = PHASE_ORDER.find(p => p.gate === t.stage);
+        if (nextPhase) {
+          // 다음 phase의 pending 작업 담당자들에게 알림
+          const nextQ = query(collection(db, "checklistItems"),
+            where("projectId", "==", t.projectId),
+            where("stage", "==", nextPhase.nextWork));
+          const nextSnap = await getDocs(nextQ);
+          const notifiedUsers = new Set();
+          for (const taskDoc of nextSnap.docs) {
+            const td = taskDoc.data();
+            if (td.assignee && !notifiedUsers.has(td.assignee)) {
+              notifiedUsers.add(td.assignee);
+              const uQ2 = query(collection(db, "users"), where("name", "==", td.assignee));
+              const uSnap2 = await getDocs(uQ2);
+              if (!uSnap2.empty) {
+                await addDoc(collection(db, "notifications"), {
+                  userId: uSnap2.docs[0].id,
+                  type: "phase_activated",
+                  title: "새 단계 시작",
+                  message: `"${nextPhase.nextWork}" 단계가 활성화되었습니다. 작업을 시작해주세요.`,
+                  link: `project.html?id=${t.projectId}`,
+                  read: false,
+                  createdAt: Timestamp.now(),
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // ── 워크플로우 자동화: Work stage 전체 완료 → Gate 승인 자동 요청 ──
+      const WORK_TO_GATE = {
+        "발의검토": "발의승인", "기획검토": "기획승인", "WM제작": "WM승인회",
+        "Tx단계": "Tx승인회", "MasterGatePilot": "MSG승인회", "양산": "영업이관",
+      };
+      if (t.stage && WORK_TO_GATE[t.stage] && t.projectId) {
+        const wQ = query(collection(db, "checklistItems"),
+          where("projectId", "==", t.projectId),
+          where("stage", "==", t.stage));
+        const wSnap = await getDocs(wQ);
+        const allApproved = wSnap.docs.every(d => d.data().approvalStatus === "approved");
+        if (allApproved) {
+          // 기획조정실(observer)에게 Gate 승인 요청 알림
+          const obsQ = query(collection(db, "users"), where("role", "==", "observer"));
+          const obsSnap = await getDocs(obsQ);
+          for (const obs of obsSnap.docs) {
+            await addDoc(collection(db, "notifications"), {
+              userId: obs.id,
+              type: "gate_review_request",
+              title: "위원회 승인 요청",
+              message: `"${t.stage}" 단계의 모든 작업이 승인 완료되었습니다. "${WORK_TO_GATE[t.stage]}" 승인을 진행해주세요.`,
+              link: `project.html?id=${t.projectId}`,
+              read: false,
+              createdAt: Timestamp.now(),
+            });
+          }
+        }
       }
     }
   } catch (e) { console.error("알림 생성 실패:", e); }
@@ -863,6 +931,7 @@ export async function rejectTask(taskId, reviewerName, reason) {
     rejectedAt: Timestamp.now(),
     rejectionReason: reason,
   });
+  try { await addActivityLog("reject_task", "", reviewerName, "", "task", taskId, { rejector: reviewerName, reason }); } catch(e) {}
 
   // 자동 알림: 담당자에게 반려 알림 + 프로젝트 통계 재계산
   try {
@@ -898,6 +967,7 @@ export async function restartTask(taskId) {
     rejectedAt: deleteField(),
     rejectionReason: deleteField(),
   });
+  try { await addActivityLog("restart_task", "", "", "", "task", taskId, {}); } catch(e) {}
   // 프로젝트 통계 재계산
   if (taskSnap.exists() && taskSnap.data().projectId) {
     await recalculateProjectStats(taskSnap.data().projectId);
@@ -983,6 +1053,7 @@ export async function addComment(taskId, userId, userName, content) {
   await updateDoc(doc(db, "checklistItems", taskId), {
     comments: [...existing, newComment],
   });
+  try { await addActivityLog("add_comment", userId, userName, "", "task", taskId, { content: content.substring(0, 100) }); } catch(e) {}
 }
 
 // ─── Change Requests ────────────────────────────────────────────────────────
@@ -1055,6 +1126,14 @@ export function subscribeNotifications(userId, callback) {
 
 export async function markNotificationRead(id) {
   await updateDoc(doc(db, "notifications", id), { read: true });
+}
+
+export async function markAllNotificationsRead(userId) {
+  const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+  await batch.commit();
 }
 
 export async function createNotification(data) {
@@ -1716,3 +1795,132 @@ export const CUSTOMER_TYPE_LABELS = {
   hospital: "병원/의료기관",
   online: "온라인 채널",
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW FEATURES — Activity Log, Bulk Operations, User Management, Comments CRUD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Activity Log ────────────────────────────────────────────────────────────
+
+export async function addActivityLog(action, userId, userName, role, targetType, targetId, details = {}) {
+  await addDoc(collection(db, "activityLogs"), {
+    action,
+    userId,
+    userName,
+    role,
+    targetType,
+    targetId,
+    details,
+    timestamp: Timestamp.now(),
+  });
+}
+
+export function subscribeActivityLogs(targetType, targetId, callback) {
+  const q = targetId
+    ? query(collection(db, "activityLogs"), where("targetType", "==", targetType), where("targetId", "==", targetId))
+    : query(collection(db, "activityLogs"), where("targetType", "==", targetType));
+  return onSnapshot(q, (snap) => {
+    const logs = snap.docs.map(d => ({ ...d.data(), id: d.id, timestamp: toDate(d.data().timestamp) }));
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+    callback(logs);
+  });
+}
+
+export function subscribeAllActivityLogs(callback, limitCount = 50) {
+  return onSnapshot(collection(db, "activityLogs"), (snap) => {
+    const logs = snap.docs.map(d => ({ ...d.data(), id: d.id, timestamp: toDate(d.data().timestamp) }));
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+    callback(logs.slice(0, limitCount));
+  });
+}
+
+// ─── Bulk Operations ─────────────────────────────────────────────────────────
+
+export async function bulkApproveTasks(taskIds, reviewerName) {
+  const batch = writeBatch(db);
+  for (const taskId of taskIds) {
+    batch.update(doc(db, "checklistItems", taskId), {
+      approvedBy: reviewerName,
+      approvedAt: Timestamp.now(),
+      approvalStatus: "approved",
+    });
+  }
+  await batch.commit();
+  // Recalculate stats for affected projects
+  const projectIds = new Set();
+  for (const taskId of taskIds) {
+    const snap = await getDoc(doc(db, "checklistItems", taskId));
+    if (snap.exists() && snap.data().projectId) projectIds.add(snap.data().projectId);
+  }
+  for (const pid of projectIds) {
+    await recalculateProjectStats(pid);
+  }
+}
+
+export async function bulkUpdateAssignee(taskIds, newAssignee) {
+  const batch = writeBatch(db);
+  for (const taskId of taskIds) {
+    batch.update(doc(db, "checklistItems", taskId), { assignee: newAssignee });
+  }
+  await batch.commit();
+}
+
+// ─── User Management ─────────────────────────────────────────────────────────
+
+export function subscribeUsers(callback) {
+  return onSnapshot(collection(db, "users"), (snap) => {
+    const users = snap.docs.map(d => docToUser(d.id, d.data()));
+    callback(users);
+  });
+}
+
+export async function updateUserRole(userId, newRole) {
+  await updateDoc(doc(db, "users", userId), { role: newRole });
+}
+
+export async function updateUserDepartment(userId, newDept) {
+  await updateDoc(doc(db, "users", userId), { department: newDept });
+}
+
+export async function deactivateUser(userId) {
+  await updateDoc(doc(db, "users", userId), { active: false });
+}
+
+export async function activateUser(userId) {
+  await updateDoc(doc(db, "users", userId), { active: true });
+}
+
+// ─── Comment Update/Delete ───────────────────────────────────────────────────
+
+export async function updateComment(taskId, commentId, newContent) {
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  if (!taskSnap.exists()) return;
+  const comments = (taskSnap.data().comments || []).map(c =>
+    c.id === commentId ? { ...c, content: newContent, editedAt: Timestamp.fromDate(new Date()) } : c
+  );
+  await updateDoc(doc(db, "checklistItems", taskId), { comments });
+}
+
+export async function deleteComment(taskId, commentId) {
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  if (!taskSnap.exists()) return;
+  const comments = (taskSnap.data().comments || []).filter(c => c.id !== commentId);
+  await updateDoc(doc(db, "checklistItems", taskId), { comments });
+}
+
+// ─── File Metadata (stored in Firestore, actual files in Firebase Storage) ──
+
+export async function addFileMetadata(taskId, fileData) {
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  if (!taskSnap.exists()) return;
+  const files = taskSnap.data().files || [];
+  files.push({ ...fileData, uploadedAt: Timestamp.fromDate(new Date()) });
+  await updateDoc(doc(db, "checklistItems", taskId), { files });
+}
+
+export async function removeFileMetadata(taskId, fileId) {
+  const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
+  if (!taskSnap.exists()) return;
+  const files = (taskSnap.data().files || []).filter(f => f.id !== fileId);
+  await updateDoc(doc(db, "checklistItems", taskId), { files });
+}
