@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>작업 상세 - ProcessCheck</title>
+  <title>활동 로그 - ProcessCheck</title>
   <link rel="stylesheet" href="css/styles.css">
   <script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
   <script type="importmap">
@@ -18,12 +18,15 @@
   </script>
 </head>
 <body>
-  <div class="page-wrapper" style="background-color: var(--surface-0)">
+  <div class="page-wrapper bg-grid" style="background-color: var(--surface-0)">
     <div id="nav-root"></div>
     <main id="app" class="page-content">
-      <div class="spinner-overlay"><div class="spinner"></div><div class="spinner-text">작업을 불러오는 중...</div></div>
+      <div class="spinner-overlay">
+        <div class="spinner"></div>
+        <div class="spinner-text">로딩 중...</div>
+      </div>
     </main>
   </div>
-  <script type="module" src="js/pages/task-detail.js"></script>
+  <script type="module" src="js/pages/activity.js"></script>
 </body>
 </html>
