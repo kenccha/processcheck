@@ -1110,6 +1110,64 @@ tbody tr:last-child td {
 .stat-card-delta.up { color: var(--success-400); }
 .stat-card-delta.down { color: var(--danger-400); }
 
+.stat-card-active {
+  border-color: var(--primary-500) !important;
+  box-shadow: 0 0 0 1px var(--primary-500), 0 0 12px rgba(6, 182, 212, 0.15);
+}
+
+.stat-sub {
+  font-size: 0.6875rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Dashboard Tabs + Collapsible
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.dash-notif-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+.dash-notif-scroll::-webkit-scrollbar { width: 4px; }
+.dash-notif-scroll::-webkit-scrollbar-track { background: transparent; }
+.dash-notif-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
+
+.dash-collapsible-header { transition: background 0.15s; }
+.dash-collapsible-header:hover { background: var(--surface-3); }
+
+.dash-chevron {
+  transform: rotate(0deg);
+  transition: transform 0.3s ease;
+}
+.dash-chevron-open { transform: rotate(180deg); }
+
+.dash-show-more { text-align: center; }
+.dash-show-more .btn-ghost {
+  width: 100%;
+  justify-content: center;
+  color: var(--primary-400);
+}
+.dash-show-more .btn-ghost:hover {
+  color: var(--primary-300);
+  background: rgba(6, 182, 212, 0.06);
+}
+
+.task-urgent {
+  border-left: 3px solid var(--danger-400) !important;
+}
+.task-warning-border {
+  border-left: 3px solid var(--warning-400) !important;
+}
+
+.dash-date {
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  font-weight: 400;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════
    Empty State
    ══════════════════════════════════════════════════════════════════════════════ */
