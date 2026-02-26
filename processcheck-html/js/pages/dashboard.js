@@ -457,6 +457,29 @@ function render() {
           </div>
         </div>
       </div>
+
+      <!-- Charts Section -->
+      <section class="mt-8" id="chart-section">
+        <h2 class="section-title mb-4">\u{1F4CA} 프로젝트 분석</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card p-4">
+            <h3 class="text-sm font-semibold mb-3" style="color:var(--slate-200)">부서별 진행률</h3>
+            <div style="height:300px"><canvas id="chart-dept"></canvas></div>
+          </div>
+          <div class="card p-4">
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <h3 class="text-sm font-semibold mb-3" style="color:var(--slate-200)">Phase별 완료율 (%)</h3>
+                <div style="height:200px"><canvas id="chart-phase"></canvas></div>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold mb-3" style="color:var(--slate-200)">주간 완료 추이</h3>
+                <div style="height:140px"><canvas id="chart-weekly"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   `;
 
@@ -554,6 +577,138 @@ function render() {
       item.style.background = "";
     });
   });
+
+  // Render charts
+  renderCharts();
+}
+
+// ─── Charts ──────────────────────────────────────────────────────────────────
+
+function renderCharts() {
+  const chartSection = document.getElementById("chart-section");
+  if (!chartSection || allTasks.length === 0) return;
+
+  const depts = ["개발팀", "품질팀", "영업팀", "제조팀", "구매팀", "CS팀", "경영관리팀", "글로벌임상팀", "디자인연구소", "인증팀"];
+  const phases = [
+    { name: "발의", stages: ["발의검토", "발의승인"] },
+    { name: "기획", stages: ["기획검토", "기획승인"] },
+    { name: "WM", stages: ["WM제작", "WM승인회"] },
+    { name: "Tx", stages: ["Tx단계", "Tx승인회"] },
+    { name: "MSG", stages: ["MasterGatePilot", "MSG승인회"] },
+    { name: "양산/이관", stages: ["양산", "영업이관"] },
+  ];
+
+  // Department bar chart data
+  const deptCompleted = depts.map(d => allTasks.filter(t => t.department === d && (t.approvalStatus === "approved" || t.status === "completed")).length);
+  const deptInProgress = depts.map(d => allTasks.filter(t => t.department === d && t.status === "in_progress").length);
+  const deptPending = depts.map(d => allTasks.filter(t => t.department === d && t.status === "pending").length);
+
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const textColor = isDark ? "#cbd5e1" : "#475569";
+  const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+
+  // Chart 1: Department progress
+  const ctx1 = document.getElementById("chart-dept");
+  if (ctx1) {
+    if (ctx1._chart) ctx1._chart.destroy();
+    ctx1._chart = new Chart(ctx1, {
+      type: "bar",
+      data: {
+        labels: depts.map(d => d.replace("팀", "")),
+        datasets: [
+          { label: "완료/승인", data: deptCompleted, backgroundColor: "rgba(16,185,129,0.7)" },
+          { label: "진행 중", data: deptInProgress, backgroundColor: "rgba(6,182,212,0.7)" },
+          { label: "대기", data: deptPending, backgroundColor: "rgba(148,163,184,0.4)" },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { color: textColor, font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor } },
+          y: { stacked: true, ticks: { color: textColor, font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  // Chart 2: Phase completion doughnut
+  const phaseData = phases.map(p => {
+    const tasks = allTasks.filter(t => p.stages.includes(t.stage));
+    if (tasks.length === 0) return 0;
+    const done = tasks.filter(t => t.approvalStatus === "approved" || t.status === "completed").length;
+    return Math.round((done / tasks.length) * 100);
+  });
+
+  const ctx2 = document.getElementById("chart-phase");
+  if (ctx2) {
+    if (ctx2._chart) ctx2._chart.destroy();
+    ctx2._chart = new Chart(ctx2, {
+      type: "doughnut",
+      data: {
+        labels: phases.map(p => p.name),
+        datasets: [{
+          data: phaseData,
+          backgroundColor: ["#06b6d4", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#f97316"],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { color: textColor, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}% 완료` } },
+        },
+      },
+    });
+  }
+
+  // Chart 3: Weekly completion trend
+  const now = new Date();
+  const weekLabels = [];
+  const weekCounts = [];
+  for (let w = 3; w >= 0; w--) {
+    const weekStart = new Date(now.getTime() - (w * 7 + 7) * 86400000);
+    const weekEnd = new Date(now.getTime() - w * 7 * 86400000);
+    weekLabels.push(`${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getDate()}`);
+    weekCounts.push(allTasks.filter(t => {
+      if (!t.completedDate) return false;
+      const cd = t.completedDate instanceof Date ? t.completedDate : new Date(t.completedDate);
+      return cd >= weekStart && cd < weekEnd;
+    }).length);
+  }
+
+  const ctx3 = document.getElementById("chart-weekly");
+  if (ctx3) {
+    if (ctx3._chart) ctx3._chart.destroy();
+    ctx3._chart = new Chart(ctx3, {
+      type: "line",
+      data: {
+        labels: weekLabels,
+        datasets: [{
+          label: "완료된 작업",
+          data: weekCounts,
+          borderColor: "#06b6d4",
+          backgroundColor: "rgba(6,182,212,0.1)",
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: "#06b6d4",
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: textColor }, grid: { color: gridColor } },
+          y: { beginAtZero: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+        },
+      },
+    });
+  }
 }
 
 // ─── Notification Link Converter ────────────────────────────────────────────

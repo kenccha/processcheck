@@ -50,7 +50,7 @@ export function initTheme() {
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   {
     href: "dashboard.html",
     label: "대시보드",
@@ -83,11 +83,27 @@ const NAV_LINKS = [
   },
 ];
 
+const ADMIN_USER_LINK = {
+  href: "admin-users.html",
+  label: "사용자 관리",
+  icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
+};
+
+function getNavLinks(userRole) {
+  const links = [...BASE_NAV_LINKS];
+  if (userRole === "observer") {
+    // Insert before 매뉴얼 (last item)
+    links.splice(links.length - 1, 0, ADMIN_USER_LINK);
+  }
+  return links;
+}
+
 export function renderNav(container) {
   const user = getUser();
   if (!user) return;
 
   const currentPage = window.location.pathname.split("/").pop() || "index.html";
+  const NAV_LINKS = getNavLinks(user.role);
 
   container.innerHTML = `
     <nav class="nav">
