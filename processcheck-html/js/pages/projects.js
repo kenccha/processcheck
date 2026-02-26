@@ -5,7 +5,7 @@
 import { guardPage } from "../auth.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
-import { subscribeProjects, subscribeAllChecklistItems } from "../firestore-service.js";
+import { subscribeProjects, subscribeAllChecklistItems, updateProject } from "../firestore-service.js";
 import {
   departments,
   projectStages,
@@ -19,6 +19,7 @@ import {
   getRiskClass,
   getRiskLabel,
   daysUntil,
+  exportToCSV,
 } from "../utils.js";
 
 // -- Guard --
@@ -248,6 +249,9 @@ function render() {
           <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">프로젝트</h1>
           <p class="text-sm text-soft mt-1">총 ${filtered.length}개 프로젝트</p>
         </div>
+        <button class="btn-ghost btn-sm" id="export-projects-csv" style="font-size:0.75rem">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV 내보내기
+        </button>
       </div>
 
       <!-- Project Type Tabs (신규개발 / 설계변경) -->
@@ -384,13 +388,14 @@ function renderChangeKanban(filtered) {
     { key: "completed", label: "완료", color: "var(--success-400)" },
     { key: "on_hold", label: "보류", color: "var(--warning-400)" },
   ];
+  // Note: DnD is handled by bindControls() via data-drop-zone and data-drag-project attributes
 
   return `
     <div class="kanban-board">
       ${columns.map(col => {
         const colProjects = filtered.filter(p => p.status === col.key);
         return `
-        <div class="kanban-column" style="flex:1;max-width:none">
+        <div class="kanban-column" data-kanban-col="${col.key}" style="flex:1;max-width:none">
           <div class="kanban-column-header">
             <div class="flex items-center gap-2">
               <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col.color}"></span>
@@ -398,11 +403,11 @@ function renderChangeKanban(filtered) {
             </div>
             <span class="kanban-column-count">${colProjects.length}</span>
           </div>
-          <div class="kanban-column-body">
+          <div class="kanban-column-body" data-drop-zone="${col.key}">
             ${colProjects.length === 0
               ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">프로젝트 없음</span></div>`
               : colProjects.map(p => `
-                <div class="kanban-card" data-project-id="${p.id}">
+                <div class="kanban-card" data-project-id="${p.id}" draggable="true" data-drag-project="${p.id}">
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
                     <span class="badge ${getChangeScaleBadge(p.changeScale)}" style="font-size:0.625rem">${getChangeScaleLabel(p.changeScale)}</span>
@@ -641,7 +646,7 @@ function renderKanban(filtered) {
         .map((col) => {
           const colProjects = filtered.filter((p) => p.status === col.key);
           return `
-          <div class="kanban-column" style="flex:1;max-width:none">
+          <div class="kanban-column" data-kanban-col="${col.key}" style="flex:1;max-width:none">
             <div class="kanban-column-header">
               <div class="flex items-center gap-2">
                 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col.color}"></span>
@@ -649,7 +654,7 @@ function renderKanban(filtered) {
               </div>
               <span class="kanban-column-count">${colProjects.length}</span>
             </div>
-            <div class="kanban-column-body">
+            <div class="kanban-column-body" data-drop-zone="${col.key}">
               ${
                 colProjects.length === 0
                   ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">프로젝트 없음</span></div>`
@@ -657,7 +662,7 @@ function renderKanban(filtered) {
                       .map((p) => {
                         const stats = getTaskStats(p.id);
                         return `
-                        <div class="kanban-card" data-project-id="${p.id}">
+                        <div class="kanban-card" data-project-id="${p.id}" draggable="true" data-drag-project="${p.id}">
                           <div class="flex items-center justify-between mb-2">
                             <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
                             <span class="risk-dot ${p.riskLevel || ""}"></span>
@@ -1091,4 +1096,59 @@ function bindControls() {
       if (id) window.location.href = `project.html?id=${id}`;
     });
   });
+
+  // --- Kanban Drag & Drop ---
+  document.querySelectorAll("[data-drag-project]").forEach((card) => {
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", card.dataset.dragProject);
+      card.style.opacity = "0.5";
+    });
+    card.addEventListener("dragend", () => {
+      card.style.opacity = "1";
+    });
+  });
+
+  document.querySelectorAll("[data-drop-zone]").forEach((zone) => {
+    zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      zone.style.background = "rgba(6, 182, 212, 0.05)";
+      zone.style.outline = "2px dashed var(--primary-400)";
+      zone.style.outlineOffset = "-2px";
+    });
+    zone.addEventListener("dragleave", () => {
+      zone.style.background = "";
+      zone.style.outline = "";
+    });
+    zone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      zone.style.background = "";
+      zone.style.outline = "";
+      const projectId = e.dataTransfer.getData("text/plain");
+      const newStatus = zone.dataset.dropZone;
+      if (!projectId || !newStatus) return;
+      const proj = projects.find((p) => p.id === projectId);
+      if (!proj || proj.status === newStatus) return;
+      if (!confirm(`"${proj.name}" 상태를 "${getProjectStatusLabel(newStatus)}"(으)로 변경하시겠습니까?`)) return;
+      try {
+        await updateProject(projectId, { status: newStatus });
+      } catch (err) {
+        alert("상태 변경 실패: " + err.message);
+      }
+    });
+  });
+
+  // --- CSV Export ---
+  const exportBtn = document.getElementById("export-projects-csv");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      const filtered = getFilteredProjects();
+      const headers = ["이름", "유형", "PM", "상태", "진행률", "시작일", "종료일", "현재 단계"];
+      const data = filtered.map((p) => [
+        p.name, p.projectType || "", p.pm || "", getProjectStatusLabel(p.status),
+        (p.progress || 0) + "%", formatDate(p.startDate), formatDate(p.endDate),
+        formatStageName(p.currentStage),
+      ]);
+      exportToCSV(data, headers, "프로젝트_목록.csv");
+    });
+  }
 }

@@ -9,6 +9,9 @@ import {
   subscribeProjects,
   subscribeChecklistItems,
   subscribeChangeRequests,
+  bulkApproveTasks,
+  bulkUpdateAssignee,
+  getUsers,
 } from "../firestore-service.js";
 import {
   departments,
@@ -26,6 +29,10 @@ import {
   getRiskLabel,
   getProgressClass,
   timeAgo,
+  exportToCSV,
+  exportToPDF,
+  getFileIcon,
+  formatFileSize,
 } from "../utils.js";
 
 // --- Auth guard ---
@@ -51,9 +58,14 @@ let activeTab = "overview";
 let selectedStage = "";
 let selectedDepartment = "";
 let checklistFilter = ""; // "" | "in_progress" | "delayed" | "manager_pending" | "committee_pending"
+let selectedTaskIds = new Set();
+let allUsers = [];
 
 // --- Render nav ---
 const unsubNav = renderNav(navRoot);
+
+// --- Load users ---
+getUsers().then(u => { allUsers = u; });
 
 // --- Subscriptions ---
 const unsubs = [];
@@ -289,6 +301,15 @@ function renderProjectHeader(riskClass, phaseIndex, totalTasks) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
             <span class="text-sm font-semibold" style="color: var(--primary-300);">현재 단계: ${currentPhaseName}</span>
+          </div>
+          <!-- Export Buttons -->
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+            <button class="btn-ghost btn-sm" id="export-csv-btn" style="font-size:0.75rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV 내보내기
+            </button>
+            <button class="btn-ghost btn-sm" id="export-pdf-btn" style="font-size:0.75rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>PDF 보고서
+            </button>
           </div>
         </div>
         <!-- Right: Progress -->
@@ -588,8 +609,24 @@ function renderChecklistTab() {
       </select>
     </div>
 
+    <!-- Select All -->
+    <div class="flex items-center gap-3 mb-3">
+      <label class="flex items-center gap-2 text-sm" style="color:var(--slate-300)">
+        <input type="checkbox" id="select-all-tasks"> 전체 선택
+      </label>
+      <span class="text-xs" style="color:var(--slate-400)" id="selected-count">${selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개 선택)` : ""}</span>
+    </div>
+
     <!-- Task List grouped by department -->
     ${renderTaskList()}
+
+    <!-- Floating Bulk Action Bar -->
+    <div id="bulk-action-bar" class="card p-3 flex items-center gap-4" style="display:${selectedTaskIds.size > 0 ? "flex" : "none"};position:sticky;bottom:16px;z-index:10;background:var(--surface-1);border:1px solid var(--primary-400)">
+      <span class="text-sm font-semibold" id="bulk-count" style="color:var(--primary-400)">${selectedTaskIds.size}개 선택됨</span>
+      <button class="btn-primary btn-sm" id="bulk-approve-btn">일괄 승인</button>
+      <button class="btn-secondary btn-sm" id="bulk-assignee-btn">담당자 변경</button>
+      <button class="btn-ghost btn-sm" id="bulk-cancel-btn">선택 해제</button>
+    </div>
   `;
 }
 
@@ -660,6 +697,7 @@ function renderTaskList() {
               (task) => `
               <div class="card-hover" data-task-id="${task.id}" style="border:none; border-bottom: 1px solid var(--surface-3); border-radius: 0; padding: 1rem 1.25rem; cursor: pointer;">
                 <div class="flex items-start gap-3">
+                  <input type="checkbox" class="task-checkbox" data-task-checkbox="${task.id}" ${selectedTaskIds.has(task.id) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--primary-400);flex-shrink:0;margin-top:0.25rem">
                   <div style="flex: 1; min-width: 0;">
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
                       <span class="badge ${getStatusBadgeClass(task.status)}">${getStatusLabel(task.status)}</span>
@@ -693,25 +731,65 @@ function renderTaskList() {
 // =============================================================================
 
 function renderFilesTab() {
+  // Aggregate files from all checklist items
+  const allFiles = [];
+  for (const task of checklistItems) {
+    if (task.files && task.files.length > 0) {
+      for (const f of task.files) {
+        allFiles.push({ ...f, taskTitle: task.title, taskId: task.id, department: task.department, stage: task.stage });
+      }
+    }
+  }
+  allFiles.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+
   return `
     <div class="card p-6">
-      <!-- Upload Area Placeholder -->
-      <div style="border: 2px dashed var(--surface-4); border-radius: var(--radius-xl); padding: 3rem 2rem; text-align: center; transition: border-color 0.2s;">
-        <svg width="48" height="48" fill="none" stroke="var(--slate-600)" viewBox="0 0 24 24" style="margin: 0 auto 1rem;">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-        </svg>
-        <div class="text-sm font-medium" style="color: var(--slate-400); margin-bottom: 0.5rem;">파일을 여기에 드래그하거나 클릭하여 업로드</div>
-        <div class="text-xs text-dim">PDF, DOCX, XLSX, 이미지 파일 지원</div>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="section-title">프로젝트 파일 (${allFiles.length})</h3>
+        <span class="text-xs text-dim">작업별 업로드된 파일이 여기에 표시됩니다</span>
       </div>
 
-      <!-- Empty State -->
-      <div class="empty-state" style="padding: 3rem 1rem; margin-top: 2rem;">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-        </svg>
-        <span class="empty-state-text">업로드된 파일이 없습니다</span>
-        <span class="text-xs text-dim" style="margin-top: 0.5rem;">프로젝트 관련 문서와 파일을 업로드하세요</span>
-      </div>
+      ${allFiles.length === 0 ? `
+        <div class="empty-state" style="padding: 3rem 1rem;">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+          </svg>
+          <span class="empty-state-text">업로드된 파일이 없습니다</span>
+          <span class="text-xs text-dim" style="margin-top: 0.5rem;">작업 상세에서 파일을 업로드하면 여기에 표시됩니다</span>
+        </div>
+      ` : `
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>파일명</th>
+                <th>작업</th>
+                <th>부서</th>
+                <th>크기</th>
+                <th>업로더</th>
+                <th>업로드일</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allFiles.map(f => `
+                <tr class="card-hover" style="cursor:pointer" data-file-url="${escapeHtml(f.url || "")}">
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span>${getFileIcon(f.name)}</span>
+                      <span class="text-sm font-medium" style="color:var(--slate-200)">${escapeHtml(f.name)}</span>
+                    </div>
+                  </td>
+                  <td class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.taskTitle)}</td>
+                  <td class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.department)}</td>
+                  <td class="text-xs text-dim">${formatFileSize(f.size || 0)}</td>
+                  <td class="text-xs" style="color:var(--slate-300)">${escapeHtml(f.uploadedBy || "-")}</td>
+                  <td class="text-xs text-dim">${f.uploadedAt ? timeAgo(f.uploadedAt) : "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `}
     </div>
   `;
 }
@@ -876,4 +954,116 @@ function bindEvents() {
       await updateChangeRequest(btn.dataset.rejectCr, { status: "rejected" });
     });
   });
+
+  // --- Bulk Operations ---
+  // Task checkboxes (stop propagation to prevent row click navigation)
+  app.querySelectorAll("[data-task-checkbox]").forEach((cb) => {
+    cb.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+    cb.addEventListener("change", (e) => {
+      const id = cb.dataset.taskCheckbox;
+      if (cb.checked) {
+        selectedTaskIds.add(id);
+      } else {
+        selectedTaskIds.delete(id);
+      }
+      updateBulkBar();
+    });
+  });
+
+  // Select all
+  const selectAllCb = app.querySelector("#select-all-tasks");
+  if (selectAllCb) {
+    selectAllCb.addEventListener("change", () => {
+      const checkboxes = app.querySelectorAll("[data-task-checkbox]");
+      if (selectAllCb.checked) {
+        checkboxes.forEach(cb => { cb.checked = true; selectedTaskIds.add(cb.dataset.taskCheckbox); });
+      } else {
+        checkboxes.forEach(cb => { cb.checked = false; });
+        selectedTaskIds.clear();
+      }
+      updateBulkBar();
+    });
+  }
+
+  // Bulk approve
+  const bulkApproveBtn = app.querySelector("#bulk-approve-btn");
+  if (bulkApproveBtn) {
+    bulkApproveBtn.addEventListener("click", async () => {
+      if (selectedTaskIds.size === 0) return;
+      if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
+      await bulkApproveTasks([...selectedTaskIds], user.name);
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // Bulk assignee change
+  const bulkAssigneeBtn = app.querySelector("#bulk-assignee-btn");
+  if (bulkAssigneeBtn) {
+    bulkAssigneeBtn.addEventListener("click", async () => {
+      if (selectedTaskIds.size === 0) return;
+      const names = allUsers.map(u => u.name);
+      const newAssignee = prompt(`새 담당자를 입력하세요:\n(${names.slice(0, 5).join(", ")}...)`);
+      if (!newAssignee) return;
+      await bulkUpdateAssignee([...selectedTaskIds], newAssignee);
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // Bulk cancel selection
+  const bulkCancelBtn = app.querySelector("#bulk-cancel-btn");
+  if (bulkCancelBtn) {
+    bulkCancelBtn.addEventListener("click", () => {
+      selectedTaskIds.clear();
+      render();
+    });
+  }
+
+  // --- Export ---
+  const csvBtn = app.querySelector("#export-csv-btn");
+  if (csvBtn) {
+    csvBtn.addEventListener("click", () => {
+      const headers = ["제목", "단계", "부서", "담당자", "상태", "마감일", "승인상태"];
+      const data = checklistItems.map(t => [
+        t.title, t.stage, t.department, t.assignee || "", getStatusLabel(t.status),
+        formatDate(t.dueDate), t.approvalStatus || "-"
+      ]);
+      exportToCSV(data, headers, `${project.name}_체크리스트.csv`);
+    });
+  }
+
+  const pdfBtn = app.querySelector("#export-pdf-btn");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", () => {
+      const completed = checklistItems.filter(t => t.status === "completed").length;
+      const content = `프로젝트: ${project.name}\nPM: ${project.pm}\n진행률: ${project.progress}%\n전체 작업: ${checklistItems.length}\n완료: ${completed}\n현재 단계: ${project.currentStage}\n마감일: ${formatDate(project.endDate)}`;
+      exportToPDF(`${project.name} 보고서`, content);
+    });
+  }
+
+  // File row click -> open URL
+  app.querySelectorAll("[data-file-url]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const url = row.dataset.fileUrl;
+      if (url) window.open(url, "_blank");
+    });
+  });
+}
+
+function updateBulkBar() {
+  const bar = app.querySelector("#bulk-action-bar");
+  const countEl = app.querySelector("#bulk-count");
+  const selectedCountEl = app.querySelector("#selected-count");
+  if (bar) {
+    bar.style.display = selectedTaskIds.size > 0 ? "flex" : "none";
+  }
+  if (countEl) {
+    countEl.textContent = `${selectedTaskIds.size}개 선택됨`;
+  }
+  if (selectedCountEl) {
+    selectedCountEl.textContent = selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개 선택)` : "";
+  }
 }
