@@ -300,3 +300,20 @@ export function validateFile(file) {
   if (!ALLOWED_FILE_TYPES.includes(file.type)) return { valid: false, error: "허용되지 않는 파일 형식입니다 (PDF, DOC, XLS, PPT, PNG, JPG 허용)" };
   return { valid: true };
 }
+
+// ─── Structure Request Helpers ──────────────────────────────────────────────
+
+export function getStructureRequestTypeLabel(type) {
+  const map = { addStage: "단계 추가", deleteStage: "단계 삭제", addDept: "부서 추가", deleteDept: "부서 삭제" };
+  return map[type] || type;
+}
+
+export function getStructureRequestStatusLabel(status) {
+  const map = { pending: "대기 중", approved: "승인", rejected: "반려" };
+  return map[status] || status;
+}
+
+export function getStructureRequestStatusClass(status) {
+  const map = { pending: "badge-warning", approved: "badge-success", rejected: "badge-danger" };
+  return map[status] || "badge-neutral";
+}

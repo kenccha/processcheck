@@ -41,6 +41,8 @@ let viewMode = "table"; // table | matrix | cards | gantt | kanban | timeline | 
 let changeViewMode = "table"; // table | kanban (설계변경 전용)
 let searchQuery = "";
 let statusFilter = "all"; // all | active | completed | on_hold
+let productTypeFilter = "all"; // 제품군 필터 (설계변경 전용)
+let changeCategoryFilter = "all"; // 분야 필터 (설계변경 전용)
 let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth(); // 0-based
 let sortField = "startDate"; // name | status | pm | progress | startDate
@@ -75,6 +77,10 @@ function getFilteredProjects() {
     if (pType !== projectTypeTab) return false;
     // status filter
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    // 제품군 필터 (설계변경 탭)
+    if (projectTypeTab === "설계변경" && productTypeFilter !== "all" && p.productType !== productTypeFilter) return false;
+    // 분야 필터 (설계변경 탭)
+    if (projectTypeTab === "설계변경" && changeCategoryFilter !== "all" && p.changeCategory !== changeCategoryFilter) return false;
     // search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -275,6 +281,21 @@ function render() {
           ).join("")}
         </select>
 
+        ${isChangeTab ? `
+        <!-- 제품군 필터 -->
+        <select class="input-field" id="product-type-filter" style="width:auto;min-width:120px">
+          <option value="all">전체 제품군</option>
+          ${[...new Set(projects.filter(p => p.projectType === "설계변경").map(p => p.productType).filter(Boolean))].sort()
+            .map(pt => `<option value="${escapeHtml(pt)}"${productTypeFilter === pt ? " selected" : ""}>${escapeHtml(pt)}</option>`).join("")}
+        </select>
+
+        <!-- 분야 필터 -->
+        <select class="input-field" id="change-category-filter" style="width:auto;min-width:100px">
+          <option value="all">전체 분야</option>
+          ${["기구", "전자", "F/W"].map(c => `<option value="${c}"${changeCategoryFilter === c ? " selected" : ""}>${c}</option>`).join("")}
+        </select>
+        ` : ""}
+
         <!-- View mode switcher -->
         <div class="view-switcher">
           ${currentViewModes.map(
@@ -347,9 +368,10 @@ function renderChangeTable(filtered) {
           <tr>
             <th>프로젝트명</th>
             <th>규모</th>
+            <th>제품군</th>
+            <th>분야</th>
             <th>상태</th>
             <th>PM</th>
-            <th>중요도</th>
             <th>진행률</th>
             <th>요청일</th>
           </tr>
@@ -359,9 +381,10 @@ function renderChangeTable(filtered) {
             <tr class="cursor-pointer" data-project-id="${p.id}">
               <td><span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span></td>
               <td><span class="badge ${getChangeScaleBadge(p.changeScale)}">${getChangeScaleLabel(p.changeScale)}</span></td>
+              <td class="text-sm">${escapeHtml(p.productType || "-")}</td>
+              <td><span class="badge badge-neutral">${escapeHtml(p.changeCategory || "-")}</span></td>
               <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
               <td>${escapeHtml(p.pm || "-")}</td>
-              <td><span class="risk-dot ${p.riskLevel || ""}"></span> ${getRiskLabel(p.riskLevel)}</td>
               <td>
                 <div class="flex items-center gap-2">
                   <div class="progress-bar" style="width:80px">
@@ -1023,6 +1046,24 @@ function bindControls() {
   if (statusSelect) {
     statusSelect.addEventListener("change", (e) => {
       statusFilter = e.target.value;
+      render();
+    });
+  }
+
+  // 제품군 필터 (설계변경)
+  const productTypeSelect = document.getElementById("product-type-filter");
+  if (productTypeSelect) {
+    productTypeSelect.addEventListener("change", (e) => {
+      productTypeFilter = e.target.value;
+      render();
+    });
+  }
+
+  // 분야 필터 (설계변경)
+  const changeCategorySelect = document.getElementById("change-category-filter");
+  if (changeCategorySelect) {
+    changeCategorySelect.addEventListener("change", (e) => {
+      changeCategoryFilter = e.target.value;
       render();
     });
   }

@@ -416,14 +416,19 @@ function renderSummaryCard() {
 
   // Bottleneck: in current phase, find departments with pending/in_progress tasks
   const bottlenecks = [];
+  const deptCounts = {};
   if (currentPhase) {
     const phaseStages = [currentPhase.workStage, currentPhase.gateStage];
     const phaseTasks = checklistItems.filter(t => phaseStages.includes(t.stage) && t.status !== "completed");
-    const deptCounts = {};
     for (const t of phaseTasks) {
-      if (!deptCounts[t.department]) deptCounts[t.department] = { inProgress: 0, pending: 0 };
-      if (t.status === "in_progress") deptCounts[t.department].inProgress++;
-      else if (t.status === "pending") deptCounts[t.department].pending++;
+      if (!deptCounts[t.department]) deptCounts[t.department] = { inProgress: 0, pending: 0, inProgressDetails: [], pendingDetails: [] };
+      if (t.status === "in_progress") {
+        deptCounts[t.department].inProgress++;
+        deptCounts[t.department].inProgressDetails.push(t.title || t.content || "작업");
+      } else if (t.status === "pending") {
+        deptCounts[t.department].pending++;
+        deptCounts[t.department].pendingDetails.push(t.title || t.content || "작업");
+      }
     }
     for (const [dept, counts] of Object.entries(deptCounts)) {
       const parts = [];
@@ -432,6 +437,40 @@ function renderSummaryCard() {
       bottlenecks.push(`${dept} ${parts.join(", ")}`);
     }
   }
+
+  // Build bottleneck table HTML
+  const deptEntries = Object.entries(deptCounts);
+  const hasBottleneckData = deptEntries.length > 0;
+  const bottleneckTableHtml = hasBottleneckData ? `
+    <div style="flex:1;min-width:0;overflow-x:auto">
+      <table class="bottleneck-table">
+        <thead>
+          <tr>
+            <th></th>
+            ${deptEntries.map(([dept]) => `<th><span class="bottleneck-dept-label">${dept}</span></th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bottleneck-row-label">진행중(건)</td>
+            ${deptEntries.map(([dept, c]) => {
+              const val = c.inProgress || 0;
+              const tooltip = c.inProgressDetails.length > 0 ? c.inProgressDetails.join("\\n") : "";
+              return `<td class="bottleneck-cell${val > 0 ? " has-value" : ""}" ${tooltip ? `data-tooltip="${tooltip.replace(/"/g, '&quot;')}"` : ""}>${val > 0 ? val : "-"}</td>`;
+            }).join("")}
+          </tr>
+          <tr>
+            <td class="bottleneck-row-label">대기(건)</td>
+            ${deptEntries.map(([dept, c]) => {
+              const val = c.pending || 0;
+              const tooltip = c.pendingDetails.length > 0 ? c.pendingDetails.join("\\n") : "";
+              return `<td class="bottleneck-cell${val > 0 ? " has-value" : ""}" ${tooltip ? `data-tooltip="${tooltip.replace(/"/g, '&quot;')}"` : ""}>${val > 0 ? val : "-"}</td>`;
+            }).join("")}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  ` : "";
 
   return `
     <div class="card p-5 mb-6">
@@ -465,21 +504,27 @@ function renderSummaryCard() {
         }).join("")}
       </div>
 
-      <!-- Deadline + Plan Deviation -->
-      <div class="flex flex-wrap gap-6 mb-4">
-        <div>
-          <div class="text-xs text-dim mb-1">마감일</div>
-          <div class="text-sm font-semibold" style="color:var(--slate-200)">${formatDate(p.endDate)}</div>
-          <div class="text-xs font-mono" style="color:${dDays !== null && dDays < 0 ? "var(--danger-400)" : "var(--primary-400)"}">${dDayLabel}</div>
+      <!-- Deadline + Plan Deviation + Bottleneck Table (2-column) -->
+      <div style="display:flex;gap:1.5rem;margin-bottom:1rem;align-items:flex-start;flex-wrap:wrap">
+        <!-- Left: Deadline + Deviation -->
+        <div style="flex-shrink:0;min-width:140px">
+          <div class="mb-3">
+            <div class="text-xs text-dim mb-1">마감일</div>
+            <div class="text-sm font-semibold" style="color:var(--slate-200)">${formatDate(p.endDate)}</div>
+            <div class="text-xs font-mono" style="color:${dDays !== null && dDays < 0 ? "var(--danger-400)" : "var(--primary-400)"}">${dDayLabel}</div>
+          </div>
+          <div>
+            <div class="text-xs text-dim mb-1">계획 대비</div>
+            <div class="text-sm font-semibold" style="color:${deviationColor}">${deviationLabel || "-"}</div>
+            <div class="text-xs text-soft">현재 ${currentPhase ? currentPhase.name : "-"} (${phaseIndex + 1}/6 phase)</div>
+          </div>
         </div>
-        <div>
-          <div class="text-xs text-dim mb-1">계획 대비</div>
-          <div class="text-sm font-semibold" style="color:${deviationColor}">${deviationLabel || "-"}</div>
-          <div class="text-xs text-soft">현재 ${currentPhase ? currentPhase.name : "-"} (${phaseIndex + 1}/6 phase)</div>
-        </div>
+
+        <!-- Right: Bottleneck Table -->
+        ${bottleneckTableHtml}
       </div>
 
-      <!-- Bottleneck -->
+      <!-- Bottleneck Text Summary -->
       ${bottlenecks.length > 0 ? `
         <div style="padding:0.75rem 1rem;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:var(--radius-lg)">
           <div class="text-xs font-semibold mb-1" style="color:var(--warning-400)">병목</div>

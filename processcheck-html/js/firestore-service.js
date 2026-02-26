@@ -5,7 +5,7 @@
 
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, deleteField,
-  query, where, Timestamp, writeBatch, onSnapshot,
+  query, where, orderBy, Timestamp, writeBatch, onSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
 
@@ -86,14 +86,14 @@ function getMockData() {
     { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", projectType: "신규개발", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), pm: "박민수", riskLevel: "yellow", currentStage: "WM제작" },
     { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", projectType: "신규개발", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), pm: "박민수", riskLevel: "green", currentStage: "Tx단계" },
     { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", projectType: "신규개발", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), pm: "박민수", riskLevel: "green", currentStage: "기획검토" },
-    { id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계", projectType: "설계변경", changeScale: "major", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
+    { id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계", projectType: "설계변경", changeScale: "major", changeCategory: "전자", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
     { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", projectType: "신규개발", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
     // 설계변경 프로젝트
-    { id: "proj6", name: "센서 교체 (혈압계)", productType: "혈압계", projectType: "설계변경", changeScale: "minor", status: "completed", progress: 100, startDate: new Date("2026-01-10"), endDate: new Date("2026-01-25"), pm: "이영희", riskLevel: "green", currentStage: "영업이관" },
-    { id: "proj7", name: "배터리 규격 변경", productType: "체성분 분석기", projectType: "설계변경", changeScale: "major", status: "active", progress: 20, startDate: new Date("2026-01-15"), endDate: new Date("2026-06-30"), pm: "박민수", riskLevel: "yellow", currentStage: "발의검토" },
-    { id: "proj8", name: "LCD 크기 조정", productType: "혈압계", projectType: "설계변경", changeScale: "medium", status: "active", progress: 40, startDate: new Date("2026-02-01"), endDate: new Date("2026-04-30"), pm: "이영희", riskLevel: "green", currentStage: "기획검토" },
-    { id: "proj9", name: "펌웨어 버전 업데이트", productType: "FRA", projectType: "설계변경", changeScale: "minor", status: "active", progress: 50, startDate: new Date("2026-02-10"), endDate: new Date("2026-03-15"), pm: "이영희", riskLevel: "green", currentStage: "발의검토" },
-    { id: "proj10", name: "외관 재질 변경", productType: "신장계", projectType: "설계변경", changeScale: "medium", status: "completed", progress: 100, startDate: new Date("2025-12-01"), endDate: new Date("2026-02-10"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
+    { id: "proj6", name: "센서 교체 (혈압계)", productType: "혈압계", projectType: "설계변경", changeScale: "minor", changeCategory: "전자", status: "completed", progress: 100, startDate: new Date("2026-01-10"), endDate: new Date("2026-01-25"), pm: "이영희", riskLevel: "green", currentStage: "영업이관" },
+    { id: "proj7", name: "배터리 규격 변경", productType: "체성분 분석기", projectType: "설계변경", changeScale: "major", changeCategory: "전자", status: "active", progress: 20, startDate: new Date("2026-01-15"), endDate: new Date("2026-06-30"), pm: "박민수", riskLevel: "yellow", currentStage: "발의검토" },
+    { id: "proj8", name: "LCD 크기 조정", productType: "혈압계", projectType: "설계변경", changeScale: "medium", changeCategory: "기구", status: "active", progress: 40, startDate: new Date("2026-02-01"), endDate: new Date("2026-04-30"), pm: "이영희", riskLevel: "green", currentStage: "기획검토" },
+    { id: "proj9", name: "펌웨어 버전 업데이트", productType: "FRA", projectType: "설계변경", changeScale: "minor", changeCategory: "F/W", status: "active", progress: 50, startDate: new Date("2026-02-10"), endDate: new Date("2026-03-15"), pm: "이영희", riskLevel: "green", currentStage: "발의검토" },
+    { id: "proj10", name: "외관 재질 변경", productType: "신장계", projectType: "설계변경", changeScale: "medium", changeCategory: "기구", status: "completed", progress: 100, startDate: new Date("2025-12-01"), endDate: new Date("2026-02-10"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
   ];
 
   // checklistItems are now generated from templates via applyTemplateToProject()
@@ -1267,6 +1267,142 @@ export async function deleteTemplateDepartment(deptId) {
   snap.docs.forEach(d => batch.delete(d.ref));
   batch.delete(doc(db, "templateDepartments", deptId));
   await batch.commit();
+}
+
+// ─── Structure Change Requests ───────────────────────────────────────────────
+
+function docToStructureRequest(id, data) {
+  return {
+    id,
+    ...data,
+    requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : data.requestedAt,
+    resolvedAt: data.resolvedAt?.toDate ? data.resolvedAt.toDate() : data.resolvedAt,
+  };
+}
+
+export async function createStructureRequest(data) {
+  const docRef = await addDoc(collection(db, "structureRequests"), {
+    ...data,
+    status: "pending",
+    requestedAt: Timestamp.now(),
+    resolvedBy: null,
+    resolvedAt: null,
+    rejectionReason: null,
+  });
+  // 모든 observer에게 알림
+  const TYPE_LABELS = { addStage: "단계 추가", deleteStage: "단계 삭제", addDept: "부서 추가", deleteDept: "부서 삭제" };
+  const typeLabel = TYPE_LABELS[data.type] || data.type;
+  try {
+    const obsQ = query(collection(db, "users"), where("role", "==", "observer"));
+    const obsSnap = await getDocs(obsQ);
+    for (const obsDoc of obsSnap.docs) {
+      await addDoc(collection(db, "notifications"), {
+        userId: obsDoc.id,
+        type: "structure_request",
+        title: "구조 변경 요청",
+        message: `${data.requestedBy}님(${data.requestedByDept})이 ${typeLabel}을(를) 요청했습니다.`,
+        link: "admin-checklists.html?tab=requests",
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    }
+  } catch (e) { console.error("구조 변경 요청 알림 실패:", e); }
+  return docRef.id;
+}
+
+export async function approveStructureRequest(requestId, reviewerName) {
+  const reqRef = doc(db, "structureRequests", requestId);
+  const reqSnap = await getDoc(reqRef);
+  if (!reqSnap.exists()) throw new Error("요청을 찾을 수 없습니다.");
+  const req = reqSnap.data();
+
+  // 상태 업데이트
+  await updateDoc(reqRef, {
+    status: "approved",
+    resolvedBy: reviewerName,
+    resolvedAt: Timestamp.now(),
+  });
+
+  // 실제 작업 실행
+  const TYPE_LABELS = { addStage: "단계 추가", deleteStage: "단계 삭제", addDept: "부서 추가", deleteDept: "부서 삭제" };
+  let detailLabel = "";
+  switch (req.type) {
+    case "addStage":
+      await addTemplateStage({ name: req.stageName, workStageName: req.workStageName, gateStageName: req.gateStageName, createdBy: reviewerName });
+      detailLabel = `단계 "${req.stageName}" 추가`;
+      break;
+    case "deleteStage":
+      try { await deleteTemplateStage(req.targetStageId); } catch (e) { console.warn("삭제 대상 없음:", e); }
+      detailLabel = `단계 "${req.targetStageName}" 삭제`;
+      break;
+    case "addDept":
+      await addTemplateDepartment({ name: req.deptName, createdBy: reviewerName });
+      detailLabel = `부서 "${req.deptName}" 추가`;
+      break;
+    case "deleteDept":
+      try { await deleteTemplateDepartment(req.targetDeptId); } catch (e) { console.warn("삭제 대상 없음:", e); }
+      detailLabel = `부서 "${req.targetDeptName}" 삭제`;
+      break;
+  }
+
+  // 요청자에게 알림
+  try {
+    const uQ = query(collection(db, "users"), where("name", "==", req.requestedBy));
+    const uSnap = await getDocs(uQ);
+    if (!uSnap.empty) {
+      await addDoc(collection(db, "notifications"), {
+        userId: uSnap.docs[0].id,
+        type: "structure_request_approved",
+        title: "구조 변경 승인",
+        message: `${reviewerName}님이 "${detailLabel}" 요청을 승인했습니다.`,
+        link: "admin-checklists.html",
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    }
+  } catch (e) { console.error("승인 알림 실패:", e); }
+}
+
+export async function rejectStructureRequest(requestId, reviewerName, rejectionReason) {
+  const reqRef = doc(db, "structureRequests", requestId);
+  const reqSnap = await getDoc(reqRef);
+  if (!reqSnap.exists()) throw new Error("요청을 찾을 수 없습니다.");
+  const req = reqSnap.data();
+
+  await updateDoc(reqRef, {
+    status: "rejected",
+    resolvedBy: reviewerName,
+    resolvedAt: Timestamp.now(),
+    rejectionReason,
+  });
+
+  const TYPE_LABELS = { addStage: "단계 추가", deleteStage: "단계 삭제", addDept: "부서 추가", deleteDept: "부서 삭제" };
+  const typeLabel = TYPE_LABELS[req.type] || req.type;
+
+  // 요청자에게 알림
+  try {
+    const uQ = query(collection(db, "users"), where("name", "==", req.requestedBy));
+    const uSnap = await getDocs(uQ);
+    if (!uSnap.empty) {
+      await addDoc(collection(db, "notifications"), {
+        userId: uSnap.docs[0].id,
+        type: "structure_request_rejected",
+        title: "구조 변경 반려",
+        message: `${reviewerName}님이 ${typeLabel} 요청을 반려했습니다. 사유: ${rejectionReason}`,
+        link: "admin-checklists.html?tab=requests",
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    }
+  } catch (e) { console.error("반려 알림 실패:", e); }
+}
+
+export function subscribeStructureRequests(callback) {
+  const q = query(collection(db, "structureRequests"), orderBy("requestedAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    const requests = snap.docs.map(d => docToStructureRequest(d.id, d.data()));
+    callback(requests);
+  });
 }
 
 // ─── Apply Template to Project ───────────────────────────────────────────────

@@ -9,9 +9,10 @@ import {
   getTemplateStages, getTemplateDepartments, subscribeTemplateItems,
   subscribeAllTemplateItems,
   addTemplateItem, updateTemplateItem, deleteTemplateItem, reorderTemplateItems,
-  addTemplateStage, deleteTemplateStage, addTemplateDepartment, deleteTemplateDepartment
+  addTemplateStage, deleteTemplateStage, addTemplateDepartment, deleteTemplateDepartment,
+  createStructureRequest, approveStructureRequest, rejectStructureRequest, subscribeStructureRequests
 } from "../firestore-service.js";
-import { escapeHtml } from "../utils.js";
+import { escapeHtml, getStructureRequestTypeLabel, getStructureRequestStatusLabel, getStructureRequestStatusClass, formatDate } from "../utils.js";
 
 // --- Auth Guard --------------------------------------------------------------
 
@@ -34,8 +35,11 @@ let activeItemUnsub = null;
 let allItemsUnsub = null;
 let modal = null; // null | {type, data}
 let dragState = { draggedId: null, overId: null };
+let structureRequests = [];
+let structureRequestsUnsub = null;
+const isObserver = user.role === "observer";
 
-// View mode: "matrix" | "tree" | "list" (기본값 matrix)
+// View mode: "matrix" | "tree" | "list" | "requests" (기본값 matrix)
 let viewMode = "matrix";
 
 // List view filters
@@ -64,6 +68,14 @@ async function init() {
 
     subscribeToItems();
     subscribeToAllItems();
+    subscribeToStructureRequests();
+
+    // ?tab=requests 쿼리 파라미터 지원
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "requests") {
+      viewMode = "requests";
+    }
+
     render();
   } catch (err) {
     console.error("Init error:", err);
@@ -110,6 +122,19 @@ function subscribeToAllItems() {
     allItems = newAllItems;
     // Re-render if not in tree mode (tree re-renders via its own subscription)
     if (viewMode !== "tree") {
+      render();
+    }
+  });
+}
+
+function subscribeToStructureRequests() {
+  if (structureRequestsUnsub) {
+    structureRequestsUnsub();
+    structureRequestsUnsub = null;
+  }
+  structureRequestsUnsub = subscribeStructureRequests((reqs) => {
+    structureRequests = reqs;
+    if (viewMode === "requests") {
       render();
     }
   });
@@ -262,6 +287,112 @@ async function handleDeleteDept(deptId) {
   } catch (err) {
     console.error("Delete dept error:", err);
     alert("부서 삭제 중 오류가 발생했습니다.");
+  }
+}
+
+// --- Structure Change Request Handlers ----------------------------------------
+
+async function handleRequestAddStage(name, workStageName, gateStageName, reason) {
+  if (!name.trim() || !reason.trim()) { alert("모든 필드를 입력해주세요."); return; }
+  try {
+    await createStructureRequest({
+      type: "addStage",
+      requestedBy: user.name,
+      requestedByRole: user.role,
+      requestedByDept: user.department,
+      reason: reason.trim(),
+      stageName: name.trim(),
+      workStageName: workStageName.trim(),
+      gateStageName: gateStageName.trim(),
+    });
+    closeModal();
+    alert("단계 추가 요청이 제출되었습니다.");
+  } catch (err) {
+    console.error("Request add stage error:", err);
+    alert("요청 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleRequestDeleteStage(stageId, stageName, reason) {
+  if (!reason.trim()) { alert("요청 사유를 입력해주세요."); return; }
+  try {
+    await createStructureRequest({
+      type: "deleteStage",
+      requestedBy: user.name,
+      requestedByRole: user.role,
+      requestedByDept: user.department,
+      reason: reason.trim(),
+      targetStageId: stageId,
+      targetStageName: stageName,
+    });
+    closeModal();
+    alert("단계 삭제 요청이 제출되었습니다.");
+  } catch (err) {
+    console.error("Request delete stage error:", err);
+    alert("요청 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleRequestAddDept(name, reason) {
+  if (!name.trim() || !reason.trim()) { alert("모든 필드를 입력해주세요."); return; }
+  try {
+    await createStructureRequest({
+      type: "addDept",
+      requestedBy: user.name,
+      requestedByRole: user.role,
+      requestedByDept: user.department,
+      reason: reason.trim(),
+      deptName: name.trim(),
+    });
+    closeModal();
+    alert("부서 추가 요청이 제출되었습니다.");
+  } catch (err) {
+    console.error("Request add dept error:", err);
+    alert("요청 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleRequestDeleteDept(deptId, deptName, reason) {
+  if (!reason.trim()) { alert("요청 사유를 입력해주세요."); return; }
+  try {
+    await createStructureRequest({
+      type: "deleteDept",
+      requestedBy: user.name,
+      requestedByRole: user.role,
+      requestedByDept: user.department,
+      reason: reason.trim(),
+      targetDeptId: deptId,
+      targetDeptName: deptName,
+    });
+    closeModal();
+    alert("부서 삭제 요청이 제출되었습니다.");
+  } catch (err) {
+    console.error("Request delete dept error:", err);
+    alert("요청 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleApproveRequest(requestId) {
+  if (!confirm("이 요청을 승인하시겠습니까?")) return;
+  try {
+    await approveStructureRequest(requestId, user.name);
+    stages = await getTemplateStages();
+    departments = await getTemplateDepartments();
+    closeModal();
+  } catch (err) {
+    console.error("Approve request error:", err);
+    alert("승인 처리 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleRejectRequest(requestId, reason) {
+  if (!reason.trim()) { alert("반려 사유를 입력해주세요."); return; }
+  try {
+    await rejectStructureRequest(requestId, user.name, reason.trim());
+    closeModal();
+  } catch (err) {
+    console.error("Reject request error:", err);
+    alert("반려 처리 중 오류가 발생했습니다.");
   }
 }
 
@@ -426,6 +557,8 @@ const ICON_LIST = `<svg width="16" height="16" fill="none" stroke="currentColor"
 
 const ICON_SEARCH = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>`;
 
+const ICON_REQUEST = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>`;
+
 // --- Render (main dispatcher) ------------------------------------------------
 
 function render() {
@@ -453,12 +586,14 @@ function render() {
           ${renderViewModeBtn("matrix", "매트릭스", ICON_MATRIX)}
           ${renderViewModeBtn("tree", "트리", ICON_TREE)}
           ${renderViewModeBtn("list", "리스트", ICON_LIST)}
+          ${renderViewModeBtn("requests", `변경 요청${(() => { const pc = structureRequests.filter(r => r.status === "pending").length; return pc > 0 ? ` (${pc})` : ""; })()}`, ICON_REQUEST)}
         </div>
       </div>
 
       <!-- View Content -->
       ${viewMode === "tree" ? renderTreeView(selectedStage, selectedDept)
         : viewMode === "matrix" ? renderMatrixView()
+        : viewMode === "requests" ? renderRequestsView()
         : renderListView()}
     </div>
 
@@ -496,10 +631,10 @@ function renderTreeView(selectedStage, selectedDept) {
       <div class="card" style="width: 260px; flex-shrink: 0; padding: 0; overflow: hidden;">
         <div class="flex items-center justify-between" style="padding: 0.875rem 1rem; border-bottom: 1px solid var(--surface-3);">
           <span class="font-semibold text-sm" style="color: var(--slate-200);">단계 목록</span>
-          <button class="btn-ghost btn-xs" id="btn-add-stage">
-            ${ICON_PLUS}
-            <span>추가</span>
-          </button>
+          ${isObserver
+            ? `<button class="btn-ghost btn-xs" id="btn-add-stage">${ICON_PLUS}<span>추가</span></button>`
+            : `<button class="btn-ghost btn-xs" id="btn-request-add-stage" style="color:var(--warning-400)">${ICON_PLUS}<span>추가 요청</span></button>`
+          }
         </div>
         <div style="max-height: 60vh; overflow-y: auto;">
           ${stages.length === 0
@@ -524,10 +659,12 @@ function renderTreeView(selectedStage, selectedDept) {
                         ${escapeHtml(stage.workStageName || "")} / ${escapeHtml(stage.gateStageName || "")}
                       </div>
                     </div>
-                    <button class="btn-ghost btn-xs stage-delete-btn" data-stage-delete-id="${stage.id}" title="단계 삭제"
-                            style="padding: 0.25rem; color: var(--slate-600); flex-shrink: 0;">
-                      ${ICON_DELETE}
-                    </button>
+                    ${isObserver
+                      ? `<button class="btn-ghost btn-xs stage-delete-btn" data-stage-delete-id="${stage.id}" title="단계 삭제"
+                              style="padding: 0.25rem; color: var(--slate-600); flex-shrink: 0;">${ICON_DELETE}</button>`
+                      : `<button class="btn-ghost btn-xs stage-request-delete-btn" data-stage-delete-id="${stage.id}" title="삭제 요청"
+                              style="padding: 0.25rem; color: var(--warning-500); flex-shrink: 0;">${ICON_DELETE}</button>`
+                    }
                   </div>
                 `;
               }).join("")
@@ -548,16 +685,12 @@ function renderTreeView(selectedStage, selectedDept) {
               `).join("")}
             </div>
             <div class="flex items-center gap-1" style="padding: 0 0.5rem; flex-shrink: 0;">
-              <button class="btn-ghost btn-xs" id="btn-add-dept">
-                ${ICON_PLUS}
-                <span>부서 추가</span>
-              </button>
-              ${selectedDeptId ? `
-                <button class="btn-ghost btn-xs" id="btn-delete-dept" data-dept-delete-id="${selectedDeptId}"
-                        title="현재 부서 삭제" style="color: var(--danger-400);">
-                  ${ICON_DELETE}
-                </button>
-              ` : ""}
+              ${isObserver
+                ? `<button class="btn-ghost btn-xs" id="btn-add-dept">${ICON_PLUS}<span>부서 추가</span></button>
+                   ${selectedDeptId ? `<button class="btn-ghost btn-xs" id="btn-delete-dept" data-dept-delete-id="${selectedDeptId}" title="현재 부서 삭제" style="color: var(--danger-400);">${ICON_DELETE}</button>` : ""}`
+                : `<button class="btn-ghost btn-xs" id="btn-request-add-dept" style="color:var(--warning-400)">${ICON_PLUS}<span>부서 추가 요청</span></button>
+                   ${selectedDeptId ? `<button class="btn-ghost btn-xs" id="btn-request-delete-dept" data-dept-delete-id="${selectedDeptId}" title="부서 삭제 요청" style="color: var(--warning-500);">${ICON_DELETE}</button>` : ""}`
+              }
             </div>
           </div>
         </div>
@@ -833,6 +966,87 @@ function renderListView() {
   `;
 }
 
+// =============================================================================
+// REQUESTS VIEW
+// =============================================================================
+
+function renderRequestsView() {
+  const visibleRequests = isObserver
+    ? structureRequests
+    : structureRequests.filter(r => r.requestedBy === user.name);
+
+  const pendingCount = visibleRequests.filter(r => r.status === "pending").length;
+
+  if (visibleRequests.length === 0) {
+    return `
+      <div class="card" style="padding: 4rem 1rem; text-align: center;">
+        <div class="empty-state">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:48px;height:48px;color:var(--slate-600);margin:0 auto 0.75rem">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
+          </svg>
+          <span class="empty-state-text">변경 요청이 없습니다</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 0.875rem 1rem; border-bottom: 1px solid var(--surface-3); display: flex; align-items: center; justify-content: space-between;">
+        <span class="font-semibold text-sm" style="color: var(--slate-200);">
+          ${isObserver ? "전체 변경 요청" : "내 변경 요청"}
+          ${pendingCount > 0 ? `<span class="badge badge-warning" style="margin-left:0.5rem">${pendingCount}건 대기</span>` : ""}
+        </span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>유형</th>
+              <th>상세</th>
+              ${isObserver ? "<th>요청자</th>" : ""}
+              <th>사유</th>
+              <th>요청일</th>
+              <th>상태</th>
+              ${isObserver ? "<th>작업</th>" : ""}
+            </tr>
+          </thead>
+          <tbody>
+            ${visibleRequests.map(r => {
+              const typeLabel = getStructureRequestTypeLabel(r.type);
+              const isAdd = r.type === "addStage" || r.type === "addDept";
+              const detail = r.type === "addStage" ? `${r.stageName || ""} (${r.workStageName || ""} / ${r.gateStageName || ""})`
+                : r.type === "deleteStage" ? r.targetStageName || ""
+                : r.type === "addDept" ? r.deptName || ""
+                : r.targetDeptName || "";
+
+              return `
+                <tr>
+                  <td><span class="request-type-badge ${isAdd ? "request-type-add" : "request-type-delete"}">${typeLabel}</span></td>
+                  <td class="text-sm" style="color:var(--slate-200)">${escapeHtml(detail)}</td>
+                  ${isObserver ? `<td class="text-sm">${escapeHtml(r.requestedBy || "")} <span class="text-xs text-dim">(${escapeHtml(r.requestedByDept || "")})</span></td>` : ""}
+                  <td class="text-xs" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.reason || "")}">${escapeHtml(r.reason || "")}</td>
+                  <td class="text-xs whitespace-nowrap">${r.requestedAt ? formatDate(r.requestedAt) : "-"}</td>
+                  <td><span class="badge ${getStructureRequestStatusClass(r.status)}">${getStructureRequestStatusLabel(r.status)}</span></td>
+                  ${isObserver ? `
+                    <td>
+                      ${r.status === "pending" ? `
+                        <button class="btn-primary btn-xs review-request-btn" data-request-id="${r.id}" style="font-size:0.7rem">검토</button>
+                      ` : `
+                        <span class="text-xs text-dim">${r.resolvedBy ? escapeHtml(r.resolvedBy) : "-"}</span>
+                      `}
+                    </td>
+                  ` : ""}
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 // --- Modal Render ------------------------------------------------------------
 
 function renderModal() {
@@ -847,6 +1061,16 @@ function renderModal() {
       return renderStageModal();
     case "addDept":
       return renderDeptModal();
+    case "requestAddStage":
+      return renderRequestStageModal();
+    case "requestDeleteStage":
+      return renderRequestDeleteModal("단계 삭제 요청", modal.data.stageName || "");
+    case "requestAddDept":
+      return renderRequestDeptModal();
+    case "requestDeleteDept":
+      return renderRequestDeleteModal("부서 삭제 요청", modal.data.deptName || "");
+    case "reviewRequest":
+      return renderReviewRequestModal(modal.data);
     default:
       return "";
   }
@@ -938,6 +1162,156 @@ function renderDeptModal() {
   `;
 }
 
+function renderRequestStageModal() {
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">단계 추가 요청</span>
+          <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex flex-col gap-4">
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">페이즈 이름</label>
+              <input type="text" class="input-field" id="modal-req-stage-name" placeholder="예: 사후관리">
+            </div>
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">작업 단계명</label>
+              <input type="text" class="input-field" id="modal-req-stage-work-name" placeholder="예: 사후관리검토">
+            </div>
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">승인 단계명</label>
+              <input type="text" class="input-field" id="modal-req-stage-gate-name" placeholder="예: 사후관리승인">
+            </div>
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">요청 사유 <span style="color:var(--danger-400)">*</span></label>
+              <textarea class="request-reason-field" id="modal-req-reason" rows="3" placeholder="이 단계가 필요한 이유를 설명해주세요..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
+          <button class="btn-primary btn-sm" id="modal-save-req-stage-btn" style="background:var(--warning-500)">요청 제출</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequestDeptModal() {
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">부서 추가 요청</span>
+          <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex flex-col gap-4">
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">부서 이름</label>
+              <input type="text" class="input-field" id="modal-req-dept-name" placeholder="예: 마케팅팀">
+            </div>
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">요청 사유 <span style="color:var(--danger-400)">*</span></label>
+              <textarea class="request-reason-field" id="modal-req-reason" rows="3" placeholder="이 부서가 필요한 이유를 설명해주세요..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
+          <button class="btn-primary btn-sm" id="modal-save-req-dept-btn" style="background:var(--warning-500)">요청 제출</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRequestDeleteModal(title, targetName) {
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">${escapeHtml(title)}</span>
+          <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex flex-col gap-4">
+            <div style="padding:0.75rem 1rem;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius-lg)">
+              <div class="text-xs text-dim mb-1">삭제 대상</div>
+              <div class="text-sm font-semibold" style="color:var(--danger-400)">${escapeHtml(targetName)}</div>
+            </div>
+            <div>
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">요청 사유 <span style="color:var(--danger-400)">*</span></label>
+              <textarea class="request-reason-field" id="modal-req-reason" rows="3" placeholder="삭제가 필요한 이유를 설명해주세요..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
+          <button class="btn-primary btn-sm" id="modal-save-req-delete-btn" style="background:var(--danger-500)">삭제 요청 제출</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderReviewRequestModal(req) {
+  const typeLabel = getStructureRequestTypeLabel(req.type);
+  const isAdd = req.type === "addStage" || req.type === "addDept";
+  const detail = req.type === "addStage" ? `페이즈: ${req.stageName || "-"} / 작업: ${req.workStageName || "-"} / 승인: ${req.gateStageName || "-"}`
+    : req.type === "deleteStage" ? `대상 단계: ${req.targetStageName || "-"}`
+    : req.type === "addDept" ? `부서명: ${req.deptName || "-"}`
+    : `대상 부서: ${req.targetDeptName || "-"}`;
+
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <span class="modal-title">변경 요청 검토</span>
+          <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex flex-col gap-4">
+            <div style="display:flex;gap:1rem;flex-wrap:wrap">
+              <div>
+                <div class="text-xs text-dim mb-1">유형</div>
+                <span class="request-type-badge ${isAdd ? "request-type-add" : "request-type-delete"}">${typeLabel}</span>
+              </div>
+              <div>
+                <div class="text-xs text-dim mb-1">요청자</div>
+                <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(req.requestedBy || "")} (${escapeHtml(req.requestedByDept || "")})</div>
+              </div>
+              <div>
+                <div class="text-xs text-dim mb-1">요청일</div>
+                <div class="text-sm" style="color:var(--slate-300)">${req.requestedAt ? formatDate(req.requestedAt) : "-"}</div>
+              </div>
+            </div>
+            <div style="padding:0.75rem 1rem;background:var(--surface-2);border:1px solid var(--surface-3);border-radius:var(--radius-lg)">
+              <div class="text-xs text-dim mb-1">상세</div>
+              <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(detail)}</div>
+            </div>
+            <div style="padding:0.75rem 1rem;background:var(--surface-2);border:1px solid var(--surface-3);border-radius:var(--radius-lg)">
+              <div class="text-xs text-dim mb-1">요청 사유</div>
+              <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(req.reason || "-")}</div>
+            </div>
+            <div id="reject-reason-area" style="display:none">
+              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">반려 사유 <span style="color:var(--danger-400)">*</span></label>
+              <textarea class="request-reason-field" id="modal-reject-reason" rows="2" placeholder="반려 사유를 입력해주세요..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
+          <button class="btn-sm" id="modal-show-reject-btn" style="background:var(--danger-500);color:white;border:none;padding:0.375rem 0.75rem;border-radius:var(--radius-md);cursor:pointer">반려</button>
+          <button class="btn-primary btn-sm" id="modal-approve-request-btn" data-request-id="${req.id}">승인</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // --- Event Binding -----------------------------------------------------------
 
 function bindEvents() {
@@ -963,8 +1337,23 @@ function bindEvents() {
     bindListEvents();
   }
 
+  // ─── Requests View Events ─────────────────────────────────────────────────
+  if (viewMode === "requests") {
+    bindRequestsViewEvents();
+  }
+
   // ─── Modal Events ─────────────────────────────────────────────────────────
   bindModalEvents();
+}
+
+function bindRequestsViewEvents() {
+  app.querySelectorAll(".review-request-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const reqId = btn.dataset.requestId;
+      const req = structureRequests.find(r => r.id === reqId);
+      if (req) openModal("reviewRequest", req);
+    });
+  });
 }
 
 function bindTreeEvents() {
@@ -987,11 +1376,21 @@ function bindTreeEvents() {
     });
   });
 
-  // Stage delete buttons
+  // Stage delete buttons (observer direct delete)
   app.querySelectorAll(".stage-delete-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       handleDeleteStage(btn.dataset.stageDeleteId);
+    });
+  });
+
+  // Stage request-delete buttons (non-observer)
+  app.querySelectorAll(".stage-request-delete-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const stageId = btn.dataset.stageDeleteId;
+      const stage = stages.find(s => s.id === stageId);
+      openModal("requestDeleteStage", { stageId, stageName: stage?.name || stageId });
     });
   });
 
@@ -1002,23 +1401,45 @@ function bindTreeEvents() {
     });
   });
 
-  // Add stage button
+  // Add stage button (observer)
   const addStageBtn = app.querySelector("#btn-add-stage");
   if (addStageBtn) {
     addStageBtn.addEventListener("click", () => openModal("addStage"));
   }
 
-  // Add dept button
+  // Request add stage button (non-observer)
+  const reqAddStageBtn = app.querySelector("#btn-request-add-stage");
+  if (reqAddStageBtn) {
+    reqAddStageBtn.addEventListener("click", () => openModal("requestAddStage"));
+  }
+
+  // Add dept button (observer)
   const addDeptBtn = app.querySelector("#btn-add-dept");
   if (addDeptBtn) {
     addDeptBtn.addEventListener("click", () => openModal("addDept"));
   }
 
-  // Delete dept button
+  // Request add dept button (non-observer)
+  const reqAddDeptBtn = app.querySelector("#btn-request-add-dept");
+  if (reqAddDeptBtn) {
+    reqAddDeptBtn.addEventListener("click", () => openModal("requestAddDept"));
+  }
+
+  // Delete dept button (observer)
   const deleteDeptBtn = app.querySelector("#btn-delete-dept");
   if (deleteDeptBtn) {
     deleteDeptBtn.addEventListener("click", () => {
       handleDeleteDept(deleteDeptBtn.dataset.deptDeleteId);
+    });
+  }
+
+  // Request delete dept button (non-observer)
+  const reqDeleteDeptBtn = app.querySelector("#btn-request-delete-dept");
+  if (reqDeleteDeptBtn) {
+    reqDeleteDeptBtn.addEventListener("click", () => {
+      const deptId = reqDeleteDeptBtn.dataset.deptDeleteId;
+      const dept = departments.find(d => d.id === deptId);
+      openModal("requestDeleteDept", { deptId, deptName: dept?.name || deptId });
     });
   }
 
@@ -1288,6 +1709,69 @@ function bindModalEvents() {
     });
   }
 
+  // ─── Request Modal Buttons ──────────────────────────────────────────────
+  // Request add stage
+  const saveReqStageBtn = app.querySelector("#modal-save-req-stage-btn");
+  if (saveReqStageBtn) {
+    saveReqStageBtn.addEventListener("click", () => {
+      const name = app.querySelector("#modal-req-stage-name")?.value || "";
+      const workName = app.querySelector("#modal-req-stage-work-name")?.value || "";
+      const gateName = app.querySelector("#modal-req-stage-gate-name")?.value || "";
+      const reason = app.querySelector("#modal-req-reason")?.value || "";
+      handleRequestAddStage(name, workName, gateName, reason);
+    });
+  }
+
+  // Request add dept
+  const saveReqDeptBtn = app.querySelector("#modal-save-req-dept-btn");
+  if (saveReqDeptBtn) {
+    saveReqDeptBtn.addEventListener("click", () => {
+      const name = app.querySelector("#modal-req-dept-name")?.value || "";
+      const reason = app.querySelector("#modal-req-reason")?.value || "";
+      handleRequestAddDept(name, reason);
+    });
+  }
+
+  // Request delete (stage or dept)
+  const saveReqDeleteBtn = app.querySelector("#modal-save-req-delete-btn");
+  if (saveReqDeleteBtn) {
+    saveReqDeleteBtn.addEventListener("click", () => {
+      const reason = app.querySelector("#modal-req-reason")?.value || "";
+      if (modal.type === "requestDeleteStage") {
+        handleRequestDeleteStage(modal.data.stageId, modal.data.stageName, reason);
+      } else if (modal.type === "requestDeleteDept") {
+        handleRequestDeleteDept(modal.data.deptId, modal.data.deptName, reason);
+      }
+    });
+  }
+
+  // Review: Approve
+  const approveBtn = app.querySelector("#modal-approve-request-btn");
+  if (approveBtn) {
+    approveBtn.addEventListener("click", () => {
+      handleApproveRequest(approveBtn.dataset.requestId);
+    });
+  }
+
+  // Review: Show reject reason area / confirm reject
+  const showRejectBtn = app.querySelector("#modal-show-reject-btn");
+  if (showRejectBtn) {
+    let rejectStep = 0; // 0 = show area, 1 = confirm reject
+    showRejectBtn.addEventListener("click", () => {
+      const area = app.querySelector("#reject-reason-area");
+      if (rejectStep === 0 && area) {
+        area.style.display = "block";
+        showRejectBtn.textContent = "반려 확인";
+        rejectStep = 1;
+      } else if (rejectStep === 1) {
+        const reason = app.querySelector("#modal-reject-reason")?.value || "";
+        if (modal && modal.data) {
+          handleRejectRequest(modal.data.id, reason);
+        }
+      }
+    });
+  }
+
   // Escape key to close modal
   if (modal) {
     const escHandler = (e) => {
@@ -1305,6 +1789,7 @@ function bindModalEvents() {
 window.addEventListener("beforeunload", () => {
   if (activeItemUnsub) activeItemUnsub();
   if (allItemsUnsub) allItemsUnsub();
+  if (structureRequestsUnsub) structureRequestsUnsub();
   unsubscribers.forEach(fn => typeof fn === "function" && fn());
 });
 
