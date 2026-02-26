@@ -2,7 +2,7 @@
 // Auth — localStorage based session management + Microsoft OAuth
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { OAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+import { OAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "./firebase-init.js";
 import { getUserByName, getUserByEmail, createUser } from "./firestore-service.js";
 
@@ -38,16 +38,10 @@ export async function login(name, role) {
   return sessionUser;
 }
 
-// Microsoft OAuth login — starts redirect (page navigates away)
-export function loginWithMicrosoft() {
+// Microsoft OAuth login — popup based
+export async function loginWithMicrosoft() {
   const provider = new OAuthProvider("microsoft.com");
-  return signInWithRedirect(auth, provider);
-}
-
-// Handle redirect result — call on page load
-export async function handleRedirectResult() {
-  const result = await getRedirectResult(auth);
-  if (!result) return null; // No redirect result (normal page load)
+  const result = await signInWithPopup(auth, provider);
 
   const firebaseUser = result.user;
   const email = firebaseUser.email;

@@ -2,7 +2,7 @@
 // Login Page — sample user cards + Microsoft OAuth login
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { getUser, login, loginWithMicrosoft, handleRedirectResult, completeRegistration } from "../auth.js";
+import { getUser, login, loginWithMicrosoft, completeRegistration } from "../auth.js";
 import { seedDatabaseIfEmpty } from "../firestore-service.js";
 
 // If already logged in, redirect immediately
@@ -30,28 +30,6 @@ let pendingAuthInfo = null;
 
 // MS button original HTML (for reset)
 const MS_BTN_HTML = msLoginBtn.innerHTML;
-
-// ── Handle redirect result (runs on page load after Microsoft redirect) ──
-async function checkRedirectResult() {
-  try {
-    const result = await handleRedirectResult();
-    if (!result) return; // Normal page load, no redirect result
-
-    if (!result.isNewUser) {
-      window.location.href = "dashboard.html";
-    } else {
-      pendingAuthInfo = result.authInfo;
-      // Hide seeding spinner, show content with role selection
-      seedingView.style.display = "none";
-      contentView.style.display = "";
-      showRoleSelection(result.authInfo);
-    }
-  } catch (e) {
-    console.error("리다이렉트 결과 처리 오류:", e);
-    // Continue to show normal login page
-  }
-}
-checkRedirectResult();
 
 // Seed database first, then show cards
 seedDatabaseIfEmpty()
@@ -94,19 +72,31 @@ userCards.forEach((card) => {
   });
 });
 
-// ── Microsoft Login (redirect) ──
-msLoginBtn.addEventListener("click", () => {
+// ── Microsoft Login (popup) ──
+msLoginBtn.addEventListener("click", async () => {
   msLoginBtn.disabled = true;
   msLoginBtn.innerHTML = `
     <div class="spinner" style="width:20px;height:20px;border-width:2px"></div>
     <span>로그인 중...</span>
   `;
   removeError();
-  loginWithMicrosoft().catch((e) => {
+
+  try {
+    const result = await loginWithMicrosoft();
+
+    if (!result.isNewUser) {
+      // Existing user — go to dashboard
+      window.location.href = "dashboard.html";
+    } else {
+      // New user — show role selection
+      pendingAuthInfo = result.authInfo;
+      showRoleSelection(result.authInfo);
+    }
+  } catch (e) {
     console.error("Microsoft 로그인 오류:", e);
     showError("로그인 중 오류가 발생했습니다.");
     resetMsButton();
-  });
+  }
 });
 
 // ── Role Selection Logic ──

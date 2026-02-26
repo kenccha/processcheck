@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Dashboard Page Controller
+// Dashboard Page Controller — Compact Tabbed Layout
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
@@ -11,6 +11,7 @@ import {
   subscribeProjects,
   subscribeNotifications,
   markNotificationRead,
+  approveTask,
 } from "../firestore-service.js";
 import {
   getStatusLabel,
@@ -24,6 +25,8 @@ import {
   timeAgo,
   daysUntil,
   getProgressClass,
+  PHASE_GROUPS,
+  GATE_STAGES,
 } from "../utils.js";
 
 // ─── Auth Guard ─────────────────────────────────────────────────────────────
@@ -46,12 +49,16 @@ let myTasks = [];
 let pendingApprovals = [];
 let myProjects = [];
 
+// UI state
+let activeTab = "tasks";
+let taskLimit = 10;
+let approvalLimit = 10;
+
 const app = document.getElementById("app");
 const unsubscribers = [];
 
 // ─── Subscriptions ──────────────────────────────────────────────────────────
 
-// Projects — all roles see all projects
 unsubscribers.push(
   subscribeProjects((projects) => {
     allProjects = projects;
@@ -60,14 +67,10 @@ unsubscribers.push(
   })
 );
 
-// Tasks — role-based subscription (matches Next.js dashboard)
 if (user.role === "observer" || user.role === "manager") {
-  // 기획조정실(observer): 전체 태스크
-  // 매니저(manager): 전체 구독 후 파생에서 부서 필터
   unsubscribers.push(
     subscribeAllChecklistItems((tasks) => {
       if (user.role === "manager") {
-        // 매니저는 자기 부서 태스크만
         allTasks = tasks.filter((t) => t.department === user.department);
       } else {
         allTasks = tasks;
@@ -77,7 +80,6 @@ if (user.role === "observer" || user.role === "manager") {
     })
   );
 } else {
-  // 실무자(worker): assignee 기준
   unsubscribers.push(
     subscribeChecklistItemsByAssignee(user.name, (tasks) => {
       allTasks = tasks;
@@ -87,10 +89,9 @@ if (user.role === "observer" || user.role === "manager") {
   );
 }
 
-// Notifications
 unsubscribers.push(
   subscribeNotifications(user.id, (notifs) => {
-    notifications = notifs.slice(0, 10);
+    notifications = notifs.slice(0, 20);
     render();
   })
 );
@@ -104,27 +105,20 @@ function computeDerived() {
   const threeDaysFromNow = new Date(now.getTime() + 3 * 86400000);
 
   if (user.role === "observer") {
-    // 기획조정실: 모든 진행중/대기 태스크
     myTasks = allTasks
       .filter((t) => t.status === "pending" || t.status === "in_progress")
       .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-    // 기획조정실: 전체 승인 대기
     pendingApprovals = allTasks.filter(
       (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
     );
   } else if (user.role === "manager") {
-    // 매니저: 부서 내 진행중/대기 태스크
     myTasks = allTasks
       .filter((t) => t.status === "pending" || t.status === "in_progress")
       .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-    // 매니저: 부서 내 승인 대기
     pendingApprovals = allTasks.filter(
       (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
     );
   } else {
-    // 실무자: 마감일 3일 이내
     myTasks = allTasks
       .filter(
         (t) =>
@@ -132,21 +126,16 @@ function computeDerived() {
           new Date(t.dueDate) <= threeDaysFromNow
       )
       .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-    // 실무자: 내가 완료했지만 승인 안 된 것
     pendingApprovals = allTasks.filter(
       (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
     );
   }
 
-  // 내 프로젝트
   if (user.role === "observer") {
-    // 기획조정실: 자기가 PM인 프로젝트
     myProjects = allProjects.filter(
       (p) => p.status === "active" && p.pm === user.name
     );
   } else {
-    // 매니저/실무자: 태스크 기반
     const myProjectIds = new Set(allTasks.map((t) => t.projectId));
     myProjects = allProjects.filter(
       (p) => p.status === "active" && myProjectIds.has(p.id)
@@ -171,7 +160,6 @@ function getDateColorClass(date) {
   const days = daysUntil(date instanceof Date ? date : new Date(date));
   if (days === null) return "";
   if (days < 0) return "text-danger";
-  if (days === 0) return "text-warning";
   if (days <= 1) return "text-warning";
   return "text-soft";
 }
@@ -184,11 +172,39 @@ function getOverdueCount() {
   }).length;
 }
 
-// ─── Project Name Lookup ────────────────────────────────────────────────────
+function getTodayDueCount() {
+  return allTasks.filter((t) => {
+    if (t.status === "completed" || t.status === "rejected") return false;
+    const days = daysUntil(t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate));
+    return days === 0;
+  }).length;
+}
+
+function getThisWeekDueCount() {
+  return allTasks.filter((t) => {
+    if (t.status === "completed" || t.status === "rejected") return false;
+    const days = daysUntil(t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate));
+    return days !== null && days >= 0 && days <= 7;
+  }).length;
+}
 
 function getProjectName(projectId) {
   const p = allProjects.find((proj) => proj.id === projectId);
   return p ? p.name : projectId;
+}
+
+// ─── Phase Progress Helper ──────────────────────────────────────────────────
+
+function getPhaseDistribution(tasks) {
+  const dist = PHASE_GROUPS.map((pg) => {
+    const workTasks = tasks.filter((t) => t.stage === pg.workStage);
+    const gateTasks = tasks.filter((t) => t.stage === pg.gateStage);
+    const total = workTasks.length + gateTasks.length;
+    const done = workTasks.filter((t) => t.status === "completed" && t.approvalStatus === "approved").length +
+                 gateTasks.filter((t) => t.status === "completed" && t.approvalStatus === "approved").length;
+    return { name: pg.name, total, done };
+  });
+  return dist;
 }
 
 // ─── Render ─────────────────────────────────────────────────────────────────
@@ -196,334 +212,382 @@ function getProjectName(projectId) {
 function render() {
   const overdueCount = getOverdueCount();
   const unreadNotifCount = notifications.filter((n) => !n.read).length;
+  const todayCount = getTodayDueCount();
+  const weekCount = getThisWeekDueCount();
 
   app.innerHTML = `
     <div class="container animate-fade-in">
-      <!-- Welcome Header -->
-      <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight" style="color: var(--slate-100)">
-            ${escapeHtml(user.name)}님, 안녕하세요
-          </h1>
-          <div class="flex items-center gap-3 mt-2">
-            <span class="badge badge-primary">${escapeHtml(getRoleName(user.role))}</span>
-            <span class="text-sm text-soft">
-              담당 작업 <span class="font-semibold" style="color: var(--primary-400)">${myTasks.length}</span>건
-            </span>
-            ${
-              overdueCount > 0
-                ? `<span class="text-sm" style="color: var(--danger-400)">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:inline-block;vertical-align:middle;margin-right:2px">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                    </svg>
-                    마감 초과 ${overdueCount}건
-                  </span>`
-                : ""
-            }
-          </div>
-        </div>
-      </div>
-
-      <!-- Stat Cards (clickable) -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-fade-in-delay-1">
-        <div class="stat-card cursor-pointer card-hover" id="stat-tasks">
-          <div class="stat-card-label">작업 대기</div>
-          <div class="stat-card-row">
-            <span class="stat-value" style="color: var(--primary-400)">${myTasks.length}</span>
-          </div>
-        </div>
-        <div class="stat-card cursor-pointer card-hover" id="stat-approvals">
-          <div class="stat-card-label">승인 대기</div>
-          <div class="stat-card-row">
-            <span class="stat-value" style="color: var(--warning-400)">${pendingApprovals.length}</span>
-          </div>
-        </div>
-        <div class="stat-card cursor-pointer card-hover" id="stat-projects">
-          <div class="stat-card-label">프로젝트</div>
-          <div class="stat-card-row">
-            <span class="stat-value" style="color: var(--success-400)">${myProjects.length}</span>
-          </div>
-        </div>
-        <div class="stat-card cursor-pointer card-hover" id="stat-notifs">
-          <div class="stat-card-label">미확인 알림</div>
-          <div class="stat-card-row">
-            <span class="stat-value" style="color: ${unreadNotifCount > 0 ? "var(--danger-400)" : "var(--slate-400)"}">${unreadNotifCount}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Two Column Layout -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-delay-2">
-
-        <!-- Left Column (2/3) -->
-        <div class="lg:col-span-2 flex flex-col gap-6">
-
-          <!-- 작업 대기 Section -->
-          <div class="card" id="section-tasks" style="padding: 0; overflow: hidden;">
-            <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
-              <div class="flex items-center gap-2">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary-400)">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-                <span class="section-title">작업 대기</span>
-                <span class="badge badge-neutral" style="margin-left: 0.25rem">${myTasks.length}</span>
-              </div>
-            </div>
-            <div>
-              ${
-                myTasks.length === 0
-                  ? `<div class="empty-state" style="padding: 2.5rem 1rem">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                      </svg>
-                      <span class="empty-state-text">${user.role === "worker" ? "3일 이내 마감 예정인 작업이 없습니다" : "대기 중인 작업이 없습니다"}</span>
-                    </div>`
-                  : myTasks
-                      .map(
-                        (task) => `
-                    <div class="task-row cursor-pointer" data-task-project="${task.projectId}" data-task-id="${task.id}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;">
-                      <div class="flex items-center justify-between gap-3 mb-1">
-                        <div class="flex items-center gap-2 flex-1" style="min-width: 0">
-                          <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(task.title)}</span>
-                          <span class="badge ${getStatusBadgeClass(task.status)}" style="flex-shrink: 0">${getStatusLabel(task.status)}</span>
-                        </div>
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                          <span class="font-mono text-xs font-semibold ${getDateColorClass(task.dueDate)}">${formatDueDate(task.dueDate)}</span>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-3 text-xs text-soft">
-                        <span>${escapeHtml(task.department || "")}${task.stage ? " / " + escapeHtml(formatStageName(task.stage)) : ""}</span>
-                        ${task.reviewer ? `<span style="color: var(--slate-500)">검토: ${escapeHtml(task.reviewer)}</span>` : ""}
-                        <span class="text-xs" style="color: var(--slate-600)">${formatDate(task.dueDate)}</span>
-                      </div>
-                    </div>
-                  `
-                      )
-                      .join("")
-              }
-            </div>
-          </div>
-
-          <!-- 승인 대기 Section -->
-          ${
-            pendingApprovals.length > 0
-              ? `
-            <div class="card" id="section-approvals" style="padding: 0; overflow: hidden;">
-              <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
-                <div class="flex items-center gap-2">
-                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--warning-400)">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <span class="section-title">승인 대기</span>
-                  <span class="badge badge-warning" style="margin-left: 0.25rem">${pendingApprovals.length}</span>
-                </div>
-              </div>
-              <div>
-                ${pendingApprovals
-                  .map(
-                    (task) => `
-                  <div class="task-row cursor-pointer" data-task-project="${task.projectId}" data-task-id="${task.id}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;">
-                    <div class="flex items-center justify-between gap-3 mb-1">
-                      <div class="flex items-center gap-2 flex-1" style="min-width: 0">
-                        <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(task.title)}</span>
-                        <span class="badge badge-success" style="flex-shrink: 0">완료</span>
-                        <span class="badge badge-warning" style="flex-shrink: 0">승인 대기</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-3 text-xs text-soft">
-                      ${task.completedDate ? `<span>완료일: ${formatDate(task.completedDate)}</span>` : ""}
-                      ${task.reviewer ? `<span style="color: var(--slate-500)">검토: ${escapeHtml(task.reviewer)}</span>` : ""}
-                    </div>
-                  </div>
-                `
-                  )
-                  .join("")}
-              </div>
-            </div>
-          `
-              : ""
-          }
-
-          <!-- 프로젝트 Section -->
-          <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
-              <div class="flex items-center gap-2">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--success-400)">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                </svg>
-                <span class="section-title">프로젝트</span>
-                <span class="badge badge-neutral" style="margin-left: 0.25rem">${myProjects.length}</span>
-              </div>
-              <button class="btn-ghost btn-sm" id="btn-view-all-projects">
-                전체 보기
-                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </button>
-            </div>
-            <div>
-              ${
-                myProjects.length === 0
-                  ? `<div class="empty-state" style="padding: 2.5rem 1rem">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                      </svg>
-                      <span class="empty-state-text">배정된 프로젝트가 없습니다</span>
-                    </div>`
-                  : myProjects
-                      .slice(0, 3)
-                      .map(
-                        (project) => `
-                    <div class="project-row cursor-pointer" data-project-id="${project.id}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;">
-                      <div class="flex items-center justify-between gap-3 mb-2">
-                        <div class="flex items-center gap-2 flex-1" style="min-width: 0">
-                          <span class="risk-dot ${project.riskLevel || "green"}"></span>
-                          <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(project.name)}</span>
-                        </div>
-                        <span class="font-mono text-xs font-semibold" style="color: var(--primary-400)">${project.progress || 0}%</span>
-                      </div>
-                      <div class="flex items-center gap-3 text-xs text-soft mb-2">
-                        <span>${escapeHtml(project.productType || "")}</span>
-                        <span>PM: ${escapeHtml(project.pm || "-")}</span>
-                        <span class="badge badge-${getRiskClass(project.riskLevel)}" style="font-size: 0.6875rem; padding: 0.125rem 0.375rem">${getRiskLabel(project.riskLevel)}</span>
-                      </div>
-                      <div class="progress-bar">
-                        <div class="progress-fill ${getProgressClass(project.progress || 0)}" style="width: ${project.progress || 0}%"></div>
-                      </div>
-                    </div>
-                  `
-                      )
-                      .join("")
-              }
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column (1/3) -->
-        <div class="lg:col-span-1">
-
-          <!-- 알림 Panel -->
-          <div class="card" id="section-notifications" style="padding: 0; overflow: hidden; position: sticky; top: 4.5rem;">
-            <div class="flex items-center justify-between" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3)">
-              <div class="flex items-center gap-2">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--warning-400)">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
-                <span class="section-title">알림</span>
-                ${
-                  unreadNotifCount > 0
-                    ? `<span class="badge badge-danger" style="margin-left: 0.25rem">${unreadNotifCount}</span>`
-                    : ""
-                }
-              </div>
-            </div>
-            <div>
-              ${
-                notifications.length === 0
-                  ? `<div class="empty-state" style="padding: 2.5rem 1rem">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                      </svg>
-                      <span class="empty-state-text">알림이 없습니다</span>
-                    </div>`
-                  : notifications
-                      .map(
-                        (notif) => `
-                    <div class="notif-dash-item cursor-pointer" data-notif-id="${notif.id}" data-notif-link="${escapeHtml(notif.link || "")}" style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--surface-3); transition: background 0.15s;${!notif.read ? " border-left: 3px solid var(--primary-500);" : ""}">
-                      <div class="flex items-start gap-2">
-                        ${
-                          !notif.read
-                            ? `<span style="width: 6px; height: 6px; border-radius: 50%; background: var(--primary-400); margin-top: 6px; flex-shrink: 0;"></span>`
-                            : `<span style="width: 6px; height: 6px; margin-top: 6px; flex-shrink: 0;"></span>`
-                        }
-                        <div style="flex: 1; min-width: 0;">
-                          <div class="text-sm font-medium truncate" style="color: ${!notif.read ? "var(--slate-100)" : "var(--slate-300)"}; margin-bottom: 0.125rem">
-                            ${escapeHtml(notif.title)}
-                          </div>
-                          <div class="text-xs" style="color: var(--slate-500); margin-bottom: 0.375rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            ${escapeHtml(notif.message)}
-                          </div>
-                          <div class="text-xs" style="color: var(--slate-600)">
-                            ${timeAgo(notif.createdAt)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  `
-                      )
-                      .join("")
-              }
-            </div>
-          </div>
+      ${renderCompactHeader(overdueCount, todayCount, weekCount)}
+      ${renderStatCards(overdueCount, unreadNotifCount)}
+      <div class="card animate-fade-in-delay-2" style="padding: 0; overflow: hidden;">
+        ${renderTabBar(unreadNotifCount)}
+        <div class="dash-tab-content">
+          ${activeTab === "tasks" ? renderTasksTab() : ""}
+          ${activeTab === "approvals" ? renderApprovalsTab() : ""}
+          ${activeTab === "projects" ? renderProjectsTab() : ""}
+          ${activeTab === "notifications" ? renderNotificationsTab() : ""}
         </div>
       </div>
     </div>
   `;
 
-  // ─── Bind Click Handlers ────────────────────────────────────────────────
+  bindClickHandlers();
+}
 
-  // Stat cards → scroll to section or navigate
-  const statTasks = app.querySelector("#stat-tasks");
-  if (statTasks) {
-    statTasks.addEventListener("click", () => {
-      const el = document.getElementById("section-tasks");
-      if (el) el.scrollIntoView({ behavior: "smooth" });
+// ─── Compact Header ─────────────────────────────────────────────────────────
+
+function renderCompactHeader(overdueCount, todayCount, weekCount) {
+  return `
+    <div class="dash-header mb-4 animate-fade-in">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-bold" style="color: var(--slate-100)">
+          ${escapeHtml(user.name)}님
+        </h1>
+        <span class="badge badge-primary">${escapeHtml(getRoleName(user.role))}</span>
+        <span class="text-xs text-soft">${escapeHtml(user.department || "")}</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs flex-wrap">
+        ${overdueCount > 0 ? `<span style="color: var(--danger-400)"><strong>${overdueCount}</strong> 초과</span><span class="text-soft">·</span>` : ""}
+        ${todayCount > 0 ? `<span style="color: var(--warning-400)">오늘 <strong>${todayCount}</strong></span><span class="text-soft">·</span>` : ""}
+        <span class="text-soft">이번 주 <strong style="color: var(--primary-400)">${weekCount}</strong>건</span>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Stat Cards ─────────────────────────────────────────────────────────────
+
+function renderStatCards(overdueCount, unreadNotifCount) {
+  return `
+    <div class="dash-stat-grid mb-4 animate-fade-in-delay-1">
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="tasks">
+        <div class="dash-stat-label">작업 대기</div>
+        <div class="dash-stat-value" style="color: var(--primary-400)">${myTasks.length}</div>
+      </div>
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="approvals">
+        <div class="dash-stat-label">승인 대기</div>
+        <div class="dash-stat-value" style="color: var(--warning-400)">${pendingApprovals.length}</div>
+      </div>
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="overdue">
+        <div class="dash-stat-label">마감 초과</div>
+        <div class="dash-stat-value" style="color: ${overdueCount > 0 ? "var(--danger-400)" : "var(--slate-500)"}">${overdueCount}</div>
+      </div>
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="projects">
+        <div class="dash-stat-label">프로젝트</div>
+        <div class="dash-stat-value" style="color: var(--success-400)">${myProjects.length}</div>
+      </div>
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="notifications">
+        <div class="dash-stat-label">알림</div>
+        <div class="dash-stat-value" style="color: ${unreadNotifCount > 0 ? "var(--danger-400)" : "var(--slate-500)"}">${unreadNotifCount}</div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Tab Bar ────────────────────────────────────────────────────────────────
+
+function renderTabBar(unreadNotifCount) {
+  const tabs = [
+    { key: "tasks", label: "내 작업", count: myTasks.length, badgeClass: "badge-neutral" },
+    { key: "approvals", label: "승인 대기", count: pendingApprovals.length, badgeClass: "badge-warning" },
+    { key: "projects", label: "프로젝트", count: myProjects.length, badgeClass: "badge-neutral" },
+    { key: "notifications", label: "알림", count: unreadNotifCount, badgeClass: unreadNotifCount > 0 ? "badge-danger" : "badge-neutral" },
+  ];
+
+  return `
+    <div class="tab-bar" style="padding: 0 0.5rem; background: var(--surface-2); border-radius: var(--radius-xl) var(--radius-xl) 0 0;">
+      ${tabs.map((t) => `
+        <button class="tab-btn ${activeTab === t.key ? "active" : ""}" data-tab="${t.key}">
+          ${t.label}
+          ${t.count > 0 ? `<span class="badge ${t.badgeClass}" style="margin-left: 4px; font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${t.count}</span>` : ""}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ─── Tasks Tab ──────────────────────────────────────────────────────────────
+
+function renderTasksTab() {
+  // Phase mini progress bar
+  const phaseDist = getPhaseDistribution(allTasks);
+  const hasPhaseData = phaseDist.some((p) => p.total > 0);
+
+  const phaseBar = hasPhaseData ? `
+    <div class="dash-phase-bar">
+      ${phaseDist.map((p) => {
+        const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+        const color = pct >= 80 ? "var(--success-400)" : pct >= 50 ? "var(--warning-400)" : p.total > 0 ? "var(--slate-500)" : "var(--surface-3)";
+        return `<div class="dash-phase-item" title="${p.name}: ${p.done}/${p.total}">
+          <div class="dash-phase-dot" style="background: ${color}; opacity: ${p.total > 0 ? 1 : 0.3}"></div>
+          <span class="text-xs text-soft">${p.name}</span>
+        </div>`;
+      }).join("")}
+    </div>
+  ` : "";
+
+  if (myTasks.length === 0) {
+    return `
+      ${phaseBar}
+      <div class="empty-state" style="padding: 3rem 1rem">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="empty-state-text">${user.role === "worker" ? "3일 이내 마감 예정인 작업이 없습니다" : "대기 중인 작업이 없습니다"}</span>
+      </div>
+    `;
+  }
+
+  const visible = myTasks.slice(0, taskLimit);
+  const remaining = myTasks.length - taskLimit;
+
+  return `
+    ${phaseBar}
+    ${visible.map((task) => `
+      <div class="dash-row cursor-pointer" data-task-project="${task.projectId}" data-task-id="${task.id}">
+        <div class="flex items-center gap-2 flex-1" style="min-width: 0">
+          <span class="dash-row-dot ${getDateColorClass(task.dueDate) === "text-danger" ? "dot-danger" : getDateColorClass(task.dueDate) === "text-warning" ? "dot-warning" : "dot-default"}"></span>
+          <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(task.title)}</span>
+          <span class="badge ${getStatusBadgeClass(task.status)}" style="flex-shrink: 0; font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${getStatusLabel(task.status)}</span>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <span class="text-xs text-soft">${escapeHtml(task.department || "").split("+")[0]}</span>
+          <span class="font-mono text-xs font-semibold ${getDateColorClass(task.dueDate)}" style="min-width: 3rem; text-align: right;">${formatDueDate(task.dueDate)}</span>
+        </div>
+      </div>
+    `).join("")}
+    ${remaining > 0 ? `
+      <div class="dash-show-more" id="btn-show-more-tasks">
+        나머지 ${remaining}건 더 보기
+      </div>
+    ` : ""}
+  `;
+}
+
+// ─── Approvals Tab ──────────────────────────────────────────────────────────
+
+function renderApprovalsTab() {
+  if (pendingApprovals.length === 0) {
+    return `
+      <div class="empty-state" style="padding: 3rem 1rem">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="empty-state-text">승인 대기 중인 작업이 없습니다</span>
+      </div>
+    `;
+  }
+
+  // Group by project
+  const grouped = {};
+  pendingApprovals.forEach((t) => {
+    if (!grouped[t.projectId]) grouped[t.projectId] = [];
+    grouped[t.projectId].push(t);
+  });
+
+  const canApprove = user.role === "manager" || user.role === "observer";
+  const visible = pendingApprovals.slice(0, approvalLimit);
+  const remaining = pendingApprovals.length - approvalLimit;
+
+  // Group visible items
+  const visibleGrouped = {};
+  visible.forEach((t) => {
+    if (!visibleGrouped[t.projectId]) visibleGrouped[t.projectId] = [];
+    visibleGrouped[t.projectId].push(t);
+  });
+
+  return `
+    ${Object.entries(visibleGrouped).map(([projId, tasks]) => `
+      <div class="dash-group-header">
+        <span class="text-xs font-semibold" style="color: var(--slate-400)">${escapeHtml(getProjectName(projId))}</span>
+        <span class="badge badge-neutral" style="font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${tasks.length}</span>
+      </div>
+      ${tasks.map((task) => `
+        <div class="dash-row ${canApprove ? "" : "cursor-pointer"}" data-task-project="${task.projectId}" data-task-id="${task.id}">
+          <div class="flex items-center gap-2 flex-1" style="min-width: 0">
+            <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(task.title)}</span>
+            <span class="badge badge-success" style="flex-shrink: 0; font-size: 0.625rem; padding: 0.0625rem 0.3rem;">완료</span>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-xs text-soft">${task.completedDate ? formatDate(task.completedDate) : ""}</span>
+            ${canApprove ? `<button class="dash-approve-btn" data-approve-id="${task.id}" title="승인">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </button>` : ""}
+          </div>
+        </div>
+      `).join("")}
+    `).join("")}
+    ${remaining > 0 ? `
+      <div class="dash-show-more" id="btn-show-more-approvals">
+        나머지 ${remaining}건 더 보기
+      </div>
+    ` : ""}
+  `;
+}
+
+// ─── Projects Tab ───────────────────────────────────────────────────────────
+
+function renderProjectsTab() {
+  if (myProjects.length === 0) {
+    return `
+      <div class="empty-state" style="padding: 3rem 1rem">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+        </svg>
+        <span class="empty-state-text">배정된 프로젝트가 없습니다</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="dash-project-grid">
+      ${myProjects.map((project) => {
+        const phaseDist = getPhaseDistribution(
+          allTasks.filter((t) => t.projectId === project.id)
+        );
+        return `
+          <div class="dash-project-card cursor-pointer" data-project-id="${project.id}">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2 flex-1" style="min-width: 0">
+                <span class="risk-dot ${project.riskLevel || "green"}"></span>
+                <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(project.name)}</span>
+              </div>
+              <span class="font-mono text-xs font-semibold" style="color: var(--primary-400)">${project.progress || 0}%</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-soft mb-2">
+              <span>${escapeHtml(project.productType || "")}</span>
+              <span>PM: ${escapeHtml(project.pm || "-")}</span>
+              <span class="badge badge-${getRiskClass(project.riskLevel)}" style="font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${getRiskLabel(project.riskLevel)}</span>
+            </div>
+            <div class="progress-bar" style="height: 0.25rem; margin-bottom: 0.5rem;">
+              <div class="progress-fill ${getProgressClass(project.progress || 0)}" style="width: ${project.progress || 0}%"></div>
+            </div>
+            <div class="dash-phase-dots">
+              ${phaseDist.map((p) => {
+                if (p.total === 0) return `<span class="phase-dot dot-empty" title="${p.name}: -"></span>`;
+                const pct = Math.round((p.done / p.total) * 100);
+                const cls = pct >= 100 ? "dot-done" : pct >= 50 ? "dot-half" : pct > 0 ? "dot-partial" : "dot-empty";
+                return `<span class="phase-dot ${cls}" title="${p.name}: ${p.done}/${p.total} (${pct}%)"></span>`;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <div class="dash-show-more" id="btn-view-all-projects" style="border-top: 1px solid var(--surface-3);">
+      전체 보기 →
+    </div>
+  `;
+}
+
+// ─── Notifications Tab ──────────────────────────────────────────────────────
+
+function renderNotificationsTab() {
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  if (notifications.length === 0) {
+    return `
+      <div class="empty-state" style="padding: 3rem 1rem">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span class="empty-state-text">알림이 없습니다</span>
+      </div>
+    `;
+  }
+
+  return `
+    ${unreadCount > 0 ? `
+      <div style="padding: 0.5rem 1rem; border-bottom: 1px solid var(--surface-3); text-align: right;">
+        <button class="btn-ghost btn-sm" id="btn-mark-all-read" style="font-size: 0.75rem;">모두 읽음</button>
+      </div>
+    ` : ""}
+    ${notifications.map((notif) => `
+      <div class="dash-notif-item cursor-pointer" data-notif-id="${notif.id}" data-notif-link="${escapeHtml(notif.link || "")}" style="${!notif.read ? "border-left: 3px solid var(--primary-500);" : ""}">
+        <div class="flex items-start gap-2">
+          ${!notif.read
+            ? `<span style="width: 6px; height: 6px; border-radius: 50%; background: var(--primary-400); margin-top: 6px; flex-shrink: 0;"></span>`
+            : `<span style="width: 6px; height: 6px; margin-top: 6px; flex-shrink: 0;"></span>`
+          }
+          <div style="flex: 1; min-width: 0;">
+            <div class="text-sm truncate" style="color: ${!notif.read ? "var(--slate-100)" : "var(--slate-300)"}; font-weight: ${!notif.read ? 600 : 400}; margin-bottom: 0.125rem;">
+              ${escapeHtml(notif.title)}
+            </div>
+            <div class="text-xs" style="color: var(--slate-500); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">
+              ${escapeHtml(notif.message)}
+            </div>
+            <div class="text-xs" style="color: var(--slate-600); margin-top: 0.125rem;">
+              ${timeAgo(notif.createdAt)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join("")}
+  `;
+}
+
+// ─── Click Handlers ─────────────────────────────────────────────────────────
+
+function bindClickHandlers() {
+  // Tab switching
+  app.querySelectorAll("[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeTab = btn.dataset.tab;
+      taskLimit = 10;
+      approvalLimit = 10;
+      render();
+    });
+  });
+
+  // Stat cards → tab switching
+  app.querySelectorAll("[data-stat]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const stat = card.dataset.stat;
+      if (stat === "tasks" || stat === "overdue") activeTab = "tasks";
+      else if (stat === "approvals") activeTab = "approvals";
+      else if (stat === "projects") { window.location.href = "projects.html"; return; }
+      else if (stat === "notifications") activeTab = "notifications";
+      taskLimit = 10;
+      approvalLimit = 10;
+      render();
+    });
+  });
+
+  // Show more buttons
+  const showMoreTasks = app.querySelector("#btn-show-more-tasks");
+  if (showMoreTasks) {
+    showMoreTasks.addEventListener("click", () => {
+      taskLimit += 10;
+      render();
     });
   }
 
-  const statApprovals = app.querySelector("#stat-approvals");
-  if (statApprovals) {
-    statApprovals.addEventListener("click", () => {
-      const el = document.getElementById("section-approvals");
-      if (el) el.scrollIntoView({ behavior: "smooth" });
+  const showMoreApprovals = app.querySelector("#btn-show-more-approvals");
+  if (showMoreApprovals) {
+    showMoreApprovals.addEventListener("click", () => {
+      approvalLimit += 10;
+      render();
     });
   }
 
-  const statProjects = app.querySelector("#stat-projects");
-  if (statProjects) {
-    statProjects.addEventListener("click", () => {
-      window.location.href = "projects.html";
-    });
-  }
-
-  const statNotifs = app.querySelector("#stat-notifs");
-  if (statNotifs) {
-    statNotifs.addEventListener("click", () => {
-      const el = document.getElementById("section-notifications");
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-    });
-  }
-
-  // Task rows → navigate to task detail
-  app.querySelectorAll(".task-row").forEach((row) => {
-    row.addEventListener("click", () => {
+  // Task rows → navigate
+  app.querySelectorAll(".dash-row[data-task-id]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".dash-approve-btn")) return;
       const projectId = row.dataset.taskProject;
       const taskId = row.dataset.taskId;
       window.location.href = `task.html?projectId=${projectId}&taskId=${taskId}`;
     });
-    row.addEventListener("mouseenter", () => {
-      row.style.background = "rgba(26, 34, 52, 0.5)";
-    });
-    row.addEventListener("mouseleave", () => {
-      row.style.background = "";
+  });
+
+  // Project cards → navigate
+  app.querySelectorAll(".dash-project-card[data-project-id]").forEach((card) => {
+    card.addEventListener("click", () => {
+      window.location.href = `project.html?id=${card.dataset.projectId}`;
     });
   });
 
-  // Project rows → navigate to project detail
-  app.querySelectorAll(".project-row").forEach((row) => {
-    row.addEventListener("click", () => {
-      const projectId = row.dataset.projectId;
-      window.location.href = `project.html?id=${projectId}`;
-    });
-    row.addEventListener("mouseenter", () => {
-      row.style.background = "rgba(26, 34, 52, 0.5)";
-    });
-    row.addEventListener("mouseleave", () => {
-      row.style.background = "";
-    });
-  });
-
-  // "전체 보기" button → navigate to projects page
+  // View all projects
   const viewAllBtn = app.querySelector("#btn-view-all-projects");
   if (viewAllBtn) {
     viewAllBtn.addEventListener("click", (e) => {
@@ -532,68 +596,65 @@ function render() {
     });
   }
 
-  // Notification items → mark as read + navigate to link
-  app.querySelectorAll(".notif-dash-item").forEach((item) => {
+  // Approve buttons (inline)
+  app.querySelectorAll(".dash-approve-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const taskId = btn.dataset.approveId;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="text-xs">...</span>`;
+      try {
+        await approveTask(taskId, user.name);
+      } catch (err) {
+        console.error("승인 실패:", err);
+        btn.innerHTML = `<span class="text-xs text-danger">실패</span>`;
+      }
+    });
+  });
+
+  // Mark all notifications as read
+  const markAllBtn = app.querySelector("#btn-mark-all-read");
+  if (markAllBtn) {
+    markAllBtn.addEventListener("click", async () => {
+      markAllBtn.disabled = true;
+      markAllBtn.textContent = "처리 중...";
+      const unread = notifications.filter((n) => !n.read);
+      for (const n of unread) {
+        try { await markNotificationRead(n.id); } catch (e) { console.error(e); }
+      }
+    });
+  }
+
+  // Notification items → mark as read + navigate
+  app.querySelectorAll(".dash-notif-item").forEach((item) => {
     item.addEventListener("click", async () => {
       const notifId = item.dataset.notifId;
       const link = item.dataset.notifLink;
-
-      // Mark as read
       await markNotificationRead(notifId);
-
-      // Navigate to notification link (convert Next.js routes to HTML routes)
       if (link) {
         const htmlLink = convertNotifLink(link);
         if (htmlLink) window.location.href = htmlLink;
       }
     });
-    item.addEventListener("mouseenter", () => {
-      item.style.background = "var(--surface-3)";
-    });
-    item.addEventListener("mouseleave", () => {
-      item.style.background = "";
-    });
   });
 }
 
 // ─── Notification Link Converter ────────────────────────────────────────────
-// Converts Next.js style routes to HTML file routes
 
 function convertNotifLink(link) {
   if (!link) return null;
-
-  // /task?projectId=X&taskId=Y → task.html?projectId=X&taskId=Y
   if (link.startsWith("/task?") || link.startsWith("/task/?")) {
     return link.replace(/^\/task\/?/, "task.html");
   }
-
-  // /project?id=X → project.html?id=X
   if (link.startsWith("/project?") || link.startsWith("/project/?")) {
     return link.replace(/^\/project\/?/, "project.html");
   }
-
-  // /projects/PROJ_ID/tasks/TASK_ID → task.html?projectId=PROJ_ID&taskId=TASK_ID
   const taskMatch = link.match(/^\/projects\/([^/]+)\/tasks\/([^/]+)/);
-  if (taskMatch) {
-    return `task.html?projectId=${taskMatch[1]}&taskId=${taskMatch[2]}`;
-  }
-
-  // /projects/PROJ_ID → project.html?id=PROJ_ID
+  if (taskMatch) return `task.html?projectId=${taskMatch[1]}&taskId=${taskMatch[2]}`;
   const projMatch = link.match(/^\/projects\/([^/]+)/);
-  if (projMatch) {
-    return `project.html?id=${projMatch[1]}`;
-  }
-
-  // /projects → projects.html
-  if (link === "/projects" || link === "/projects/") {
-    return "projects.html";
-  }
-
-  // /dashboard → dashboard.html
-  if (link === "/dashboard" || link === "/dashboard/") {
-    return "dashboard.html";
-  }
-
+  if (projMatch) return `project.html?id=${projMatch[1]}`;
+  if (link === "/projects" || link === "/projects/") return "projects.html";
+  if (link === "/dashboard" || link === "/dashboard/") return "dashboard.html";
   return null;
 }
 
