@@ -9,7 +9,7 @@ Phases are ordered security-first — each phase leaves the app in a deployable 
 
 ## Phases
 
-- [ ] **Phase 1: Security Hardening** - Lock down Firestore/Storage rules and eliminate XSS + session risks
+- [x] **Phase 1: Security Hardening** - Lock down Firestore/Storage rules and eliminate XSS + session risks (completed 2026-03-11)
 - [ ] **Phase 2: Stability & Data Integrity** - Fix known data corruption bugs and make multi-step operations atomic
 - [ ] **Phase 3: Core Flow Pipeline** - Complete approval workflow with gate auto-advance, reviewer notifications, manager filtering, and accurate stats
 - [ ] **Phase 4: File Upload** - Connect the existing file upload UI to Firebase Storage
@@ -104,7 +104,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 2/3 | In Progress|  |
+| 1. Security Hardening | 3/3 | Complete   | 2026-03-11 |
 | 2. Stability & Data Integrity | 0/TBD | Not started | - |
 | 3. Core Flow Pipeline | 0/TBD | Not started | - |
 | 4. File Upload | 0/TBD | Not started | - |

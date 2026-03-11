@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-security-hardening 01-03-PLAN.md
-last_updated: "2026-03-11T21:49:22.334Z"
+stopped_at: Completed 01-security-hardening 01-02-PLAN.md
+last_updated: "2026-03-11T21:50:41.902Z"
 last_activity: 2026-03-12 — Roadmap created (6 phases, 46 requirements mapped)
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 33
 ---
 
@@ -52,6 +52,7 @@ Progress: [███░░░░░░░] 33%
 *Updated after each plan completion*
 | Phase 01-security-hardening P01 | 12 | 2 tasks | 3 files |
 | Phase 01-security-hardening P03 | 1 | 1 tasks | 1 files |
+| Phase 01-security-hardening P02 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Progress: [███░░░░░░░] 33%
 - [Phase 01-security-hardening]: startSessionWatcher called once per renderNav() — all protected pages covered without per-page modifications
 - [Phase 01-security-hardening]: IS_PROD check is UI-layer defense only; Firestore rules (Plan 02) provide actual enforcement for demo user access control
 - [Phase 01-security-hardening]: escapeHtml() applied to n.id and n.link in data-* HTML attribute positions — defense-in-depth even though Firestore auto-IDs are alphanumeric
+- [Phase 01-security-hardening]: firebase.json required a firestore section (was missing) — added alongside storage so both rule sets deploy correctly
+- [Phase 01-security-hardening]: Firebase Storage not enabled on project — storage.rules correct but requires user to activate Storage in Firebase console before deploying
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T21:49:22.332Z
-Stopped at: Completed 01-security-hardening 01-03-PLAN.md
+Last session: 2026-03-11T21:50:41.901Z
+Stopped at: Completed 01-security-hardening 01-02-PLAN.md
 Resume file: None
