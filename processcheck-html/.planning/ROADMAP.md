@@ -8,11 +8,11 @@
 ## Phases
 
 - [x] **Phase 1: Security Hardening** - Lock down Firestore/Storage rules and eliminate XSS + session risks (completed 2026-03-11)
-- [ ] **Phase 2: Stability & Data Integrity** - Fix known data corruption bugs and make multi-step operations atomic
-- [ ] **Phase 3: Core Flow Pipeline** - Complete approval workflow with gate auto-advance, reviewer notifications, manager filtering, and accurate stats
-- [ ] **Phase 4: File Upload** - Connect the existing file upload UI to Firebase Storage
-- [ ] **Phase 5: UX Polish** - Forms validation, toast notifications, responsive layout, accessibility, empty states, and navigation
-- [ ] **Phase 6: Advanced Workflow** - Activity timeline, @mention, bulk assign, new user onboarding, and print view
+- [x] **Phase 2: Stability & Data Integrity** - Fix known data corruption bugs and make multi-step operations atomic (completed 2026-03-12)
+- [x] **Phase 3: Core Flow Pipeline** - Complete approval workflow with gate auto-advance, reviewer notifications, manager filtering, and accurate stats (completed 2026-03-12)
+- [x] **Phase 4: File Upload** - Connect the existing file upload UI to Firebase Storage (already built, verified 2026-03-12)
+- [x] **Phase 5: UX Polish** - Forms validation, toast notifications, responsive layout, accessibility, empty states, and navigation (completed 2026-03-12)
+- [x] **Phase 6: Advanced Workflow** - Activity timeline, @mention, bulk assign, new user onboarding, and print view (completed 2026-03-12)
 
 ## Phase Details
 
@@ -159,12 +159,12 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security Hardening | 3/3 | Complete | 2026-03-11 |
-| 2. Stability & Data Integrity | 0/TBD | Not started | - |
-| 3. Core Flow Pipeline | 0/TBD | Not started | - |
-| 4. File Upload | 0/TBD | Not started | - |
-| 5. UX Polish | 0/TBD | Not started | - |
-| 6. Advanced Workflow | 0/TBD | Not started | - |
-| 7. Foundation CSS + Toast + Skeleton | 0/TBD | Not started | - |
-| 8. Inline Actions + Navigation | 0/TBD | Not started | - |
-| 9. Power User + Info Architecture | 0/TBD | Not started | - |
-| 10. Advanced — Bulk + Heatmap + DnD | 0/TBD | Not started | - |
+| 2. Stability & Data Integrity | 1/1 | Complete | 2026-03-12 |
+| 3. Core Flow Pipeline | 1/1 | Complete | 2026-03-12 |
+| 4. File Upload | — | Complete (already built) | 2026-03-12 |
+| 5. UX Polish | 1/1 | Complete | 2026-03-12 |
+| 6. Advanced Workflow | 1/1 | Complete | 2026-03-12 |
+| 7. Foundation CSS + Toast + Skeleton | 1/1 | Complete | 2026-03-12 |
+| 8. Inline Actions + Navigation | 1/1 | Complete | 2026-03-12 |
+| 9. Power User + Info Architecture | 1/1 | Complete | 2026-03-12 |
+| 10. Advanced — Bulk + Heatmap + DnD | 1/1 | Complete | 2026-03-12 |
