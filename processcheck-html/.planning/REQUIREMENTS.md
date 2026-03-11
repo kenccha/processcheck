@@ -125,59 +125,60 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase ? | Pending |
-| SEC-02 | Phase ? | Pending |
-| SEC-03 | Phase ? | Pending |
-| SEC-04 | Phase ? | Pending |
-| SEC-05 | Phase ? | Pending |
-| BUG-01 | Phase ? | Pending |
-| BUG-02 | Phase ? | Pending |
-| BUG-03 | Phase ? | Pending |
-| BUG-04 | Phase ? | Pending |
-| FILE-01 | Phase ? | Pending |
-| FILE-02 | Phase ? | Pending |
-| DATA-01 | Phase ? | Pending |
-| DATA-02 | Phase ? | Pending |
-| DATA-03 | Phase ? | Pending |
-| WORK-01 | Phase ? | Pending |
-| WORK-02 | Phase ? | Pending |
-| WORK-03 | Phase ? | Pending |
-| UX-01 | Phase ? | Pending |
-| UX-02 | Phase ? | Pending |
-| UX-03 | Phase ? | Pending |
-| UX-04 | Phase ? | Pending |
-| UX-05 | Phase ? | Pending |
-| UX-06 | Phase ? | Pending |
-| UX-07 | Phase ? | Pending |
-| UX-08 | Phase ? | Pending |
-| UX-09 | Phase ? | Pending |
-| UX-10 | Phase ? | Pending |
-| UX-11 | Phase ? | Pending |
-| NAV-01 | Phase ? | Pending |
-| NAV-02 | Phase ? | Pending |
-| NAV-03 | Phase ? | Pending |
-| FLOW-01 | Phase ? | Pending |
-| FLOW-02 | Phase ? | Pending |
-| FLOW-03 | Phase ? | Pending |
-| FLOW-04 | Phase ? | Pending |
-| FLOW-05 | Phase ? | Pending |
-| FLOW-06 | Phase ? | Pending |
-
-| PIPE-01 | Phase ? | Pending |
-| PIPE-02 | Phase ? | Pending |
-| PIPE-03 | Phase ? | Pending |
-| PIPE-04 | Phase ? | Pending |
-| PIPE-05 | Phase ? | Pending |
-| SYNC-01 | Phase ? | Pending |
-| SYNC-02 | Phase ? | Pending |
-| SYNC-03 | Phase ? | Pending |
-| SYNC-04 | Phase ? | Pending |
+| SEC-01 | Phase 1 | Pending |
+| SEC-02 | Phase 1 | Pending |
+| SEC-03 | Phase 1 | Pending |
+| SEC-04 | Phase 1 | Pending |
+| SEC-05 | Phase 1 | Pending |
+| BUG-01 | Phase 2 | Pending |
+| BUG-02 | Phase 2 | Pending |
+| BUG-03 | Phase 2 | Pending |
+| BUG-04 | Phase 2 | Pending |
+| DATA-01 | Phase 2 | Pending |
+| DATA-02 | Phase 2 | Pending |
+| DATA-03 | Phase 2 | Pending |
+| PIPE-01 | Phase 3 | Pending |
+| PIPE-02 | Phase 3 | Pending |
+| PIPE-03 | Phase 3 | Pending |
+| PIPE-04 | Phase 3 | Pending |
+| PIPE-05 | Phase 3 | Pending |
+| WORK-01 | Phase 3 | Pending |
+| WORK-02 | Phase 3 | Pending |
+| WORK-03 | Phase 3 | Pending |
+| SYNC-01 | Phase 3 | Pending |
+| SYNC-02 | Phase 3 | Pending |
+| SYNC-03 | Phase 3 | Pending |
+| SYNC-04 | Phase 3 | Pending |
+| FLOW-01 | Phase 3 | Pending |
+| FILE-01 | Phase 4 | Pending |
+| FILE-02 | Phase 4 | Pending |
+| UX-01 | Phase 5 | Pending |
+| UX-02 | Phase 5 | Pending |
+| UX-03 | Phase 5 | Pending |
+| UX-04 | Phase 5 | Pending |
+| UX-05 | Phase 5 | Pending |
+| UX-06 | Phase 5 | Pending |
+| UX-07 | Phase 5 | Pending |
+| UX-08 | Phase 5 | Pending |
+| UX-09 | Phase 5 | Pending |
+| UX-10 | Phase 5 | Pending |
+| UX-11 | Phase 5 | Pending |
+| NAV-01 | Phase 5 | Pending |
+| NAV-02 | Phase 5 | Pending |
+| NAV-03 | Phase 5 | Pending |
+| FLOW-02 | Phase 6 | Pending |
+| FLOW-03 | Phase 6 | Pending |
+| FLOW-04 | Phase 6 | Pending |
+| FLOW-05 | Phase 6 | Pending |
+| FLOW-06 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 46 total
-- Mapped to phases: 0
-- Unmapped: 46 ⚠️
+- Mapped to phases: 46
+- Unmapped: 0
+
+**Note:** FLOW-01 and SYNC-04 are identical requirements ("승인 불가 시 이유 명확히 표시"). Both are assigned to Phase 3 and will be implemented as a single feature.
 
 ---
 *Requirements defined: 2026-03-12*
-*Last updated: 2026-03-12 after initial definition*
+*Last updated: 2026-03-12 — traceability complete, all 46 requirements mapped*
