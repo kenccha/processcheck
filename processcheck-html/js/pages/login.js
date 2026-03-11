@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { getUser, login, loginWithMicrosoft, completeRegistration } from "../auth.js";
-// import { seedDatabaseIfEmpty } from "../firestore-service.js"; // 시딩 비활성화 — 실제 데이터 사용
+import { seedTemplatesIfEmpty } from "../firestore-service.js";
 
 // If already logged in, redirect immediately
 if (getUser()) {
@@ -25,6 +25,19 @@ const completeBtn = document.getElementById("complete-registration-btn");
 const cancelBtn = document.getElementById("cancel-registration-btn");
 const msUserEmail = document.getElementById("ms-user-email");
 
+// ── Production guard — hide demo cards on non-localhost hostnames ──
+const IS_PROD = window.location.hostname !== "localhost"
+             && window.location.hostname !== "127.0.0.1";
+
+if (IS_PROD) {
+  const demoRow = document.getElementById("user-cards");
+  const divider = document.getElementById("login-divider");
+  const prompt = document.querySelector(".login-prompt");
+  if (demoRow) demoRow.style.display = "none";
+  if (divider) divider.style.display = "none";
+  if (prompt) prompt.textContent = "InBody 계정으로 로그인하세요";
+}
+
 // State for Microsoft auth flow
 let pendingAuthInfo = null;
 
@@ -44,6 +57,11 @@ const showContent = () => {
 
 // No seeding — show login content immediately
 showContent();
+
+// Seed templates if missing (6 phases, 10 depts, 193 items)
+seedTemplatesIfEmpty().then(seeded => {
+  if (seeded) console.log("📦 템플릿 데이터 자동 생성 완료");
+});
 
 // ── Demo card click → login → redirect ──
 userCards.forEach((card) => {

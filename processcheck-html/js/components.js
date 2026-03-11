@@ -2,7 +2,7 @@
 // Shared Components — Nav, Spinner, Badges, etc.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { getUser, logout } from "./auth.js";
+import { getUser, logout, startSessionWatcher } from "./auth.js";
 import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
 import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
 import { ReviewPanel } from "./review-system.js";
@@ -348,6 +348,9 @@ export function renderNav(container) {
 
   // ─── Global Feedback Widget ─────────────────────────────────────────────────
   import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
+
+  // Start session watcher — auto-logout after 24h of inactivity
+  startSessionWatcher();
 
   // Return unsubscribe for cleanup
   return () => {
