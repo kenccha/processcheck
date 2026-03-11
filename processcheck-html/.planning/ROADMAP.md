@@ -28,7 +28,12 @@ Phases are ordered security-first — each phase leaves the app in a deployable 
   3. Submitting a task name containing `<script>alert(1)</script>` does not execute JavaScript on any page
   4. A user who logs in is automatically logged out after 24 hours and redirected to the login page
   5. Firebase Storage upload and download requests from unauthenticated origins are rejected
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Demo card hostname gate (SEC-03) + 24h session expiry (SEC-05)
+- [ ] 01-02-PLAN.md — Firestore rules hardened (SEC-01) + Storage rules created (SEC-02)
+- [ ] 01-03-PLAN.md — XSS audit: escapeHtml() in notification panel (SEC-04)
 
 ### Phase 2: Stability & Data Integrity
 **Goal**: Known data corruption and error-handling bugs are eliminated — the app behaves predictably under real conditions
@@ -99,7 +104,7 @@ Phases are ordered security-first — each phase leaves the app in a deployable 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 0/TBD | Not started | - |
+| 1. Security Hardening | 0/3 | Not started | - |
 | 2. Stability & Data Integrity | 0/TBD | Not started | - |
 | 3. Core Flow Pipeline | 0/TBD | Not started | - |
 | 4. File Upload | 0/TBD | Not started | - |
