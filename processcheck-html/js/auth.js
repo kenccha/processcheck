@@ -8,6 +8,7 @@ import { getUserByName, getUserByEmail, createUser } from "./firestore-service.j
 
 const STORAGE_KEY = "pc_user";
 const ALLOWED_DOMAIN = "inbody.com"; // Only @inbody.com emails allowed
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
 
 // Get current user from localStorage
 export function getUser() {
@@ -34,7 +35,7 @@ export async function login(name, role) {
   }
 
   // Override role for demo convenience
-  const sessionUser = { ...user, role };
+  const sessionUser = { ...user, role, loginAt: Date.now() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
   return sessionUser;
 }
@@ -61,7 +62,7 @@ export async function loginWithMicrosoft() {
   const existingUser = await getUserByEmail(email);
 
   if (existingUser) {
-    const msUser = { ...existingUser, authProvider: "microsoft" };
+    const msUser = { ...existingUser, authProvider: "microsoft", loginAt: Date.now() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
     return { user: msUser, isNewUser: false };
   }
@@ -74,7 +75,7 @@ export async function loginWithMicrosoft() {
     department: "",
     authProvider: "microsoft",
   });
-  const msUser = { ...newUser, authProvider: "microsoft" };
+  const msUser = { ...newUser, authProvider: "microsoft", loginAt: Date.now() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
   return { user: msUser, isNewUser: false };
 }
@@ -88,7 +89,7 @@ export async function completeRegistration(authInfo, role, department) {
     department,
     authProvider: "microsoft",
   });
-  const msUser = { ...newUser, authProvider: "microsoft" };
+  const msUser = { ...newUser, authProvider: "microsoft", loginAt: Date.now() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
   return msUser;
 }
@@ -111,5 +112,20 @@ export function guardPage() {
     window.location.href = "index.html";
     return null;
   }
+  if (user.loginAt && Date.now() - user.loginAt > SESSION_TTL) {
+    logout();
+    return null;
+  }
   return user;
+}
+
+// Session watcher — auto-logout after 24h, checked every 5 minutes
+export function startSessionWatcher() {
+  const INTERVAL = 5 * 60 * 1000; // check every 5 minutes
+  setInterval(() => {
+    const user = getUser();
+    if (!user || (user.loginAt && Date.now() - user.loginAt > SESSION_TTL)) {
+      logout();
+    }
+  }, INTERVAL);
 }
