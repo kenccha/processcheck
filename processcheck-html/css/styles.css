@@ -3998,3 +3998,18 @@ tbody tr:last-child td {
 /* ── Bulk Select ── */
 .bulk-checkbox { width: 1rem; height: 1rem; accent-color: var(--primary-500); cursor: pointer; }
 .bulk-action-bar { position: sticky; bottom: 0; background: var(--surface-2); border-top: 1px solid var(--surface-3); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Print Styles
+   ══════════════════════════════════════════════════════════════════════════════ */
+@media print {
+  body { background: white !important; color: black !important; }
+  #nav-root, .nav, .bulk-action-bar, .slide-over-backdrop,
+  #confirm-modal-overlay, .btn-primary, .btn-ghost, .btn-outline,
+  .file-upload-zone, .tab-btn, .view-tabs, .filter-pills,
+  [data-print-hide] { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
+  a { color: black !important; text-decoration: none !important; }
+  * { color: black !important; background: white !important; border-color: #ccc !important; }
+  .badge { border: 1px solid #999 !important; }
+}

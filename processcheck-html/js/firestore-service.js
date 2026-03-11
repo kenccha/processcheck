@@ -1168,6 +1168,33 @@ export async function addComment(taskId, userId, userName, content) {
     comments: [...existing, newComment],
   });
   try { await addActivityLog("add_comment", userId, userName, "", "task", taskId, { content: content.substring(0, 100) }); } catch(e) {}
+
+  // @mention 알림 생성
+  try {
+    const mentionRegex = /@([\uAC00-\uD7A3a-zA-Z]{2,10})/g;
+    let match;
+    const mentioned = new Set();
+    while ((match = mentionRegex.exec(content)) !== null) mentioned.add(match[1]);
+    if (mentioned.size > 0) {
+      const t = taskSnap.data();
+      for (const name of mentioned) {
+        if (name === userName) continue; // 자기 자신 제외
+        const uQ = query(collection(db, "users"), where("name", "==", name));
+        const uSnap = await getDocs(uQ);
+        if (!uSnap.empty) {
+          await addDoc(collection(db, "notifications"), {
+            userId: uSnap.docs[0].id,
+            type: "mention",
+            title: "멘션 알림",
+            message: `${userName}님이 코멘트에서 회원님을 언급했습니다: "${content.substring(0, 60)}..."`,
+            link: `task.html?projectId=${t.projectId}&taskId=${taskId}`,
+            read: false,
+            createdAt: Timestamp.now(),
+          });
+        }
+      }
+    }
+  } catch (e) { console.error("멘션 알림 생성 실패:", e); }
 }
 
 // ─── Change Requests ────────────────────────────────────────────────────────

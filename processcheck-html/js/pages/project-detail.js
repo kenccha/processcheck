@@ -10,6 +10,7 @@ initTheme();
 import {
   subscribeProjects,
   subscribeChecklistItems,
+  subscribeActivityLogs,
   bulkApproveTasks,
   bulkUpdateAssignee,
   getUsers,
@@ -61,6 +62,7 @@ let selectedDepartment = "";
 let checklistFilter = "";
 let selectedTaskIds = new Set();
 let allUsers = [];
+let activityLogs = [];
 let checklistView = "phase"; // phase | timeline | department | board | list
 
 // --- Render nav ---
@@ -85,6 +87,11 @@ unsubProject = subscribeProjects((projects) => {
 
 unsubChecklist = subscribeChecklistItems(projectId, (items) => {
   checklistItems = items;
+  render();
+});
+
+subscribeActivityLogs("project", projectId, (logs) => {
+  activityLogs = logs;
   render();
 });
 
@@ -297,6 +304,9 @@ function renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPendi
             </button>
             <button class="btn-ghost btn-sm" id="export-pdf-btn" style="font-size:0.75rem;">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>PDF
+            </button>
+            <button class="btn-ghost btn-sm" id="print-btn" data-print-hide style="font-size:0.75rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>인쇄
             </button>
           </div>
         </div>
@@ -628,7 +638,36 @@ function renderEmptyState() {
   `;
 }
 
+const ACTION_LABELS = {
+  complete_task: "작업 완료", approve_task: "승인", reject_task: "반려",
+  restart_task: "재작업 시작", create_task: "작업 생성", assign_task: "담당자 지정",
+  add_comment: "코멘트 작성", upload_file: "파일 업로드",
+};
+
 function renderRecentActivity() {
+  // Prefer real activity logs; fall back to checklistItems
+  if (activityLogs.length > 0) {
+    return `
+      <div class="timeline">
+        ${activityLogs.slice(0, 15).map(log => {
+          const label = ACTION_LABELS[log.action] || log.action;
+          const actor = log.actorName || log.userName || "";
+          const ts = log.timestamp ? timeAgo(log.timestamp) : "";
+          return `
+            <div class="timeline-item" style="padding-bottom:0.625rem;">
+              <div class="timeline-dot ${log.action?.includes("complete") || log.action?.includes("approve") ? "completed" : "active"}"></div>
+              <div>
+                <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(actor)} 님이 ${escapeHtml(label)}</div>
+                <div style="font-size:0.6rem;color:var(--slate-400);margin-top:0.125rem;">${ts}</div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  // Fallback: derive from checklist items
   const recentItems = checklistItems
     .filter(t => t.status === "completed" || t.status === "in_progress")
     .sort((a, b) => {
@@ -1141,6 +1180,10 @@ function bindEvents() {
     });
   }
 }
+
+  // Print button
+  const printBtn = app.querySelector("#print-btn");
+  if (printBtn) printBtn.addEventListener("click", () => window.print());
 
 // ─── UXA-05: Task Peek Slide-Over ───────────────────────────────────────────
 
