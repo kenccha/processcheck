@@ -3983,3 +3983,18 @@ tbody tr:last-child td {
   padding: 0.2rem 0.5rem;
   font-size: 0.6875rem;
 }
+
+/* ── DnD Kanban ── */
+.dnd-ghost { opacity: 0.4; }
+.dnd-chosen { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.dnd-drag { opacity: 0.8; }
+.kanban-column { min-height: 200px; padding: 0.5rem; background: var(--surface-2); border-radius: var(--radius-lg); }
+.kanban-card { padding: 0.75rem; margin-bottom: 0.5rem; background: var(--surface-1); border: 1px solid var(--surface-3); border-radius: var(--radius-lg); cursor: grab; transition: box-shadow 0.15s ease; }
+.kanban-card:hover { box-shadow: var(--shadow-glow-sm); }
+.kanban-card.urgent { border-left: 3px solid var(--danger-500); }
+.kanban-swimlane { margin-bottom: 1rem; }
+.kanban-swimlane-header { padding: 0.25rem 0.5rem; font-size: 0.6875rem; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--surface-3); margin-bottom: 0.5rem; }
+
+/* ── Bulk Select ── */
+.bulk-checkbox { width: 1rem; height: 1rem; accent-color: var(--primary-500); cursor: pointer; }
+.bulk-action-bar { position: sticky; bottom: 0; background: var(--surface-2); border-top: 1px solid var(--surface-3); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10; }
