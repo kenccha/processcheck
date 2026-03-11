@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage, getUser } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject } from "../firestore-service.js";
@@ -1195,7 +1196,7 @@ function bindControls() {
       try {
         await updateProject(projectId, { status: newStatus });
       } catch (err) {
-        alert("상태 변경 실패: " + err.message);
+        showToast('error', "상태 변경 실패: " + err.message);
       }
     });
   });
@@ -1246,15 +1247,15 @@ function bindControls() {
 
       // Validation
       if (!name || !productType || !startStr || !endStr) {
-        alert("필수 항목을 모두 입력하세요.");
+        showToast('warning', "필수 항목을 모두 입력하세요.");
         return;
       }
       if (isChange && !changeScale) {
-        alert("변경 규모를 선택하세요.");
+        showToast('warning', "변경 규모를 선택하세요.");
         return;
       }
       if (new Date(endStr) <= new Date(startStr)) {
-        alert("종료일은 시작일보다 이후여야 합니다.");
+        showToast('warning', "종료일은 시작일보다 이후여야 합니다.");
         return;
       }
 
@@ -1283,7 +1284,7 @@ function bindControls() {
         window.location.href = `project.html?id=${newId}`;
       } catch (err) {
         console.error("프로젝트 등록 오류:", err);
-        alert("프로젝트 등록 중 오류가 발생했습니다.");
+        showToast('error', "프로젝트 등록 중 오류가 발생했습니다.");
         submitBtn.disabled = false;
         submitBtn.textContent = "등록";
       }

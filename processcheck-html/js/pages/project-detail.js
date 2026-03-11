@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -147,20 +148,22 @@ function render() {
   ).length;
 
   app.innerHTML = `
-    ${renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPending)}
+    <div class="container">
+      ${renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPending)}
 
-    <!-- Tabs -->
-    <div class="tab-group mb-4" style="margin-top:1rem;">
-      <button class="tab-btn${activeTab === "work" ? " active" : ""}" data-tab="work">개요 + 작업</button>
-      <button class="tab-btn${activeTab === "schedule" ? " active" : ""}" data-tab="schedule">스케줄</button>
-      <button class="tab-btn${activeTab === "bottleneck" ? " active" : ""}" data-tab="bottleneck">병목</button>
-    </div>
+      <!-- Tabs -->
+      <div class="tab-group mb-4" style="margin-top:1rem;">
+        <button class="tab-btn${activeTab === "work" ? " active" : ""}" data-tab="work">개요 + 작업</button>
+        <button class="tab-btn${activeTab === "schedule" ? " active" : ""}" data-tab="schedule">스케줄</button>
+        <button class="tab-btn${activeTab === "bottleneck" ? " active" : ""}" data-tab="bottleneck">병목</button>
+      </div>
 
-    <!-- Tab Content -->
-    <div class="animate-fade-in">
-      ${activeTab === "work" ? renderWorkTab() : ""}
-      ${activeTab === "schedule" ? renderScheduleTab() : ""}
-      ${activeTab === "bottleneck" ? renderBottleneckTab() : ""}
+      <!-- Tab Content -->
+      <div class="animate-fade-in">
+        ${activeTab === "work" ? renderWorkTab() : ""}
+        ${activeTab === "schedule" ? renderScheduleTab() : ""}
+        ${activeTab === "bottleneck" ? renderBottleneckTab() : ""}
+      </div>
     </div>
   `;
 
@@ -235,10 +238,10 @@ function renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPendi
               const isCompleted = idx < phaseIndex;
               const isCurrent = idx === phaseIndex;
               const bg = isCompleted ? "var(--success-500)" : isCurrent ? "var(--primary-500)" : "var(--surface-4)";
-              const tc = isCompleted || isCurrent ? "white" : "var(--slate-500)";
+              const tc = isCompleted || isCurrent ? "white" : "var(--slate-400)";
               return `<div style="display:flex;align-items:center;gap:0.2rem;">
                 <span style="padding:0.2rem 0.5rem;border-radius:var(--radius-lg);background:${bg};color:${tc};font-size:0.65rem;font-weight:600;white-space:nowrap;">${isCompleted ? "✔ " : isCurrent ? "▶ " : ""}${ph.name}</span>
-                ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-500);font-size:0.6rem;">→</span>' : ""}
+                ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-400);font-size:0.6rem;">→</span>' : ""}
               </div>`;
             }).join("")}
           </div>
@@ -378,7 +381,7 @@ function renderTaskRow(task) {
             <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${
               task.status === "completed" ? "var(--success-400)" :
               task.status === "in_progress" ? "var(--primary-400)" :
-              task.status === "rejected" ? "var(--danger-400)" : "var(--slate-500)"
+              task.status === "rejected" ? "var(--danger-400)" : "var(--slate-400)"
             };"></span>
             <span style="font-size:0.8rem;font-weight:500;color:var(--slate-200);">${escapeHtml(task.title)}</span>
           </div>
@@ -389,7 +392,7 @@ function renderTaskRow(task) {
             ${task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending") ? '<span class="badge badge-warning" style="font-size:0.55rem;padding:0.1rem 0.3rem;">승인대기</span>' : ""}
           </div>
         </div>
-        <svg width="14" height="14" fill="none" stroke="var(--slate-500)" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:0.25rem;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        <svg width="14" height="14" fill="none" stroke="var(--slate-400)" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:0.25rem;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       </div>
     </div>
   `;
@@ -409,7 +412,7 @@ function renderPhaseView() {
       approved: { text: `✓ ${phase.gateStage} 승인 완료`, bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.3)", color: "var(--success-400)" },
       rejected: { text: `✗ ${phase.gateStage} 반려`, bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.3)", color: "var(--danger-400)" },
       pending: { text: `⏳ ${phase.gateStage} 승인 대기`, bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.3)", color: "var(--warning-400)" },
-      not_reached: { text: `— ${phase.gateStage} 미도달`, bg: "var(--surface-2)", border: "var(--surface-3)", color: "var(--slate-500)" },
+      not_reached: { text: `— ${phase.gateStage} 미도달`, bg: "var(--surface-2)", border: "var(--surface-3)", color: "var(--slate-400)" },
       none: null,
     };
     const banner = gateBannerMap[gateStatus];
@@ -463,7 +466,7 @@ function renderTimelineView() {
     { key: "thisWeek", label: "이번 주", color: "var(--warning-400)" },
     { key: "nextWeek", label: "다음 주", color: "var(--primary-400)" },
     { key: "later", label: "이후", color: "var(--slate-400)" },
-    { key: "noDue", label: "마감일 없음", color: "var(--slate-500)" },
+    { key: "noDue", label: "마감일 없음", color: "var(--slate-400)" },
   ];
 
   return groupLabels.map(g => {
@@ -473,7 +476,7 @@ function renderTimelineView() {
       <div class="card mb-3">
         <div style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);">
           <span style="font-size:0.75rem;font-weight:600;color:${g.color};">${g.label}</span>
-          <span style="font-size:0.65rem;color:var(--slate-500);margin-left:0.5rem;">${tasks.length}건</span>
+          <span style="font-size:0.65rem;color:var(--slate-400);margin-left:0.5rem;">${tasks.length}건</span>
         </div>
         ${tasks.sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0)).map(t => renderTaskRow(t)).join("")}
       </div>
@@ -522,10 +525,10 @@ function renderBoardView() {
           <div class="card" style="min-height:200px;">
             <div style="padding:0.5rem 0.75rem;border-bottom:2px solid ${col.color};display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:0.75rem;font-weight:600;color:${col.color};">${col.label}</span>
-              <span style="font-size:0.65rem;color:var(--slate-500);">${tasks.length}</span>
+              <span style="font-size:0.65rem;color:var(--slate-400);">${tasks.length}</span>
             </div>
             <div style="max-height:50vh;overflow-y:auto;">
-              ${tasks.length === 0 ? '<div style="padding:2rem;text-align:center;font-size:0.7rem;color:var(--slate-500);">없음</div>' :
+              ${tasks.length === 0 ? '<div style="padding:2rem;text-align:center;font-size:0.7rem;color:var(--slate-400);">없음</div>' :
                 tasks.map(t => `
                   <div class="card-hover pd-task-row" data-task-id="${t.id}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;">
                     <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);margin-bottom:0.25rem;">${escapeHtml(t.title)}</div>
@@ -550,7 +553,7 @@ function renderListView() {
         <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.7rem;color:var(--slate-400);">
           <input type="checkbox" id="select-all-tasks"> 전체 선택
         </label>
-        <span style="font-size:0.65rem;color:var(--slate-500);" id="selected-count">${selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개)` : ""}</span>
+        <span style="font-size:0.65rem;color:var(--slate-400);" id="selected-count">${selectedTaskIds.size > 0 ? `(${selectedTaskIds.size}개)` : ""}</span>
       </div>
       ${filtered.map(t => renderTaskRow(t)).join("")}
     </div>
@@ -579,7 +582,7 @@ function renderRecentActivity() {
     .slice(0, 10);
 
   if (recentItems.length === 0) {
-    return `<div style="padding:1.5rem;text-align:center;font-size:0.75rem;color:var(--slate-500);">최근 활동이 없습니다</div>`;
+    return `<div style="padding:1.5rem;text-align:center;font-size:0.75rem;color:var(--slate-400);">최근 활동이 없습니다</div>`;
   }
 
   return `
@@ -625,7 +628,7 @@ function renderScheduleTab() {
 
       <!-- Timeline header -->
       <div style="position:relative;margin-bottom:0.5rem;padding-left:100px;">
-        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--slate-500);">
+        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--slate-400);">
           <span>${formatDate(projectStart)}</span>
           <span>${formatDate(projectEnd)}</span>
         </div>
@@ -704,7 +707,7 @@ function renderScheduleTab() {
               const prog = getPhaseWorkProgress(phase.name);
               const gs = getPhaseGateStatus(phase.name);
               const gsLabel = { approved: "✓ 승인", rejected: "✗ 반려", pending: "⏳ 대기", not_reached: "— 미도달", none: "-" }[gs];
-              const gsColor = { approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--warning-400)", not_reached: "var(--slate-500)", none: "var(--slate-500)" }[gs];
+              const gsColor = { approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--warning-400)", not_reached: "var(--slate-400)", none: "var(--slate-400)" }[gs];
               return `
                 <tr>
                   <td style="font-weight:600;color:var(--slate-200);">${phase.name}</td>
@@ -766,7 +769,7 @@ function renderBottleneckTab() {
     <!-- Heatmap -->
     <div class="card p-5 mb-4">
       <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin-bottom:0.75rem;">Phase × 부서 히트맵</h3>
-      <p style="font-size:0.65rem;color:var(--slate-500);margin-bottom:0.75rem;">빨간색 = 지연 작업 있음 · 숫자 = 완료율% · 빈 칸 = 해당 작업 없음</p>
+      <p style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.75rem;">빨간색 = 지연 작업 있음 · 숫자 = 완료율% · 빈 칸 = 해당 작업 없음</p>
       <div class="table-responsive">
         <table class="data-table" style="font-size:0.7rem;">
           <thead>
@@ -784,7 +787,7 @@ function renderBottleneckTab() {
                   <td style="font-weight:500;color:var(--slate-300);white-space:nowrap;">${escapeHtml(dept)}</td>
                   ${PHASE_GROUPS.map(p => {
                     const cell = heatmapData[p.name][dept];
-                    if (cell.total === 0) return `<td style="text-align:center;color:var(--slate-600);">—</td>`;
+                    if (cell.total === 0) return `<td style="text-align:center;color:var(--slate-400);">—</td>`;
                     const bg = cell.overdue > 0 ? "rgba(239,68,68,0.2)" :
                                cell.pct === 100 ? "rgba(34,197,94,0.15)" :
                                cell.pct > 50 ? "rgba(6,182,212,0.1)" : "transparent";
@@ -819,7 +822,7 @@ function renderBottleneckTab() {
                 <div style="position:absolute;bottom:0;width:100%;height:${pct}%;background:${fillColor};border-radius:var(--radius-sm);transition:height 0.3s;"></div>
               </div>
               <span style="font-size:0.6rem;font-weight:500;color:var(--slate-300);text-align:center;">${phase.name}</span>
-              <span style="font-size:0.55rem;color:var(--slate-500);">${prog.total}건</span>
+              <span style="font-size:0.55rem;color:var(--slate-400);">${prog.total}건</span>
             </div>
           `;
         }).join("")}
@@ -947,7 +950,7 @@ function bindEvents() {
     bulkApproveBtn.addEventListener("click", async () => {
       if (selectedTaskIds.size === 0) return;
       // 모든 승인은 observer만
-      if (user.role !== "observer") { alert("승인 권한이 없습니다. 기획조정실만 승인할 수 있습니다."); return; }
+      if (user.role !== "observer") { showToast('error', "승인 권한이 없습니다. 기획조정실만 승인할 수 있습니다."); return; }
       if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
       await bulkApproveTasks([...selectedTaskIds], user.name);
       selectedTaskIds.clear();
@@ -1104,7 +1107,7 @@ async function handleQuickAdd() {
   const input = document.getElementById("quick-add-input");
   if (!input || !input.value.trim()) return;
   const parsed = parseQuickInput(input.value);
-  if (!parsed.title) { alert("작업 내용을 입력해주세요"); return; }
+  if (!parsed.title) { showToast('warning', "작업 내용을 입력해주세요"); return; }
   if (!parsed.department) parsed.department = user.department || departments[0];
   if (!parsed.assignee) {
     const suggestions = getSmartAssigneeSuggestions(parsed.department);
@@ -1114,7 +1117,7 @@ async function handleQuickAdd() {
   try {
     await createChecklistItem({ projectId, title: parsed.title, assignee: parsed.assignee, department: parsed.department, stage: parsed.stage, importance: parsed.importance, dueDate: parsed.dueDate, status: "pending" });
     input.value = "";
-  } catch (err) { alert("작업 생성 실패: " + err.message); }
+  } catch (err) { showToast('error', "작업 생성 실패: " + err.message); }
 }
 
 function showAddTaskModal() {
@@ -1212,7 +1215,7 @@ function showAddTaskModal() {
 
   overlay.querySelector("#submit-add-modal").addEventListener("click", async () => {
     const title = overlay.querySelector("#modal-task-title").value.trim();
-    if (!title) { alert("작업 내용을 입력해주세요"); return; }
+    if (!title) { showToast('warning', "작업 내용을 입력해주세요"); return; }
     try {
       await createChecklistItem({
         projectId, title,
@@ -1224,6 +1227,6 @@ function showAddTaskModal() {
         status: "pending",
       });
       overlay.remove();
-    } catch (err) { alert("작업 생성 실패: " + err.message); }
+    } catch (err) { showToast('error', "작업 생성 실패: " + err.message); }
   });
 }

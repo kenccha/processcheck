@@ -7,6 +7,7 @@
 
 import { db } from "./firebase-init.js";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { showToast } from "./ui/toast.js";
 
 let _initialized = false;
 
@@ -286,7 +287,7 @@ export function initFeedbackWidget() {
     try {
       await ensureHtml2Canvas();
     } catch {
-      alert("캡처 라이브러리를 로드할 수 없습니다. 네트워크를 확인하세요.");
+      showToast('error', "캡처 라이브러리를 로드할 수 없습니다. 네트워크를 확인하세요.");
       return;
     }
 
@@ -332,7 +333,7 @@ export function initFeedbackWidget() {
       }).catch(err => {
         console.error("캡처 실패:", err);
         fab.style.display = "";
-        alert("화면 캡처에 실패했습니다.");
+        showToast('error', "화면 캡처에 실패했습니다.");
       });
     });
   }
@@ -514,7 +515,7 @@ export function initFeedbackWidget() {
   document.getElementById("fw-submit")?.addEventListener("click", async function () {
     const author = document.getElementById("fw-author").value.trim();
     const content = document.getElementById("fw-content").value.trim();
-    if (!author || !content) { alert("이름과 피드백 내용을 입력하세요"); return; }
+    if (!author || !content) { showToast('warning', "이름과 피드백 내용을 입력하세요"); return; }
 
     const pageInfo = getPageInfo();
 
@@ -557,7 +558,7 @@ export function initFeedbackWidget() {
       floatBar.classList.remove("open");
     } catch (e) {
       console.error("피드백 등록 오류:", e);
-      alert("등록 실패: " + e.message);
+      showToast('error', "등록 실패: " + e.message);
     }
 
     this.disabled = false;

@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { db } from "../firebase-init.js";
+import { showToast } from "../ui/toast.js";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
 import {
   subscribeCustomers,
@@ -494,7 +495,7 @@ function bindEvents() {
       const title = app.querySelector("#cr-title")?.value.trim();
       const desc = app.querySelector("#cr-desc")?.value.trim();
       if (!title) {
-        alert("제목을 입력해주세요");
+        showToast('warning', "제목을 입력해주세요");
         return;
       }
       try {
@@ -513,7 +514,7 @@ function bindEvents() {
         showNewRequestModal = false;
         render();
       } catch (err) {
-        alert("요청 제출 실패: " + err.message);
+        showToast('error', "요청 제출 실패: " + err.message);
       }
     });
   }

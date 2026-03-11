@@ -6,6 +6,7 @@
 
 import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
 import { guardPage, getUser, logout } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import {
   subscribeAllLaunchChecklists,
   subscribeProjects,
@@ -87,7 +88,7 @@ function renderSalesNav(container) {
         <div class="flex items-center gap-8">
           <button class="nav-logo" data-nav="home.html">
             <div class="nav-logo-icon" style="background:linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.1));color:#f59e0b"><span>SL</span></div>
-            <span class="nav-logo-text" style="color:var(--slate-800)">영업<span class="accent" style="color:#f59e0b">출시준비</span></span>
+            <span class="nav-logo-text" style="color:var(--slate-100)">영업<span class="accent" style="color:#f59e0b">출시준비</span></span>
           </button>
         </div>
         <div class="nav-right">
@@ -1150,7 +1151,7 @@ function renderTimelineView(filtered) {
 
   if (buckets.noDueDate.length > 0) {
     html += `
-      <div class="card" style="border-left:4px solid var(--slate-600);padding:0;overflow:hidden;">
+      <div class="card" style="border-left:4px solid var(--slate-400);padding:0;overflow:hidden;">
         <div style="padding:0.75rem 1rem;background:transparent;border-bottom:1px solid var(--border);">
           <div class="flex items-center gap-2">
             <span>❓</span>
@@ -1597,7 +1598,7 @@ function bindEvents() {
   document.getElementById("confirm-submit")?.addEventListener("click", async () => {
     const name = document.getElementById("confirm-name").value.trim();
     if (!name) {
-      alert("확인자 이름을 입력해주세요.");
+      showToast('warning', "확인자 이름을 입력해주세요.");
       return;
     }
     const note = document.getElementById("confirm-note").value.trim();
@@ -1610,7 +1611,7 @@ function bindEvents() {
       pendingConfirmId = null;
     } catch (err) {
       console.error("확인 처리 실패:", err);
-      alert("확인 처리에 실패했습니다.");
+      showToast('error', "확인 처리에 실패했습니다.");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "확인 처리";

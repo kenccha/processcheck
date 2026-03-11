@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -249,7 +250,7 @@ function bindEvents() {
       try {
         await updateUserRole(sel.dataset.roleChange, e.target.value);
       } catch (err) {
-        alert("역할 변경 실패: " + err.message);
+        showToast('error', "역할 변경 실패: " + err.message);
       }
     });
   });
@@ -260,7 +261,7 @@ function bindEvents() {
       try {
         await updateUserDepartment(sel.dataset.deptChange, e.target.value);
       } catch (err) {
-        alert("부서 변경 실패: " + err.message);
+        showToast('error', "부서 변경 실패: " + err.message);
       }
     });
   });
@@ -272,7 +273,7 @@ function bindEvents() {
       try {
         await deactivateUser(btn.dataset.deactivate);
       } catch (err) {
-        alert("비활성화 실패: " + err.message);
+        showToast('error', "비활성화 실패: " + err.message);
       }
     });
   });
@@ -283,7 +284,7 @@ function bindEvents() {
       try {
         await activateUser(btn.dataset.activate);
       } catch (err) {
-        alert("활성화 실패: " + err.message);
+        showToast('error', "활성화 실패: " + err.message);
       }
     });
   });

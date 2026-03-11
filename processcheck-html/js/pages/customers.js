@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { initTheme } from "../components.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, navigate } from "../components.js";
 import { guardPage, getUser } from "../auth.js";
 import {
@@ -331,7 +332,7 @@ async function handleSave() {
   };
 
   if (!data.name || !data.region || !data.contactName) {
-    alert("거래처명, 지역, 담당자명은 필수입니다.");
+    showToast('warning', "거래처명, 지역, 담당자명은 필수입니다.");
     return;
   }
 
@@ -344,7 +345,7 @@ async function handleSave() {
     app.querySelector("#customer-modal").classList.add("hidden");
   } catch (err) {
     console.error("고객 저장 실패:", err);
-    alert("저장에 실패했습니다.");
+    showToast('error', "저장에 실패했습니다.");
   }
 }
 

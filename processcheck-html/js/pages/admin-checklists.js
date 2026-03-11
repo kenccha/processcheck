@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage, getUser } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -171,7 +172,7 @@ async function handleAddItem(content, isRequired) {
     closeModal();
   } catch (err) {
     console.error("Add item error:", err);
-    alert("항목 추가 중 오류가 발생했습니다.");
+    showToast('error', "항목 추가 중 오류가 발생했습니다.");
   }
 }
 
@@ -186,7 +187,7 @@ async function handleEditItem(itemId, content, isRequired) {
     closeModal();
   } catch (err) {
     console.error("Edit item error:", err);
-    alert("항목 수정 중 오류가 발생했습니다.");
+    showToast('error', "항목 수정 중 오류가 발생했습니다.");
   }
 }
 
@@ -196,7 +197,7 @@ async function handleDeleteItem(itemId) {
     await deleteTemplateItem(itemId);
   } catch (err) {
     console.error("Delete item error:", err);
-    alert("항목 삭제 중 오류가 발생했습니다.");
+    showToast('error', "항목 삭제 중 오류가 발생했습니다.");
   }
 }
 
@@ -213,7 +214,7 @@ async function handleAddStage(name, workStageName, gateStageName) {
     closeModal();
   } catch (err) {
     console.error("Add stage error:", err);
-    alert("단계 추가 중 오류가 발생했습니다.");
+    showToast('error', "단계 추가 중 오류가 발생했습니다.");
   }
 }
 
@@ -231,7 +232,7 @@ async function handleDeleteStage(stageId) {
     render();
   } catch (err) {
     console.error("Delete stage error:", err);
-    alert("단계 삭제 중 오류가 발생했습니다.");
+    showToast('error', "단계 삭제 중 오류가 발생했습니다.");
   }
 }
 
@@ -243,7 +244,7 @@ async function handleAddDept(name) {
     closeModal();
   } catch (err) {
     console.error("Add dept error:", err);
-    alert("부서 추가 중 오류가 발생했습니다.");
+    showToast('error', "부서 추가 중 오류가 발생했습니다.");
   }
 }
 
@@ -261,7 +262,7 @@ async function handleDeleteDept(deptId) {
     render();
   } catch (err) {
     console.error("Delete dept error:", err);
-    alert("부서 삭제 중 오류가 발생했습니다.");
+    showToast('error', "부서 삭제 중 오류가 발생했습니다.");
   }
 }
 
@@ -348,7 +349,7 @@ function handleDrop(e) {
 
   reorderTemplateItems(reorderPayload).catch(err => {
     console.error("Reorder error:", err);
-    alert("순서 변경 중 오류가 발생했습니다.");
+    showToast('error', "순서 변경 중 오류가 발생했습니다.");
   });
 
   dragState = { draggedId: null, overId: null };
