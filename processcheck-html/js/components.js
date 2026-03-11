@@ -274,7 +274,7 @@ export function renderNav(container) {
           ${notifications.length === 0
             ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">알림이 없습니다</span></div>`
             : notifications.map(n => `
-              <div class="notif-item${n.read ? "" : " unread"}" data-notif-id="${n.id}" data-notif-link="${n.link || ""}">
+              <div class="notif-item${n.read ? "" : " unread"}" data-notif-id="${escapeHtml(n.id)}" data-notif-link="${escapeHtml(n.link || "")}">
                 <div class="notif-item-title">${escapeHtml(n.title)}</div>
                 <div class="notif-item-message">${escapeHtml(n.message)}</div>
                 <div class="notif-item-time">${timeAgo(n.createdAt)}</div>
