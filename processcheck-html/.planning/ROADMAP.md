@@ -1,11 +1,9 @@
-# Roadmap: ProcessCheck Production Readiness
+# Roadmap: ProcessCheck
 
 ## Overview
 
-ProcessCheck is a working, feature-complete app that needs hardening before real users can trust
-it. This milestone delivers the app in production-safe state: locked-down Firestore rules, fixed
-data corruption bugs, a complete approval pipeline, working file uploads, and a polished UX.
-Phases are ordered security-first — each phase leaves the app in a deployable state.
+**v1.0 (Phases 1-6):** Production readiness — security, stability, workflow, file upload, UX polish, advanced workflow.
+**v2.0 (Phases 7-10):** UX/UI 대규모 개선 — 경쟁사 분석 기반 26개 기능. Foundation CSS → inline actions → power user → advanced DnD/bulk.
 
 ## Phases
 
@@ -98,15 +96,75 @@ Plans:
   5. Printing a project detail page produces a clean layout with navigation and action buttons hidden
 **Plans**: TBD
 
+### Phase 7: Foundation — CSS + Toast + Skeleton
+**Goal**: Visual foundation for all v2.0 features — semantic CSS tokens, toast system, skeleton loading, battery-bar, and view transition animations
+**Depends on**: Phase 1 (security baseline)
+**Requirements**: VIS-01, VIS-02, VIS-03, VIS-04, VIS-05, VIS-06, UXA-04
+**Success Criteria** (what must be TRUE):
+  1. All `alert()` calls are replaced with Notyf toast notifications (success/error/warning)
+  2. Every data-loading page shows skeleton placeholders before content renders
+  3. Project progress is displayed as a battery-bar instead of a percentage number
+  4. List items reveal action buttons only on hover (hidden by default)
+  5. CSS uses semantic tokens (`--bg-surface`, `--text-primary`) and both light/dark themes render correctly
+  6. View/tab switching has a visible fade or slide animation
+  7. Status colors follow a consistent 3-color system (green/yellow/red) across all pages
+**Plans**: TBD
+
+### Phase 8: Inline Actions + Navigation
+**Goal**: Users can take actions directly from lists without page navigation — inline status change, inline approval, slide-over preview, and improved navigation links
+**Depends on**: Phase 7 (toast system required for feedback)
+**Requirements**: UXA-01, UXA-02, UXA-03, UXA-05, UXA-06, INF-01
+**Success Criteria** (what must be TRUE):
+  1. Opening a project detail page auto-scrolls the checklist to the current active phase
+  2. Clicking approve/reject in the dashboard approval tab processes the action without navigating away
+  3. All notification links navigate to the correct task detail page (zero 404s)
+  4. Clicking a task in a list opens a slide-over panel showing task details without leaving the page
+  5. Task status can be changed via inline dropdown in any checklist view
+  6. Project table has a D-Day column sortable by deadline proximity
+**Plans**: TBD
+
+### Phase 9: Power User + Information Architecture
+**Goal**: Power users can find anything instantly with Cmd+K, filter with pills, persist view preferences, and access a dedicated approval page
+**Depends on**: Phase 8 (inline patterns established)
+**Requirements**: PWR-01, PWR-02, PWR-03, INF-02, INF-03, INF-04, INF-05
+**Success Criteria** (what must be TRUE):
+  1. Pressing Cmd+K (Mac) or Ctrl+K (Win) opens a command palette that searches projects, tasks, and pages
+  2. Active filters are shown as removable pill tags above the list
+  3. View mode, sort order, and filter selections persist across page reloads via localStorage
+  4. Low-frequency views are collapsed or hidden behind a "더보기" toggle
+  5. Dashboard links directly to report/analytics pages
+  6. Sales dashboard is accessible from the main navigation bar
+  7. A dedicated approval page lists all pending items for observers
+**Plans**: TBD
+
+### Phase 10: Advanced — Bulk + Heatmap + DnD
+**Goal**: Complete the UX transformation with bulk operations, workload visualization, real data in charts, and drag-and-drop kanban
+**Depends on**: Phase 9 (filter/inline patterns needed)
+**Requirements**: PWR-04, PWR-05, INF-06, INF-07, DND-01, DND-02, DND-03
+**Success Criteria** (what must be TRUE):
+  1. Users can select multiple checklist items and change status or assignee in one bulk action
+  2. A department × phase heatmap visualizes workload distribution in the bottleneck tab
+  3. Gantt chart renders actual project start/end dates and task progress from Firestore
+  4. Activity history shows real Firestore notification/change data instead of placeholder content
+  5. Kanban view supports drag-and-drop to change task status (SortableJS)
+  6. Kanban has department swimlanes separating cards by team
+  7. Urgent (red) items are pinned to the top of kanban columns
+**Plans**: TBD
+
 ## Progress
 
-**Execution Order:** 1 → 2 → 3 → 4 → 5 → 6
+**v1.0 Execution Order:** 1 → 2 → 3 → 4 → 5 → 6
+**v2.0 Execution Order:** 7 → 8 → 9 → 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 3/3 | Complete   | 2026-03-11 |
+| 1. Security Hardening | 3/3 | Complete | 2026-03-11 |
 | 2. Stability & Data Integrity | 0/TBD | Not started | - |
 | 3. Core Flow Pipeline | 0/TBD | Not started | - |
 | 4. File Upload | 0/TBD | Not started | - |
 | 5. UX Polish | 0/TBD | Not started | - |
 | 6. Advanced Workflow | 0/TBD | Not started | - |
+| 7. Foundation CSS + Toast + Skeleton | 0/TBD | Not started | - |
+| 8. Inline Actions + Navigation | 0/TBD | Not started | - |
+| 9. Power User + Info Architecture | 0/TBD | Not started | - |
+| 10. Advanced — Bulk + Heatmap + DnD | 0/TBD | Not started | - |

@@ -89,23 +89,60 @@ Requirements for production-ready release. Each maps to roadmap phases.
 - [ ] **FLOW-05**: 프로젝트 상세 체크리스트에서 벌크 작업 배정이 가능하다 (체크박스 선택 → 담당자 지정)
 - [ ] **FLOW-06**: 프로젝트 인쇄용 뷰가 제공된다 (네비/버튼 숨김, 깔끔한 레이아웃)
 
-## v2 Requirements
+## v2 Requirements: UX/UI 대규모 개선
 
-Deferred to future release. Tracked but not in current roadmap.
+경쟁사 분석(Linear, Notion, Monday.com, Arena PLM, Jira, ClickUp) 기반 26개 기능.
 
-### Advanced Workflow
+### 즉시 체감 UX (A)
 
-- **ADV-01**: 태스크 간 의존성 설정 (A 완료 전 B 시작 불가)
-- **ADV-02**: 마감일 N일 전 자동 알림 (Cloud Functions 필요)
-- **ADV-03**: 프로젝트 복사 기능 ("프로젝트 X에서 복사")
-- **ADV-04**: 변경요청 상태 이력 타임라인 (statusHistory 배열)
-- **ADV-05**: 프로젝트 체크리스트 내 항목 드래그 순서 변경
+- [ ] **UXA-01**: 프로젝트 상세에서 체크리스트 탭이 현재 Phase에 맞게 자동으로 열린다
+- [ ] **UXA-02**: 대시보드 승인 대기 탭에서 인라인 승인/반려 버튼으로 페이지 이동 없이 처리한다
+- [ ] **UXA-03**: 알림 클릭 시 해당 작업 상세 페이지로 정확히 이동한다 (현재 일부 404)
+- [ ] **UXA-04**: 모든 성공/실패/경고 피드백이 토스트 알림으로 표시된다 (alert() 완전 제거, Notyf 사용)
+- [ ] **UXA-05**: 프로젝트/작업 목록에서 항목 클릭 시 슬라이드 오버 패널로 미리보기한다 (전체 페이지 이동 없이)
+- [ ] **UXA-06**: 체크리스트에서 작업 상태를 인라인 드롭다운으로 직접 변경한다 (모달/페이지 이동 없이)
 
-### Performance
+### 시각적 품질 (B)
 
-- **PERF-01**: Firestore 복합 인덱스 최적화 (부서+상태+마감일)
-- **PERF-02**: 매트릭스 뷰 셀 데이터 메모이제이션
-- **PERF-03**: 알림/활동 로그 90일 이후 아카이브
+- [ ] **VIS-01**: 프로젝트 진행률이 Battery-bar(배터리 막대)로 시각화된다 (숫자% 대신)
+- [ ] **VIS-02**: 상태 색상이 3색 시스템(green/yellow/red)으로 통일된다 (현재 불일치 해소)
+- [ ] **VIS-03**: 데이터 로딩 중 스켈레톤 플레이스홀더가 표시된다 (빈 화면/스피너 대신)
+- [ ] **VIS-04**: 목록 항목에 마우스 오버 시 액션 버튼이 나타난다 (항상 표시 대신)
+- [ ] **VIS-05**: CSS 디자인 토큰이 semantic 변수로 정리된다 (--bg-surface, --text-primary 등)
+- [ ] **VIS-06**: 뷰/탭 전환 시 fade/slide 애니메이션이 적용된다
+
+### 파워유저 생산성 (C)
+
+- [ ] **PWR-01**: Cmd+K(Mac)/Ctrl+K(Win) 단축키로 명령 팔레트를 열어 프로젝트/작업/페이지를 검색·이동한다 (ninja-keys)
+- [ ] **PWR-02**: 목록 필터가 pill(태그) 형태로 표시되며 클릭으로 토글/제거한다
+- [ ] **PWR-03**: 뷰 모드, 정렬, 필터 상태가 localStorage에 저장되어 다음 방문 시 복원된다
+- [ ] **PWR-04**: 체크리스트에서 여러 항목을 선택하여 일괄 상태 변경/담당자 배정한다
+- [ ] **PWR-05**: 부서×Phase 워크로드 히트맵이 프로젝트 병목 탭에 표시된다 (CSS grid 기반)
+
+### 정보 구조 (D)
+
+- [ ] **INF-01**: 프로젝트 목록 테이블에 D-Day 컬럼이 추가되어 마감 임박 순 정렬 가능하다
+- [ ] **INF-02**: 프로젝트 목록 뷰가 핵심 위주로 정리된다 (사용 빈도 낮은 뷰 축소/접기)
+- [ ] **INF-03**: 대시보드에서 리포트/분석 페이지로 직접 연결 링크가 제공된다
+- [ ] **INF-04**: Sales 대시보드가 메인 네비게이션에 통합된다 (별도 사이트 링크 대신)
+- [ ] **INF-05**: 승인 대기 항목만 모아보는 전용 페이지가 제공된다 (observer용)
+- [ ] **INF-06**: 간트 차트가 실제 Firestore 데이터(시작일/종료일/진행률)로 렌더링된다
+- [ ] **INF-07**: 활동 히스토리가 실제 Firestore 데이터(알림/변경 로그)로 렌더링된다
+
+### 칸반 DnD (E)
+
+- [ ] **DND-01**: 칸반 뷰에서 카드를 드래그앤드롭으로 상태 변경한다 (SortableJS)
+- [ ] **DND-02**: 칸반 뷰에 부서별 스윔레인(가로 구분선)이 표시된다
+- [ ] **DND-03**: 긴급(red) 항목이 칸반 상단에 고정 레인으로 표시된다
+
+### Deferred (v3+)
+
+- **ADV-01**: 태스크 간 의존성 설정
+- **ADV-02**: 마감일 N일 전 자동 알림 (Cloud Functions)
+- **ADV-03**: 프로젝트 복사
+- **PERF-01**: Firestore 복합 인덱스 최적화
+- **PERF-02**: 매트릭스 뷰 메모이제이션
+- **PERF-03**: 알림 90일 아카이브
 
 ## Out of Scope
 
@@ -172,13 +209,26 @@ Deferred to future release. Tracked but not in current roadmap.
 | FLOW-05 | Phase 6 | Pending |
 | FLOW-06 | Phase 6 | Pending |
 
-**Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 46
-- Unmapped: 0
+**v1 Coverage:**
+- v1 requirements: 46 total → Mapped to phases 1-6: 46, Unmapped: 0
+- Note: FLOW-01 and SYNC-04 are identical ("승인 불가 시 이유 명확히 표시") — single implementation in Phase 3
 
-**Note:** FLOW-01 and SYNC-04 are identical requirements ("승인 불가 시 이유 명확히 표시"). Both are assigned to Phase 3 and will be implemented as a single feature.
+**v2 Coverage:**
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VIS-01 ~ VIS-06 | Phase 7 | Pending |
+| UXA-04 | Phase 7 | Pending |
+| UXA-01, UXA-02, UXA-03, UXA-05, UXA-06 | Phase 8 | Pending |
+| INF-01 | Phase 8 | Pending |
+| PWR-01, PWR-02, PWR-03 | Phase 9 | Pending |
+| INF-02, INF-03, INF-04, INF-05 | Phase 9 | Pending |
+| PWR-04, PWR-05 | Phase 10 | Pending |
+| INF-06, INF-07 | Phase 10 | Pending |
+| DND-01, DND-02, DND-03 | Phase 10 | Pending |
+
+- v2 requirements: 26 total → Mapped to phases 7-10: 26, Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-12*
-*Last updated: 2026-03-12 — traceability complete, all 46 requirements mapped*
+*Last updated: 2026-03-12 — v2.0 requirements added (26 features across 4 phases)*
