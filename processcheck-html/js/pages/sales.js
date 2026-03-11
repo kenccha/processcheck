@@ -252,14 +252,14 @@ function renderItemRow(item, opts = {}) {
   const showCheckbox = opts.showCheckbox === true;
   const isOverdue = item.status !== "completed" && item.dueDate && daysUntil(item.dueDate) !== null && daysUntil(item.dueDate) < 0;
   return `
-    <tr${isOverdue ? ' style="background:rgba(239,68,68,0.06);"' : ""}>
+    <tr${isOverdue ? ' style="background:rgba(239,68,68,0.06);"' : ""} class="cursor-pointer row-hover" data-navigate-project="${item.projectId}">
       ${showCheckbox ? `<td style="width:32px;"><input type="checkbox" class="bulk-check" data-item-id="${item.id}" ${selectedItems.has(item.id) ? "checked" : ""} ${item.status === "completed" ? "disabled" : ""}></td>` : ""}
       <td><code class="text-sm">${escapeHtml(item.code || "")}</code></td>
       <td>
         ${escapeHtml(item.title)}
         ${item.isRequired ? '<span class="badge badge-danger" style="margin-left:4px;font-size:10px;">필수</span>' : ""}
       </td>
-      ${showProject ? `<td class="text-sm">${escapeHtml(getProjectName(item.projectId))}</td>` : ""}
+      ${showProject ? `<td class="text-sm"><a href="project.html?id=${item.projectId}" style="color:var(--primary-400);text-decoration:none;" title="프로젝트 상세 보기">${escapeHtml(getProjectName(item.projectId))}</a></td>` : ""}
       ${showCategory ? `<td class="text-sm">${getCategoryBadge(item.category)}</td>` : ""}
       <td class="text-sm">${escapeHtml(item.assignee || item.department || "")}</td>
       <td>${getStatusBadge(item.status)}</td>
@@ -615,7 +615,7 @@ function renderReadinessView(filtered) {
           </tbody>
         </table>
       </div>
-      <div style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--surface-3); display: flex; gap: 1rem; font-size: 0.75rem; color: var(--slate-500);">
+      <div style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--surface-3); display: flex; gap: 1rem; font-size: 0.75rem; color: var(--slate-300);">
         <span><span class="sales-rag-dot rag-green" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> 80%+</span>
         <span><span class="sales-rag-dot rag-amber" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> 50-79%</span>
         <span><span class="sales-rag-dot rag-red" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> <50% 또는 초과</span>
@@ -644,7 +644,7 @@ function render() {
           </div>
         </div>
         <div class="card" style="padding: 3rem; text-align: center;">
-          <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--slate-600); margin: 0 auto 1rem;">
+          <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--slate-400); margin: 0 auto 1rem;">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
           <h2 class="text-lg font-semibold mb-2" style="color: var(--slate-300)">출시 준비 체크리스트가 없습니다</h2>
@@ -889,7 +889,7 @@ function renderProductCards(filtered) {
         <div style="padding:1.25rem;">
           <div class="flex items-center justify-between mb-2">
             <div>
-              <strong style="color:var(--slate-100);font-size:1.05rem;">${escapeHtml(pName)}</strong>
+              <a href="project.html?id=${projectId}" class="project-link" style="color:var(--slate-100);font-size:1.05rem;font-weight:bold;text-decoration:none;" title="프로젝트 상세 보기" onclick="event.stopPropagation();">${escapeHtml(pName)}</a>
               ${proj && proj.currentStage ? `<span class="text-xs text-soft" style="margin-left:6px;">${escapeHtml(proj.currentStage)}</span>` : ""}
             </div>
             <span class="text-lg font-mono font-bold" style="color:var(--primary-400)">${pct}%</span>
@@ -1080,7 +1080,7 @@ function renderCategoryMatrix(filtered) {
                     const total = catItems.length;
                     if (total === 0) return `<td style="text-align:center;"><span class="text-soft">—</span></td>`;
                     const cellPct = Math.round((done / total) * 100);
-                    const color = cellPct >= 100 ? 'color:var(--success)' : cellPct >= 50 ? 'color:var(--primary-400)' : cellPct > 0 ? 'color:var(--warning)' : 'color:var(--slate-500)';
+                    const color = cellPct >= 100 ? 'color:var(--success)' : cellPct >= 50 ? 'color:var(--primary-400)' : cellPct > 0 ? 'color:var(--warning)' : 'color:var(--slate-300)';
                     return `<td style="text-align:center;${color};font-weight:500;">${done}/${total}</td>`;
                   }).join("")}
                 </tr>`;
@@ -1124,7 +1124,7 @@ function renderTimelineView(filtered) {
     { key: "thisWeek", label: "이번 주 (D-7 ~ D0)", icon: "⚠️", items: buckets.thisWeek, color: "var(--warning)", bg: "rgba(245,158,11,0.06)", alwaysOpen: true },
     { key: "nextWeek", label: "다음 주 (D1 ~ D7)", icon: "📅", items: buckets.nextWeek, color: "var(--primary-400)", bg: "rgba(6,182,212,0.06)", alwaysOpen: true },
     { key: "upcoming", label: "이후 (D8 ~ D30)", icon: "📋", items: buckets.upcoming, color: "var(--slate-400)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
-    { key: "later", label: "장기 (D31+)", icon: "📦", items: buckets.later, color: "var(--slate-500)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
+    { key: "later", label: "장기 (D31+)", icon: "📦", items: buckets.later, color: "var(--slate-300)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
   ];
 
   let html = `<div class="flex flex-col gap-4">`;
@@ -1154,7 +1154,7 @@ function renderTimelineView(filtered) {
         <div style="padding:0.75rem 1rem;background:transparent;border-bottom:1px solid var(--border);">
           <div class="flex items-center gap-2">
             <span>❓</span>
-            <strong style="color:var(--slate-500)">마감일 미설정</strong>
+            <strong style="color:var(--slate-300)">마감일 미설정</strong>
             <span class="badge badge-neutral" style="font-size:11px;">${buckets.noDueDate.length}건</span>
           </div>
         </div>
@@ -1401,10 +1401,19 @@ function bindEvents() {
     });
   });
 
+  // Table row click → navigate to project detail
+  app.querySelectorAll("tr[data-navigate-project]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("button") || e.target.closest("a") || e.target.closest("input")) return;
+      const pid = row.dataset.navigateProject;
+      if (pid) window.location.href = `project.html?id=${pid}`;
+    });
+  });
+
   // Product card expand/collapse
   app.querySelectorAll("[data-product-card]").forEach((card) => {
     card.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button") || e.target.closest("a")) return;
       const pid = card.dataset.productCard;
       if (expandedProducts.has(pid)) {
         expandedProducts.delete(pid);

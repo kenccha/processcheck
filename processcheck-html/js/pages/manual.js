@@ -308,7 +308,7 @@ function getContentHtml() {
   <div class="manual-flow">
     <span class="badge badge-neutral">대기 중</span> → <span class="badge badge-primary">진행 중</span> → <span class="badge badge-success">완료</span> → <span class="badge badge-warning">승인 대기</span> → <span class="badge badge-success">승인</span>
   </div>
-  <p style="text-align:center;margin-top:0.5rem;color:var(--slate-500)">반려 시: <span class="badge badge-danger">반려</span> → <span class="badge badge-primary">재작업(진행 중)</span></p>
+  <p style="text-align:center;margin-top:0.5rem;color:var(--slate-300)">반려 시: <span class="badge badge-danger">반려</span> → <span class="badge badge-primary">재작업(진행 중)</span></p>
 </section>
 
 <section id="task-complete" class="manual-section">
@@ -1043,7 +1043,7 @@ style.textContent = `
     padding: 0.5rem 0.75rem;
     background: var(--surface-2);
     font-size: 0.75rem;
-    color: var(--slate-500);
+    color: var(--slate-300);
     text-align: center;
   }
 
@@ -1057,12 +1057,12 @@ style.textContent = `
     border-radius: 0.5rem;
     padding: 1rem 1.25rem;
     margin: 0.75rem 0;
-    color: var(--slate-500);
+    color: var(--slate-300);
     font-size: 0.8125rem;
   }
 
   .manual-screenshot svg {
-    color: var(--slate-500);
+    color: var(--slate-300);
     flex-shrink: 0;
   }
 
@@ -1111,7 +1111,7 @@ style.textContent = `
     content: "▶";
     font-size: 0.625rem;
     transition: transform 0.2s ease;
-    color: var(--slate-500);
+    color: var(--slate-300);
   }
 
   .manual-faq-item[open] summary::before {

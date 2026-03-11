@@ -204,14 +204,30 @@ export function renderSimpleMarkdown(text) {
 // ─── Export Helpers ──────────────────────────────────────────────────────────
 
 export function exportToCSV(data, headers, filename = "export.csv") {
-  const headerRow = headers.map(h => h.label).join(",");
-  const rows = data.map(row =>
-    headers.map(h => {
-      let val = typeof h.key === "function" ? h.key(row) : (row[h.key] ?? "");
-      val = String(val).replace(/"/g, '""');
-      return `"${val}"`;
-    }).join(",")
-  );
+  // Support both formats:
+  // 1) headers = ["col1", "col2"], data = [["val1", "val2"], ...]  (simple arrays)
+  // 2) headers = [{label, key}, ...], data = [{field: val}, ...]   (object format)
+  const isSimple = headers.length > 0 && typeof headers[0] === "string";
+
+  let headerRow, rows;
+  if (isSimple) {
+    headerRow = headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(",");
+    rows = data.map(row =>
+      (Array.isArray(row) ? row : headers.map((_, i) => row[i] ?? ""))
+        .map(val => `"${String(val ?? "").replace(/"/g, '""')}"`)
+        .join(",")
+    );
+  } else {
+    headerRow = headers.map(h => `"${String(h.label).replace(/"/g, '""')}"`).join(",");
+    rows = data.map(row =>
+      headers.map(h => {
+        let val = typeof h.key === "function" ? h.key(row) : (row[h.key] ?? "");
+        val = String(val).replace(/"/g, '""');
+        return `"${val}"`;
+      }).join(",")
+    );
+  }
+
   const csv = [headerRow, ...rows].join("\n");
   const BOM = "\uFEFF";
   const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });

@@ -1233,6 +1233,32 @@ export async function fallbackLoadNotifications(userId) {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
+// ─── Dashboard Targeted Queries (fast: loads only needed subset) ──────────
+// Instead of loading all ~1,800 checklistItems, these load only what the
+// dashboard actually displays: active tasks + pending approvals (~200-300 docs).
+
+export async function loadDashboardActiveTasks(department = null) {
+  const q = query(
+    collection(db, "checklistItems"),
+    where("status", "in", ["pending", "in_progress"])
+  );
+  const snap = await getDocs(q);
+  let tasks = snap.docs.map(d => docToChecklistItem(d.id, d.data()));
+  if (department) tasks = tasks.filter(t => t.department === department);
+  return tasks;
+}
+
+export async function loadDashboardPendingApprovals(department = null) {
+  const q = query(
+    collection(db, "checklistItems"),
+    where("approvalStatus", "==", "pending")
+  );
+  const snap = await getDocs(q);
+  let tasks = snap.docs.map(d => docToChecklistItem(d.id, d.data()));
+  if (department) tasks = tasks.filter(t => t.department === department);
+  return tasks;
+}
+
 export async function createNotification(data) {
   await addDoc(collection(db, "notifications"), {
     ...data,

@@ -965,11 +965,11 @@ function renderMatrix(filtered) {
 
   // Get work circle color
   function getWorkColor(work) {
-    if (work.total === 0) return "var(--slate-600)";
+    if (work.total === 0) return "var(--slate-400)";
     if (work.delayed > 0) return "var(--danger-400)";
     if (work.completed === work.total) return "var(--success-400)";
     if (work.inProgress > 0) return "var(--primary-400)";
-    return "var(--slate-500)";
+    return "var(--slate-300)";
   }
 
   // Get gate circle info
@@ -978,7 +978,7 @@ function renderMatrix(filtered) {
       case "approved": return { symbol: "✓", color: "var(--success-400)", bg: "rgba(34,197,94,0.15)" };
       case "rejected": return { symbol: "✗", color: "var(--danger-400)", bg: "rgba(239,68,68,0.15)" };
       case "pending":  return { symbol: "⏳", color: "var(--warning-400)", bg: "rgba(245,158,11,0.15)" };
-      default:         return { symbol: "—", color: "var(--slate-600)", bg: "var(--surface-3)" };
+      default:         return { symbol: "—", color: "var(--slate-400)", bg: "var(--surface-3)" };
     }
   }
 
@@ -1009,12 +1009,12 @@ function renderMatrix(filtered) {
                     <!-- Work circle -->
                     <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
                       <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${hasWork ? "rgba(0,0,0,0.15)" : "var(--surface-3)"};border:2px solid ${workColor};font-size:0.6rem;color:${workColor};font-weight:700;font-family:'JetBrains Mono',monospace">${hasWork ? `${work.completed}/${work.total}` : "-"}</span>
-                      <span style="font-size:0.5rem;color:var(--slate-600)">작업</span>
+                      <span style="font-size:0.5rem;color:var(--slate-400)">작업</span>
                     </div>
                     <!-- Gate circle -->
                     <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
                       <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${gateInfo.bg};font-size:0.7rem;color:${gateInfo.color};font-weight:700">${gateInfo.symbol}</span>
-                      <span style="font-size:0.5rem;color:var(--slate-600)">승인</span>
+                      <span style="font-size:0.5rem;color:var(--slate-400)">승인</span>
                     </div>
                   </div>
                 </td>`;

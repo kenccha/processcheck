@@ -66,12 +66,17 @@ export async function loginWithMicrosoft() {
     return { user: msUser, isNewUser: false };
   }
 
-  // New user: return auth info so login page can show role selection
-  return {
-    user: null,
-    isNewUser: true,
-    authInfo: { email, displayName },
-  };
+  // New user — auto-register as worker (admin will assign role/dept later)
+  const newUser = await createUser({
+    name: displayName,
+    email,
+    role: "worker",
+    department: "",
+    authProvider: "microsoft",
+  });
+  const msUser = { ...newUser, authProvider: "microsoft" };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
+  return { user: msUser, isNewUser: false };
 }
 
 // Complete registration for new Microsoft users

@@ -442,7 +442,7 @@ function render() {
           </h1>
           <p class="text-sm text-soft mt-1">
             프로젝트에 적용할 체크리스트 템플릿의 단계별, 부서별 항목을 관리합니다.
-            <span style="color: var(--slate-500); margin-left: 0.5rem; font-family: monospace; font-size: 0.75rem;">
+            <span style="color: var(--slate-300); margin-left: 0.5rem; font-family: monospace; font-size: 0.75rem;">
               총 ${allItems.length}개 항목
             </span>
           </p>
@@ -518,14 +518,14 @@ function renderTreeView(selectedStage, selectedDept) {
                         <span class="text-sm font-medium truncate" style="color: ${stage.id === selectedStageId ? "var(--primary-300)" : "var(--slate-300)"};">
                           ${escapeHtml(stage.name)}
                         </span>
-                        ${cellCount > 0 ? `<span style="font-size: 0.625rem; font-family: monospace; color: var(--slate-500); background: var(--surface-3); padding: 0.0625rem 0.375rem; border-radius: 0.25rem;">${cellCount}</span>` : ""}
+                        ${cellCount > 0 ? `<span style="font-size: 0.625rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.0625rem 0.375rem; border-radius: 0.25rem;">${cellCount}</span>` : ""}
                       </div>
                       <div class="text-xs text-dim" style="margin-top: 0.125rem;">
                         ${escapeHtml(stage.workStageName || "")} / ${escapeHtml(stage.gateStageName || "")}
                       </div>
                     </div>
                     <button class="btn-ghost btn-xs stage-delete-btn" data-stage-delete-id="${stage.id}" title="단계 삭제"
-                            style="padding: 0.25rem; color: var(--slate-600); flex-shrink: 0;">
+                            style="padding: 0.25rem; color: var(--slate-400); flex-shrink: 0;">
                       ${ICON_DELETE}
                     </button>
                   </div>
@@ -668,7 +668,7 @@ function renderMatrixView() {
       } else {
         return `
           <td style="text-align: center; padding: 0.75rem; border-bottom: 1px solid var(--surface-3);">
-            <span style="color: var(--slate-600); font-size: 0.875rem;">&mdash;</span>
+            <span style="color: var(--slate-400); font-size: 0.875rem;">&mdash;</span>
           </td>
         `;
       }
@@ -679,7 +679,7 @@ function renderMatrixView() {
         <td style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--surface-3); position: sticky; left: 0; z-index: 1; ${bgStyle}">
           <div>
             <span style="font-weight: 500; color: var(--slate-200); font-size: 0.875rem;">${escapeHtml(stage.name)}</span>
-            <span style="font-size: 0.625rem; color: var(--slate-500); font-family: monospace; margin-left: 0.5rem;">
+            <span style="font-size: 0.625rem; color: var(--slate-300); font-family: monospace; margin-left: 0.5rem;">
               ${escapeHtml(stage.workStageName || "")}/${escapeHtml(stage.gateStageName || "")}
             </span>
           </div>
@@ -687,7 +687,7 @@ function renderMatrixView() {
         ${cells}
         <td style="text-align: center; padding: 0.75rem; border-bottom: 1px solid var(--surface-3);">
           <span style="font-family: monospace; font-size: 0.875rem; font-weight: 600;
-                       color: ${rowTotal > 0 ? "var(--slate-300)" : "var(--slate-600)"};">${rowTotal}</span>
+                       color: ${rowTotal > 0 ? "var(--slate-300)" : "var(--slate-400)"};">${rowTotal}</span>
         </td>
       </tr>
     `;
@@ -699,7 +699,7 @@ function renderMatrixView() {
     return `
       <td style="text-align: center; padding: 0.75rem;">
         <span style="font-family: monospace; font-size: 0.875rem; font-weight: 600;
-                     color: ${colTotal > 0 ? "var(--slate-300)" : "var(--slate-600)"};">${colTotal}</span>
+                     color: ${colTotal > 0 ? "var(--slate-300)" : "var(--slate-400)"};">${colTotal}</span>
       </td>
     `;
   }).join("");
@@ -738,7 +738,7 @@ function renderMatrixView() {
           </tbody>
         </table>
       </div>
-      <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--surface-3); display: flex; align-items: center; gap: 1rem; font-size: 0.75rem; color: var(--slate-500);">
+      <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--surface-3); display: flex; align-items: center; gap: 1rem; font-size: 0.75rem; color: var(--slate-300);">
         <span style="display: flex; align-items: center; gap: 0.375rem;">
           <span style="display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 0.25rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.3);"></span>
           클릭하면 트리 뷰에서 편집
@@ -768,8 +768,8 @@ function renderListView() {
   ).join("");
 
   const listRows = filteredItems.length === 0
-    ? `<div style="text-align: center; padding: 4rem 1rem; color: var(--slate-500);">
-        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 0.75rem; color: var(--slate-600);">
+    ? `<div style="text-align: center; padding: 4rem 1rem; color: var(--slate-300);">
+        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 0.75rem; color: var(--slate-400);">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
         </svg>
         <span>검색 결과가 없습니다.</span>
@@ -780,10 +780,10 @@ function renderListView() {
           <div style="flex: 1; min-width: 0;">
             <p style="color: var(--slate-200); font-size: 0.875rem; line-height: 1.6;">${escapeHtml(item.content)}</p>
             <div class="flex items-center gap-2" style="margin-top: 0.375rem;">
-              <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-500); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
+              <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
                 ${escapeHtml(getStageName(item.stageId))}
               </span>
-              <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-500); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
+              <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
                 ${escapeHtml(getDeptName(item.departmentId))}
               </span>
               <span class="${item.isRequired ? "badge-danger" : "badge-neutral"}"
@@ -805,7 +805,7 @@ function renderListView() {
       <!-- Search & Filter Bar -->
       <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--surface-3); display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
         <div style="flex: 1; min-width: 200px; position: relative;">
-          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--slate-500); display: flex;">
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--slate-300); display: flex;">
             ${ICON_SEARCH}
           </span>
           <input type="text" id="list-search-input" class="input-field" placeholder="항목 검색..."
@@ -820,7 +820,7 @@ function renderListView() {
           <option value="all" ${listFilterDept === "all" ? "selected" : ""}>모든 부서</option>
           ${deptOptions}
         </select>
-        <span style="font-size: 0.75rem; font-family: monospace; color: var(--slate-500);">
+        <span style="font-size: 0.75rem; font-family: monospace; color: var(--slate-300);">
           ${filteredItems.length}/${allItems.length}
         </span>
       </div>
@@ -1135,8 +1135,8 @@ function renderListContent() {
   // Just re-render the whole list area since the filter bar stays
   if (filteredItems.length === 0) {
     container.innerHTML = `
-      <div style="text-align: center; padding: 4rem 1rem; color: var(--slate-500);">
-        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 0.75rem; color: var(--slate-600);">
+      <div style="text-align: center; padding: 4rem 1rem; color: var(--slate-300);">
+        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 0.75rem; color: var(--slate-400);">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
         </svg>
         <span>검색 결과가 없습니다.</span>
@@ -1149,10 +1149,10 @@ function renderListContent() {
         <div style="flex: 1; min-width: 0;">
           <p style="color: var(--slate-200); font-size: 0.875rem; line-height: 1.6;">${escapeHtml(item.content)}</p>
           <div class="flex items-center gap-2" style="margin-top: 0.375rem;">
-            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-500); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
+            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
               ${escapeHtml(getStageName(item.stageId))}
             </span>
-            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-500); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
+            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
               ${escapeHtml(getDeptName(item.departmentId))}
             </span>
             <span class="${item.isRequired ? "badge-danger" : "badge-neutral"}"

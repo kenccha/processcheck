@@ -164,12 +164,9 @@ function canApprove() {
   if (!task || task.status !== "completed" || (task.approvalStatus && task.approvalStatus !== "pending")) {
     return false;
   }
-  // gate stage → observer(기획조정실)만 승인
-  if (isGateStage(task.stage)) {
-    return user.role === "observer";
-  }
-  // work stage → manager만 승인
-  return user.role === "manager";
+  // 모든 승인은 기획조정실(observer)만 수행
+  // 매니저는 작업 배분만 담당
+  return user.role === "observer";
 }
 
 function canRestart() {
@@ -230,9 +227,9 @@ function render() {
       <!-- Breadcrumb -->
       <nav class="flex items-center gap-2 text-sm text-soft mb-6" style="margin-top:0.5rem">
         <a href="dashboard.html" style="color:var(--slate-400);text-decoration:none">프로젝트</a>
-        <span style="color:var(--slate-600)">${ICONS.chevronRight}</span>
+        <span style="color:var(--slate-400)">${ICONS.chevronRight}</span>
         <a href="project.html?id=${escapeHtml(projectId)}" style="color:var(--slate-400);text-decoration:none">${escapeHtml(project.name)}</a>
-        <span style="color:var(--slate-600)">${ICONS.chevronRight}</span>
+        <span style="color:var(--slate-400)">${ICONS.chevronRight}</span>
         <span style="color:var(--slate-300)">작업 상세</span>
       </nav>
 
@@ -299,7 +296,7 @@ function render() {
                   <div class="checkbox-custom${item.checked ? " checked" : ""}" data-checklist-toggle="${idx}">
                     ${item.checked ? ICONS.check : ""}
                   </div>
-                  <span class="text-sm${item.checked ? "" : ""}" style="color:${item.checked ? "var(--slate-500)" : "var(--slate-200)"};${item.checked ? "text-decoration:line-through" : ""};flex:1">${escapeHtml(item.content)}</span>
+                  <span class="text-sm${item.checked ? "" : ""}" style="color:${item.checked ? "var(--slate-300)" : "var(--slate-200)"};${item.checked ? "text-decoration:line-through" : ""};flex:1">${escapeHtml(item.content)}</span>
                   ${item.required ? `<span class="text-xs" style="color:var(--danger-400);font-weight:500">필수</span>` : `<span class="text-xs text-dim">선택</span>`}
                 </div>
               `).join("")}
@@ -317,7 +314,7 @@ function render() {
             <h2 class="section-title mb-4">첨부 파일</h2>
             <div id="file-upload-area" style="border:2px dashed var(--surface-4);border-radius:var(--radius-xl);padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.2s">
               <input type="file" id="file-input" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
-              <div style="color:var(--slate-500);margin-bottom:0.5rem">${ICONS.upload}</div>
+              <div style="color:var(--slate-300);margin-bottom:0.5rem">${ICONS.upload}</div>
               <p class="text-sm text-soft">파일을 드래그하거나 클릭하여 업로드</p>
               <p class="text-xs text-dim mt-1">PDF, DOC, XLS, 이미지 등 (최대 10MB)</p>
             </div>
@@ -425,7 +422,7 @@ function renderComments() {
           <span class="comment-time">${timeAgo(c.createdAt)}</span>
         </div>
         <div class="comment-text">${parseMentions(c.content || "", allUsers.map(u => u.name))}</div>
-        ${c.editedAt ? '<div class="text-xs" style="color:var(--slate-500);margin-top:2px">(수정됨)</div>' : ''}
+        ${c.editedAt ? '<div class="text-xs" style="color:var(--slate-300);margin-top:2px">(수정됨)</div>' : ''}
         ${c.userId === user.id ? `
           <div class="flex gap-2 mt-1">
             <button class="btn-ghost btn-xs" data-edit-comment="${c.id}">수정</button>
@@ -514,7 +511,7 @@ function renderActionSection() {
 
   // View only
   return `
-    <div class="flex items-center justify-center gap-2 p-4" style="color:var(--slate-500)">
+    <div class="flex items-center justify-center gap-2 p-4" style="color:var(--slate-300)">
       ${ICONS.eye}
       <span class="text-sm font-semibold">조회 전용</span>
     </div>
@@ -572,7 +569,7 @@ function renderTimeline() {
 
     const textColor = ev.active || ev.completed
       ? (ev.isDanger ? "var(--danger-400)" : "var(--slate-200)")
-      : "var(--slate-600)";
+      : "var(--slate-400)";
 
     const dateStr = ev.date ? formatDate(ev.date) : "";
 
@@ -581,7 +578,7 @@ function renderTimeline() {
         <div class="${dotClass}" ${ev.isDanger && ev.active ? 'style="border-color:var(--danger-500);background:var(--danger-500)"' : ""}></div>
         <div>
           <div class="text-sm" style="color:${textColor}">${escapeHtml(ev.label)}</div>
-          ${dateStr ? `<div class="text-xs" style="color:var(--slate-500);margin-top:0.125rem">${dateStr}</div>` : ""}
+          ${dateStr ? `<div class="text-xs" style="color:var(--slate-300);margin-top:0.125rem">${dateStr}</div>` : ""}
         </div>
       </div>
     `;

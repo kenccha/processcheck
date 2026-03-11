@@ -63,19 +63,9 @@ const BASE_NAV_LINKS = [
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`,
   },
   {
-    href: "reports.html",
-    label: "보고서",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>`,
-  },
-  {
     href: "admin-checklists.html",
     label: "체크리스트",
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
-  },
-  {
-    href: "activity.html",
-    label: "활동 로그",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
   },
   {
     href: "docs/deliverables/wireframes.html",
@@ -91,7 +81,7 @@ const BASE_NAV_LINKS = [
   },
   {
     href: "#",
-    label: "관련 서비스",
+    label: "다른 사이트",
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
     isSeparated: true,
     children: [
@@ -108,10 +98,13 @@ const ADMIN_USER_LINK = {
 };
 
 function getNavLinks(userRole) {
-  const links = [...BASE_NAV_LINKS];
+  const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
+  // Add 사용자 관리 to 리뷰 dropdown for observer
   if (userRole === "observer") {
-    // Insert before 매뉴얼 (last item)
-    links.splice(links.length - 1, 0, ADMIN_USER_LINK);
+    const reviewMenu = links.find((l) => l.label === "리뷰");
+    if (reviewMenu && reviewMenu.children) {
+      reviewMenu.children.push({ href: "admin-users.html", label: "사용자 관리" });
+    }
   }
   return links;
 }

@@ -98,42 +98,29 @@ docs/
 - Firestore timestamps are converted to JS Dates via helper functions in `firestoreService.ts`
 - Database auto-seeds on first load via `seedDatabaseIfEmpty()`
 
-### Login Design (확정)
+### Login Design (확정 — 2026-03-11 간소화)
 - **2가지 로그인 방식 공존**:
   1. **데모 카드 로그인**: 3개의 샘플 사용자 카드 버튼 (기존)
-     - 김철수 (실무자/worker) — 개발팀
-     - 이영희 (매니저/manager) — 개발팀
-     - 박민수 (기획조정실/observer) — 경영관리팀
-     - 카드 클릭 → 즉시 해당 역할로 로그인 → 대시보드 이동
   2. **Microsoft OAuth 로그인**: Firebase Auth 연동
-     - "또는" 구분선 아래 "Microsoft 계정으로 로그인" 버튼
-     - `OAuthProvider("microsoft.com")` + `signInWithPopup` 사용
      - 기존 사용자: 이메일로 Firestore 조회 → 바로 대시보드
-     - 신규 사용자: 역할(실무자/매니저/기획조정실) + 부서(10개) 선택 화면 → Firestore 등록
-     - `authProvider: "microsoft"` 필드로 데모 사용자와 구분
-- DB 시딩 중에는 스피너 표시, 완료 후 카드+버튼 노출
+     - **신규 사용자: 역할/부서 선택 없이 바로 등록** (worker, 부서 미지정) → 대시보드 이동
+     - 관리자(admin-users.html)가 나중에 역할/부서 수정
+- **자동 시딩 비활성화**: 실제 데이터 사용
 - `logout()` 시 Firebase Auth `signOut()`도 함께 호출
 
-### Dashboard Design (확정)
-- **혼합 레이아웃 (탭 + 컴팩트)**: 세로 나열 → 탭 UI로 개선
-- **탭 네비게이션**: 작업 대기 / 승인 대기 / 프로젝트를 탭으로 통합 (한 번에 하나만 표시)
-  - 각 탭에 건수 뱃지: `작업 대기 (5)`, `승인 대기 (2)`, `프로젝트 (3)`
-  - 각 탭 최대 5개 표시 + "더 보기" 토글 (접기/펼치기)
-- **통계 카드 4개 클릭 가능**: 작업/승인/프로젝트 카드 → 해당 탭으로 자동 전환, 알림 → 스크롤
-  - 서브텍스트: 작업("마감 초과 N건"), 승인("최대 N일 대기"), 프로젝트("지연 N건")
-  - 활성 탭과 연동된 카드에 하이라이트 보더 표시
-- **차트 섹션 접기/펼치기**: 기본 접힌 상태, `localStorage('pc-dash-charts-open')`로 상태 유지
-  - Chart.js 3종: 부서별 진행률(바), Phase별 완료율(도넛), 주간 완료 추이(라인)
-- **알림 패널**: sticky + max-height 60vh + 내부 스크롤 (`.dash-notif-scroll`)
-- **환영 헤더**: 오늘 날짜+요일 표시 (`2026년 2월 26일 (목)`)
-- **마감 임박 하이라이트**: D-Day→주황 보더, D+N(초과)→빨간 보더
-- **프로젝트 행**: 현재 Phase 뱃지 표시 (예: "WM", "Tx")
-- **빈 상태 액션 버튼**: "프로젝트 목록 보기" 등 이동 버튼 포함
+### Dashboard Design (확정) — 프로젝트 중심 뷰
+- **프로젝트 중심**: 기본 탭이 "프로젝트" — 프로젝트 목록 D-Day + 지연 사유 표시
+- **탭 4개**: 프로젝트 / 작업 / 승인 대기 / 알림
+- **D-Day + 스케줄 지연 중심**: 진행률(%) 대신 D-Day 남은 일수와 지연 사유가 핵심 지표
+- **프로젝트 카드**: D-Day(큰 글씨) + 현재Phase 뱃지 + 지연 사유 1줄 요약
+- **긴급도 그룹핑**: 작업 탭에서 마감초과 → 오늘 → 이번주 → 이후 순 정렬, 이후 항목은 접힌 상태
+- **통계 카드 4개**: 프로젝트(지연 N건), 긴급(초과+오늘), 승인 대기, 알림
+- **알림 탭**: 최근 알림 타임라인 표시
 - **역할별 구독 분리**:
-  - 실무자: `subscribeChecklistItemsByAssignee` (자기 이름 기준, 마감 3일 이내)
+  - 실무자: `subscribeChecklistItemsByAssignee` (자기 이름 기준)
   - 매니저: `subscribeAllChecklistItems` → 자기 부서 필터
   - 기획조정실: `subscribeAllChecklistItems` (전체)
-- **알림 클릭 시 해당 페이지로 이동** (Next.js 라우트 → HTML 파일 라우트 자동 변환)
+- **모든 승인은 observer만**: 매니저는 작업 배분만 담당
 
 ### Checklist Admin Design (확정)
 - **3가지 뷰 모드**: 매트릭스(matrix), 트리(tree), 리스트(list) — 기본값 matrix
@@ -144,10 +131,10 @@ docs/
 
 ## Domain Model
 
-### User Roles (3 roles)
-- **실무자 (worker):** 실제 업무 담당자. 영업, 개발, 디자이너 등 다양한 직군이 실무자에 포함됨. 태스크 수행, 체크리스트 완료, 파일 업로드, 코멘트 작성.
-- **매니저 (manager):** 부서별 관리자. **work stage** 작업 승인/반려, 자기 부서 체크리스트 편집.
-- **기획조정실 (observer):** 전체 프로젝트 현황 모니터링, **gate stage** 작업 최종 승인, 스테이지/부서 추가·삭제, 모든 체크리스트 열람/편집.
+### User Roles (3 roles) — 확정 (2026-03-11 변경)
+- **실무자 (worker):** 실제 업무 담당자. 태스크 수행, 체크리스트 완료, 파일 업로드, 코멘트 작성.
+- **매니저 (manager):** 부서별 관리자. **작업 배분/재배분만** (승인 권한 없음). 자기 부서 체크리스트 편집.
+- **기획조정실 (observer):** 전체 프로젝트 현황 모니터링, **모든 승인** (work stage + gate stage 전부), 스테이지/부서 추가·삭제, 모든 체크리스트 열람/편집, 사용자 관리.
 
 ### Departments
 10 departments: 개발팀, 품질팀, 영업팀, 제조팀, 구매팀, CS팀, 경영관리팀, 글로벌임상팀, 디자인연구소, 인증팀
@@ -200,19 +187,12 @@ docs/
 - 프로젝트 상세 체크리스트 탭: 항목이 0개이면 "템플릿에서 체크리스트 생성" 버튼 표시
 - 시드 데이터: 각 프로젝트별 `applyTemplateToProject()` 호출 후 프로젝트 상태에 맞게 status 업데이트
 
-### 승인 2단계 구조 (확정)
-프로젝트에는 **두 가지 승인 유형**이 존재:
-
-1. **매니저 승인 (Task Approval)**: 부서 관리자(manager)가 **work stage** 작업을 승인/반려
-   - 대상 stage: 발의검토, 기획검토, WM제작, Tx단계, MasterGatePilot, 양산
-   - `checklistItems`의 `approvalStatus`, `approvedBy`, `approvedAt` 필드 사용
-
-2. **게이트 승인 (Gate/Committee Approval)**: 기획조정실(observer)이 **gate stage** 작업을 최종 승인
-   - 대상 stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관
-   - 해당 work stage의 모든 작업이 매니저 승인 완료 후 진행
-   - 동일한 `approvalStatus/approvedBy/approvedAt` 필드 사용
-
-**승인 권한 규칙 (코드)**: `GATE_STAGES` 배열(`utils.js`)로 판별. work stage → manager만, gate stage → observer만.
+### 승인 구조 (확정 — 2026-03-11 변경)
+- **모든 승인은 기획조정실(observer)만 수행** — 매니저는 승인 권한 없음
+- work stage + gate stage 구분 없이 observer가 전부 승인/반려
+- 매니저 주 역할: 작업 배분/재배분 (적합한 사람에게 작업 할당)
+- `checklistItems`의 `approvalStatus`, `approvedBy`, `approvedAt` 필드 사용
+- **승인 권한 규칙 (코드)**: `user.role === "observer"`만 승인 가능
 
 ### Task Detail Design (확정)
 - 타임라인에 각 이벤트별 날짜+행위자 표시
@@ -220,15 +200,26 @@ docs/
 - 반려 시 worker에게 "재작업 시작" 버튼 제공 (`restartTask()`)
 - `completeTask()` 시 `approvalStatus: "pending"` 자동 설정
 
-### Project Detail Design (확정)
-- **Stat 카드 5개 (클릭 가능)**: 전체작업, 진행중, 지연, 매니저승인대기, 위원회승인대기
-  - 클릭 → 체크리스트 탭 + 해당 필터 적용
-- **프로젝트 상태 요약 카드**: "단계별/부서별 진행 상황" 대신 요약 카드 1개
-  - 현재 phase + phase 진행 바 (✔완료/[현재]/미래)
-  - 마감일 + D-day
-  - 계획 대비 진행 상태 (정상/지연/심각)
-  - 병목: 어느 부서에서 막혀있는지
-- **"부서별 진행 상황" 없음** — 의미 없으므로 제거됨
+### Project Detail Design (확정 — 2026-03-11 재설계)
+- **3탭 구조**: `개요+작업 | 스케줄 | 병목` (기존 4탭에서 변경)
+  - 파일 탭, 설계변경 탭 **제거**
+  - 개요+체크리스트 **합침**
+- **프로젝트 헤더 (탭 위, 항상 표시)**:
+  - 제목 + Phase 뱃지 + D-Day (큰 글씨, 색상 강조) + PM/기간
+  - 지연 시 사유 1줄 요약 (빨강 배너): "품질팀 WM제작 미완료로 3일 지연"
+  - 정상 시 녹색 배너: "정상 진행"
+  - Phase 파이프라인 (✔완료/▶현재/미래)
+  - 우측: 전체작업/지연/승인대기 숫자
+- **개요+작업 탭 (2컬럼)**:
+  - 좌측: 체크리스트 (max-height + 스크롤)
+  - 우측: 최근 활동 타임라인 (sticky, 스크롤)
+  - 5가지 뷰: Phase/타임라인/부서/보드(칸반)/리스트
+  - Phase 뷰: 각 Phase 그룹 상단에 위원회 승인 배너 (색상 구분)
+  - 체크리스트 아이템: **단일 동그라미** (기존 2개 → 1개)
+  - 필터: 단계, 부서
+- **스케줄 탭**: 간트 차트 + Phase별 상세 테이블
+- **병목 탭**: Phase×부서 히트맵 + 파이프라인 다이어그램 + 지연 원인 상세
+- CSV/PDF 내보내기 유지
 
 ### Matrix View Design (확정)
 - **6개 phase 열** (발의, 기획, WM, Tx, MSG, 양산/이관)
@@ -320,22 +311,24 @@ docs/
 - ~~데모/실사용 데이터 미분리~~ → `isDemo: true` 플래그 + `filterDemo()` + 마이그레이션 함수로 완전 분리
 - ~~피드백 스크린샷 전체페이지~~ → 뷰포트 캡처로 변경 + 다중 스크린샷 축적 지원
 
-### Navigation Design (확정)
-- **로고 클릭 → 대시보드**: "대시보드" 탭 불필요, ProcessCheck 로고 클릭으로 이동
-- **네비 탭 순서**: 출시위원회 → 설계변경 → 체크리스트 → 리뷰(드롭다운) → | → 관련 서비스(드롭다운)
-- **리뷰 드롭다운**: 전체 화면 설계, 업무 흐름, 시스템 구조, 피드백 모아보기, **매뉴얼** (리뷰/문서 통합)
-- **관련 서비스 드롭다운**: 영업 출시 준비(외부↗), 고객 관리(외부↗) — 구분선(|)으로 시각적 분리, 새 탭에서 열림
-- **영업 출시 준비는 별도 사이트**: 같은 Firebase DB를 공유하지만 별도 홈페이지/페이지 구조로 분리 예정
-- `components.js`의 `NAV_LINKS`와 `deliverable-nav.js`의 `MAIN_NAV` 동기화 필수
+### Navigation Design (확정 — 2026-03-11 변경)
+- **로고 클릭 → 대시보드**: ProcessCheck 로고 클릭으로 이동
+- **네비 탭 순서**: 출시위원회 → 설계변경 → 체크리스트 → 리뷰(드롭다운) → | → 다른 사이트(드롭다운)
+- **리뷰 드롭다운**: 전체 화면 설계, 업무 흐름, 시스템 구조, 피드백 모아보기, 매뉴얼, **사용자 관리** (observer만)
+- **다른 사이트 드롭다운** (구 "관련 서비스"): 영업 출시 준비(외부↗), 고객 관리(외부↗) — 구분선(|)으로 시각적 분리
+- `components.js`의 `BASE_NAV_LINKS`와 `deliverable-nav.js`의 `MAIN_NAV` 동기화 필수
 
-### Demo/Real Data Separation Design (확정)
-- **2가지 사용자 타입**: 데모 카드 사용자 (`isDemo: true`) vs MS OAuth 사용자 (`isDemo: false`)
-- **데이터 분리**: 모든 시드 데이터에 `isDemo: true` 플래그 → `filterDemo()` 함수로 MS OAuth 사용자에게 필터링
-- **MS OAuth 사용자는 빈 DB에서 시작**: 체크리스트, 프로젝트, 출시위원회 등 모든 데이터를 직접 입력
-- **마이그레이션**: `migrateDemoFlags()` — 기존 시드 데이터에 `isDemo: true` 일괄 추가 (v2 localStorage 키로 1회 실행)
-- **대상 컬렉션**: users, projects, checklistItems, changeRequests, notifications, customers, launchChecklists, portalNotifications
-- **templateStages, templateDepartments, templateItems는 공유**: 데모 플래그 미적용 (모든 사용자 공통)
-- **`filterDemo(items)` 로직**: `_isRealUser()` → localStorage `pc_user.isDemo === false` 확인 → `item.isDemo !== true` 필터
+### Login Design — 간소화 (확정 — 2026-03-11 변경)
+- **MS OAuth 신규 사용자**: 역할/부서 선택 화면 **제거**, 바로 기본값(`worker`, 부서 미지정)으로 Firestore 등록 → 대시보드 이동
+- 관리자(admin-users.html)가 나중에 역할/부서 수정
+- **데모 카드 로그인**: 유지 (기존대로)
+- **자동 시딩 비활성화**: `seedDatabaseIfEmpty()` 호출 제거 — 실제 데이터 직접 입력
+
+### Demo/Real Data Separation Design
+- **isDemo 시스템 완전 제거됨** (2026-03-11): 실제 운영 모드로 전환
+- 모든 샘플/시드 데이터 Firestore에서 삭제 완료 (2,486개 문서)
+- 템플릿 데이터도 삭제 (210개) — 사용자가 직접 입력
+- `seedDatabaseIfEmpty()` 비활성화
 
 ### Feedback/Screenshot System Design (확정)
 - **뷰포트 캡처**: html2canvas로 현재 보이는 영역만 캡처 (전체 페이지 X)

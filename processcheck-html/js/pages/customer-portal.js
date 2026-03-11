@@ -262,13 +262,13 @@ function renderProjectsView() {
                 const textColor =
                   status === "completed" || status === "current"
                     ? "white"
-                    : "var(--slate-500)";
+                    : "var(--slate-300)";
                 return `
                   <div style="display:flex;align-items:center;gap:0.25rem">
                     <div style="padding:0.25rem 0.625rem;border-radius:var(--radius-lg);background:${bg};color:${textColor};font-size:0.7rem;font-weight:600;white-space:nowrap">
                       ${status === "completed" ? "✔ " : status === "current" ? "▶ " : ""}${ph.name}
                     </div>
-                    ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-600);font-size:0.7rem">→</span>' : ""}
+                    ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-400);font-size:0.7rem">→</span>' : ""}
                   </div>
                 `;
               }).join("")}

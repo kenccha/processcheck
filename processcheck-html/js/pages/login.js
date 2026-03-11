@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { getUser, login, loginWithMicrosoft, completeRegistration } from "../auth.js";
-import { seedDatabaseIfEmpty } from "../firestore-service.js";
+// import { seedDatabaseIfEmpty } from "../firestore-service.js"; // 시딩 비활성화 — 실제 데이터 사용
 
 // If already logged in, redirect immediately
 if (getUser()) {
@@ -42,12 +42,8 @@ const showContent = () => {
   window.__seedComplete = true;
 };
 
-// Safety timeout: show login content after 3 seconds regardless
-setTimeout(showContent, 3000);
-
-seedDatabaseIfEmpty()
-  .catch((e) => console.warn("시드 오류 (무시 가능):", e))
-  .finally(showContent);
+// No seeding — show login content immediately
+showContent();
 
 // ── Demo card click → login → redirect ──
 userCards.forEach((card) => {
@@ -84,15 +80,9 @@ msLoginBtn.addEventListener("click", async () => {
 
   try {
     const result = await loginWithMicrosoft();
-
-    if (!result.isNewUser) {
-      // Existing user — go to dashboard
-      window.location.href = "home.html";
-    } else {
-      // New user — show role selection
-      pendingAuthInfo = result.authInfo;
-      showRoleSelection(result.authInfo);
-    }
+    // Both existing and new users go straight to dashboard
+    // (new users auto-registered as worker, admin assigns role later)
+    window.location.href = "home.html";
   } catch (e) {
     console.error("Microsoft 로그인 오류:", e);
     showError(e.message || "로그인 중 오류가 발생했습니다.");

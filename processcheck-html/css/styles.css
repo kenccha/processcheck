@@ -424,8 +424,8 @@ select.input-field {
   letter-spacing: -0.025em;
 }
 
-.text-dim { color: var(--slate-500); }
-.text-soft { color: var(--slate-400); }
+.text-dim { color: var(--slate-400); }
+.text-soft { color: var(--slate-300); }
 .text-primary { color: var(--primary-400); }
 .text-success { color: var(--success-400); }
 .text-warning { color: var(--warning-400); }
@@ -2823,12 +2823,85 @@ tbody tr:last-child td {
 .phase-dot.dot-partial { background: var(--slate-600); border-color: var(--slate-500); }
 .phase-dot.dot-empty { background: transparent; border-color: var(--slate-700); }
 
+/* ── Project Row (D-Day + Delay focus) ── */
+.dash-project-row {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--surface-3);
+  transition: background 0.12s;
+}
+.dash-project-row:hover { background: var(--surface-3); }
+.dash-project-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.dash-dday {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.125rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: -0.02em;
+}
+.dash-project-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.dash-delay-reason {
+  font-size: 0.75rem;
+  color: var(--slate-300);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dash-project-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  flex-shrink: 0;
+}
+
+/* ── Urgency Groups ── */
+.dash-urgency-group {
+  border-bottom: 1px solid var(--surface-3);
+}
+.dash-urgency-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  background: var(--surface-2);
+}
+
 .dash-notif-item {
   padding: 0.625rem 1rem;
   border-bottom: 1px solid var(--surface-3);
   transition: background 0.12s;
 }
 .dash-notif-item:hover { background: var(--surface-3); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Project Detail — 2-column responsive
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .pd-two-col {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.pd-task-row:hover { background: var(--surface-3); }
+
+.view-switch-btn.active {
+  background: var(--primary-500) !important;
+  color: white !important;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Sales Dashboard Enhancements
