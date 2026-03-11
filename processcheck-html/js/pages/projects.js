@@ -22,6 +22,7 @@ import {
   daysUntil,
   exportToCSV,
 } from "../utils.js";
+import { saveViewState, loadViewState } from "../ui/view-state.js";
 
 // -- Guard --
 const user = guardPage();
@@ -42,18 +43,20 @@ const forcedType = urlParams.get("type"); // "신규개발" | "설계변경" | n
 let projects = [];
 let allTasks = [];
 let projectTypeTab = forcedType || "신규개발"; // "신규개발" | "설계변경"
-let viewMode = "table"; // table | matrix | cards | gantt | kanban | timeline | calendar
+const _savedProj = loadViewState('projects');
+let viewMode = (_savedProj && _savedProj.viewMode) || "table";
 let changeViewMode = "table"; // table | kanban (설계변경 전용)
 let searchQuery = "";
-let statusFilter = "all"; // all | active | completed | on_hold
+let statusFilter = (_savedProj && _savedProj.statusFilter) || "all";
 let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth(); // 0-based
-let sortField = "startDate"; // name | status | pm | progress | startDate
-let sortDir = "desc"; // asc | desc
+let sortField = (_savedProj && _savedProj.sortField) || "startDate";
+let sortDir = (_savedProj && _savedProj.sortDir) || "desc";
 
 // -- Subscriptions --
 const unsubProjects = subscribeProjects((data) => {
   projects = data;
+  window.__pcProjects = data;
   render();
 });
 
@@ -241,6 +244,7 @@ function getProjectStatusBadge(status) {
 // =============================================================================
 
 function render() {
+  saveViewState('projects', { viewMode, sortField, sortDir, statusFilter });
   const filtered = getFilteredProjects();
   const isChangeTab = projectTypeTab === "설계변경";
   const currentViewModes = isChangeTab ? CHANGE_VIEW_MODES : VIEW_MODES;

@@ -35,6 +35,7 @@ import {
   PHASE_GROUPS,
   GATE_STAGES,
 } from "../utils.js";
+import { saveViewState, loadViewState } from "../ui/view-state.js";
 
 // ─── Auth Guard ─────────────────────────────────────────────────────────────
 
@@ -58,7 +59,8 @@ let pendingApprovals = [];
 let urgencyGroups = { overdue: [], today: [], thisWeek: [], later: [] };
 
 // UI state
-let activeTab = "projects";
+const _savedDash = loadViewState('dashboard');
+let activeTab = (_savedDash && _savedDash.activeTab) || "projects";
 let showLaterTasks = false;
 let approvalLimit = 10;
 let hasFullData = false;
@@ -162,6 +164,7 @@ if (cached) {
   unsubscribers.push(
     subscribeProjects((projects) => {
       allProjects = projects;
+      window.__pcProjects = projects;
       computeDerived();
       render();
     })
@@ -391,7 +394,7 @@ function renderHeader() {
         <span class="badge badge-primary">${escapeHtml(getRoleName(user.role))}</span>
         ${user.department ? `<span class="text-xs text-soft">${escapeHtml(user.department)}</span>` : ""}
       </div>
-      <div class="text-xs text-soft">${getTodayString()}</div>
+      <div class="text-xs text-soft">${getTodayString()} &nbsp;·&nbsp; <a href="reports.html" style="color:var(--primary-400);text-decoration:underline;">리포트 보기 →</a></div>
     </div>
   `;
 }
@@ -712,6 +715,7 @@ function bindClickHandlers() {
     btn.addEventListener("click", () => {
       activeTab = btn.dataset.tab;
       approvalLimit = 10;
+      saveViewState('dashboard', { activeTab });
       render();
     });
   });

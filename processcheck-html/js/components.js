@@ -101,12 +101,16 @@ const BASE_NAV_LINKS = [
     ],
   },
   {
+    href: "sales.html",
+    label: "영업",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>`,
+  },
+  {
     href: "#",
     label: "다른 사이트",
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
     isSeparated: true,
     children: [
-      { href: "sales.html", label: "영업 출시 준비", external: true },
       { href: "customers.html", label: "고객 관리", external: true },
     ],
   },
@@ -373,6 +377,15 @@ export function renderNav(container) {
 
   // ─── Global Feedback Widget ─────────────────────────────────────────────────
   import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
+
+  // ─── Command Palette (Cmd+K) ──────────────────────────────────────────────
+  import('./ui/cmd-k.js').then(({ initCommandPalette, buildNavActions, buildProjectActions }) => {
+    initCommandPalette(() => {
+      const navActions = buildNavActions();
+      const projectActions = buildProjectActions(window.__pcProjects || []);
+      return [...navActions, ...projectActions];
+    });
+  }).catch(() => {});
 
   // Start session watcher — auto-logout after 24h of inactivity
   startSessionWatcher();
