@@ -75,9 +75,11 @@ getUsers().then((u) => { allUsers = u; }).catch(() => {});
 let unsubProject = null;
 let unsubChecklist = null;
 
+let projectsLoaded = false;
 unsubProject = subscribeProjects((projects) => {
-  project = projects.find((p) => p.id === projectId);
-  if (project) render();
+  project = projects.find((p) => p.id === projectId) || null;
+  projectsLoaded = true;
+  render();
 });
 
 unsubChecklist = subscribeChecklistItems(projectId, (items) => {
@@ -132,7 +134,18 @@ function getPhaseWorkProgress(phaseName) {
 // =============================================================================
 
 function render() {
-  if (!project || !app) return;
+  if (!app) return;
+  if (!project) {
+    if (projectsLoaded) {
+      app.innerHTML = `<div style="max-width:600px;margin:4rem auto;text-align:center;padding:2rem;">
+        <div style="font-size:3rem;margin-bottom:1rem;">📋</div>
+        <h2 style="color:var(--text-primary);margin-bottom:0.5rem;">프로젝트를 찾을 수 없습니다</h2>
+        <p style="color:var(--text-soft);margin-bottom:1.5rem;">요청하신 프로젝트가 존재하지 않거나 삭제되었습니다.</p>
+        <a href="projects.html?type=신규개발" class="btn-primary" style="display:inline-block;padding:0.5rem 1.5rem;border-radius:0.5rem;text-decoration:none;">프로젝트 목록으로</a>
+      </div>`;
+    }
+    return;
+  }
 
   const phaseIndex = PHASE_GROUPS.findIndex(
     (ph) => ph.workStage === project.currentStage || ph.gateStage === project.currentStage
@@ -993,10 +1006,15 @@ function bindEvents() {
   if (bulkApproveBtn) {
     bulkApproveBtn.addEventListener("click", async () => {
       if (selectedTaskIds.size === 0) return;
-      // 모든 승인은 observer만
       if (user.role !== "observer") { showToast('error', "승인 권한이 없습니다. 기획조정실만 승인할 수 있습니다."); return; }
       if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
-      await bulkApproveTasks([...selectedTaskIds], user.name);
+      try {
+        const { successCount, failCount } = await bulkApproveTasks([...selectedTaskIds], user.name);
+        if (failCount > 0) showToast('warning', `${successCount}건 성공, ${failCount}건 실패`);
+        else showToast('success', `${successCount}개 작업이 승인되었습니다.`);
+      } catch (e) {
+        showToast('error', "일괄 승인에 실패했습니다.");
+      }
       selectedTaskIds.clear();
       render();
     });
@@ -1010,7 +1028,13 @@ function bindEvents() {
       const names = allUsers.map(u => u.name);
       const newAssignee = prompt(`새 담당자를 입력하세요:\n(${names.slice(0, 5).join(", ")}...)`);
       if (!newAssignee) return;
-      await bulkUpdateAssignee([...selectedTaskIds], newAssignee);
+      try {
+        const { successCount, failCount } = await bulkUpdateAssignee([...selectedTaskIds], newAssignee);
+        if (failCount > 0) showToast('warning', `${successCount}건 성공, ${failCount}건 실패`);
+        else showToast('success', `${successCount}개 작업의 담당자가 변경되었습니다.`);
+      } catch (e) {
+        showToast('error', "담당자 일괄 변경에 실패했습니다.");
+      }
       selectedTaskIds.clear();
       render();
     });

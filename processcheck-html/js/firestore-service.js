@@ -873,11 +873,15 @@ export async function createChecklistItem(data) {
 }
 
 export async function completeTask(taskId) {
-  await updateDoc(doc(db, "checklistItems", taskId), {
-    status: "completed",
-    completedDate: Timestamp.now(),
-    approvalStatus: "pending",
-  });
+  try {
+    await updateDoc(doc(db, "checklistItems", taskId), {
+      status: "completed",
+      completedDate: Timestamp.now(),
+      approvalStatus: "pending",
+    });
+  } catch (e) {
+    throw new Error("작업 완료 처리에 실패했습니다: " + e.message);
+  }
   try { await addActivityLog("complete_task", "", "", "", "task", taskId, { status: "completed" }); } catch(e) {}
 
   // 자동 알림: 검토자에게 승인 요청 + 프로젝트 통계 재계산
@@ -907,11 +911,15 @@ export async function completeTask(taskId) {
 }
 
 export async function approveTask(taskId, reviewerName) {
-  await updateDoc(doc(db, "checklistItems", taskId), {
-    approvedBy: reviewerName,
-    approvedAt: Timestamp.now(),
-    approvalStatus: "approved",
-  });
+  try {
+    await updateDoc(doc(db, "checklistItems", taskId), {
+      approvedBy: reviewerName,
+      approvedAt: Timestamp.now(),
+      approvalStatus: "approved",
+    });
+  } catch (e) {
+    throw new Error("작업 승인 처리에 실패했습니다: " + e.message);
+  }
   try { await addActivityLog("approve_task", "", reviewerName, "", "task", taskId, { approver: reviewerName }); } catch(e) {}
 
   // 자동 알림: 담당자에게 승인 완료 + 프로젝트 통계 재계산 + 포털 알림
@@ -1013,13 +1021,17 @@ export async function approveTask(taskId, reviewerName) {
 }
 
 export async function rejectTask(taskId, reviewerName, reason) {
-  await updateDoc(doc(db, "checklistItems", taskId), {
-    status: "rejected",
-    approvalStatus: "rejected",
-    rejectedBy: reviewerName,
-    rejectedAt: Timestamp.now(),
-    rejectionReason: reason,
-  });
+  try {
+    await updateDoc(doc(db, "checklistItems", taskId), {
+      status: "rejected",
+      approvalStatus: "rejected",
+      rejectedBy: reviewerName,
+      rejectedAt: Timestamp.now(),
+      rejectionReason: reason,
+    });
+  } catch (e) {
+    throw new Error("작업 반려 처리에 실패했습니다: " + e.message);
+  }
   try { await addActivityLog("reject_task", "", reviewerName, "", "task", taskId, { rejector: reviewerName, reason }); } catch(e) {}
 
   // 자동 알림: 담당자에게 반려 알림 + 프로젝트 통계 재계산
@@ -1422,6 +1434,20 @@ export async function deleteTemplateDepartment(deptId) {
  * @returns {Promise<number>} 생성된 체크리스트 항목 수
  */
 export async function applyTemplateToProject(projectId, projectType, changeScale) {
+  // 0) 중복 방지: 이미 적용된 항목 확인
+  const existingSnap = await getDocs(
+    query(collection(db, "checklistItems"), where("projectId", "==", projectId))
+  );
+  if (!existingSnap.empty) {
+    const existingTemplateIds = new Set(
+      existingSnap.docs.map(d => d.data().templateItemId).filter(Boolean)
+    );
+    if (existingTemplateIds.size > 0) {
+      console.warn(`⚠️ 프로젝트 ${projectId}에 이미 ${existingTemplateIds.size}개 템플릿 항목 존재 — 중복 생성 건너뜀`);
+      return 0;
+    }
+  }
+
   // 1) 템플릿 stages, departments, items 로드
   const stages = await getTemplateStages();
   const depts = await getTemplateDepartments();
@@ -1980,32 +2006,64 @@ export function subscribeAllActivityLogs(callback, limitCount = 50) {
 // ─── Bulk Operations ─────────────────────────────────────────────────────────
 
 export async function bulkApproveTasks(taskIds, reviewerName) {
-  const batch = writeBatch(db);
-  for (const taskId of taskIds) {
-    batch.update(doc(db, "checklistItems", taskId), {
-      approvedBy: reviewerName,
-      approvedAt: Timestamp.now(),
-      approvalStatus: "approved",
-    });
+  let successCount = 0;
+  let failCount = 0;
+  const BATCH_LIMIT = 450;
+
+  for (let i = 0; i < taskIds.length; i += BATCH_LIMIT) {
+    const chunk = taskIds.slice(i, i + BATCH_LIMIT);
+    try {
+      const batch = writeBatch(db);
+      for (const taskId of chunk) {
+        batch.update(doc(db, "checklistItems", taskId), {
+          approvedBy: reviewerName,
+          approvedAt: Timestamp.now(),
+          approvalStatus: "approved",
+        });
+      }
+      await batch.commit();
+      successCount += chunk.length;
+    } catch (e) {
+      console.error("Bulk approve batch failed:", e);
+      failCount += chunk.length;
+    }
   }
-  await batch.commit();
+
   // Recalculate stats for affected projects
   const projectIds = new Set();
   for (const taskId of taskIds) {
-    const snap = await getDoc(doc(db, "checklistItems", taskId));
-    if (snap.exists() && snap.data().projectId) projectIds.add(snap.data().projectId);
+    try {
+      const snap = await getDoc(doc(db, "checklistItems", taskId));
+      if (snap.exists() && snap.data().projectId) projectIds.add(snap.data().projectId);
+    } catch (e) { /* skip */ }
   }
   for (const pid of projectIds) {
-    await recalculateProjectStats(pid);
+    try { await recalculateProjectStats(pid); } catch (e) { /* skip */ }
   }
+
+  return { successCount, failCount };
 }
 
 export async function bulkUpdateAssignee(taskIds, newAssignee) {
-  const batch = writeBatch(db);
-  for (const taskId of taskIds) {
-    batch.update(doc(db, "checklistItems", taskId), { assignee: newAssignee });
+  let successCount = 0;
+  let failCount = 0;
+  const BATCH_LIMIT = 450;
+
+  for (let i = 0; i < taskIds.length; i += BATCH_LIMIT) {
+    const chunk = taskIds.slice(i, i + BATCH_LIMIT);
+    try {
+      const batch = writeBatch(db);
+      for (const taskId of chunk) {
+        batch.update(doc(db, "checklistItems", taskId), { assignee: newAssignee });
+      }
+      await batch.commit();
+      successCount += chunk.length;
+    } catch (e) {
+      console.error("Bulk assignee batch failed:", e);
+      failCount += chunk.length;
+    }
   }
-  await batch.commit();
+  return { successCount, failCount };
 }
 
 // ─── User Management ─────────────────────────────────────────────────────────

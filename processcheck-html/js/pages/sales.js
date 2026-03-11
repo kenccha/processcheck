@@ -132,24 +132,32 @@ function renderSalesNav(container) {
 // Init — with loading state and error handling
 // =============================================================================
 
+let unsubProjects = null;
+let unsubItems = null;
+
 function init() {
   renderSalesNav(navRoot);
   app.innerHTML = renderSpinner("출시 준비 데이터 로딩 중...");
 
-  subscribeProjects((data) => {
+  unsubProjects = subscribeProjects((data) => {
     console.log("[Sales] projects received:", data.length);
     projects = data;
     dataLoaded.projects = true;
     render();
   });
 
-  subscribeAllLaunchChecklists((data) => {
+  unsubItems = subscribeAllLaunchChecklists((data) => {
     console.log("[Sales] launch checklists received:", data.length);
     allItems = data;
     dataLoaded.items = true;
     render();
   });
 }
+
+window.addEventListener("beforeunload", () => {
+  unsubProjects?.();
+  unsubItems?.();
+});
 
 // =============================================================================
 // Filtering & Helpers
@@ -1669,7 +1677,7 @@ function bindEvents() {
       }
     }
     selectedItems.clear();
-    console.log(`[Sales] bulk start: ${count} items`);
+    showToast('success', `${count}개 항목이 진행 중으로 변경되었습니다.`);
   });
 
   document.getElementById("bulk-complete")?.addEventListener("click", async () => {
@@ -1678,17 +1686,22 @@ function bindEvents() {
     btn.textContent = "처리 중...";
     const ids = [...selectedItems];
     let count = 0;
+    let failCount = 0;
     for (const id of ids) {
       const item = allItems.find(i => i.id === id);
       if (item && item.status === "in_progress") {
         try {
           await completeLaunchChecklist(id);
           count++;
-        } catch (e) { console.error("bulk complete failed:", id, e); }
+        } catch (e) {
+          console.error("bulk complete failed:", id, e);
+          failCount++;
+        }
       }
     }
     selectedItems.clear();
-    console.log(`[Sales] bulk complete: ${count} items`);
+    if (failCount > 0) showToast('warning', `${count}건 완료, ${failCount}건 실패`);
+    else showToast('success', `${count}개 항목이 완료되었습니다.`);
   });
 }
 

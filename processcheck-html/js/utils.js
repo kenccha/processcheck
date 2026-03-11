@@ -137,6 +137,7 @@ export function timeAgo(date) {
 export function daysUntil(date) {
   if (!date) return null;
   const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return null;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
