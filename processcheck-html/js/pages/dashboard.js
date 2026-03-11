@@ -56,6 +56,7 @@ let notifications = [];
 let projectCards = []; // enriched project data
 let myTasks = [];
 let pendingApprovals = [];
+let unassignedTasks = [];
 let urgencyGroups = { overdue: [], today: [], thisWeek: [], later: [] };
 
 // UI state
@@ -316,6 +317,14 @@ function computeDerived() {
     }
   });
 
+  // --- Unassigned tasks (for managers) ---
+  unassignedTasks = [];
+  if (user.role === "manager" || user.role === "observer") {
+    unassignedTasks = allTasks.filter(
+      (t) => (t.status === "pending" || t.status === "in_progress") && !t.assignee
+    );
+  }
+
   // --- Pending approvals ---
   pendingApprovals = allTasks.filter(
     (t) => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")
@@ -515,7 +524,7 @@ function renderProjectsTab() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function renderTasksTab() {
-  if (myTasks.length === 0) {
+  if (myTasks.length === 0 && unassignedTasks.length === 0) {
     return `
       <div class="empty-state" style="padding: 3rem 1rem">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -527,6 +536,11 @@ function renderTasksTab() {
   }
 
   let html = "";
+
+  // Group 0: Unassigned (for managers/observers)
+  if (unassignedTasks.length > 0 && (user.role === "manager" || user.role === "observer")) {
+    html += renderTaskGroup("미배정", unassignedTasks, "var(--warning-300)", true);
+  }
 
   // Group 1: Overdue (D+N)
   if (urgencyGroups.overdue.length > 0) {

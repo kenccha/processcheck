@@ -960,11 +960,24 @@ export async function approveTask(taskId, reviewerName) {
         ];
         const nextPhase = PHASE_ORDER.find(p => p.gate === t.stage);
         if (nextPhase) {
-          // 다음 phase의 pending 작업 담당자들에게 알림
+          // 다음 phase의 pending 작업 → in_progress 자동 전환 + 담당자 알림
           const nextQ = query(collection(db, "checklistItems"),
             where("projectId", "==", t.projectId),
             where("stage", "==", nextPhase.nextWork));
           const nextSnap = await getDocs(nextQ);
+
+          // 자동 활성화: pending → in_progress
+          const activateBatch = writeBatch(db);
+          let activateCount = 0;
+          for (const taskDoc of nextSnap.docs) {
+            if (taskDoc.data().status === "pending") {
+              activateBatch.update(taskDoc.ref, { status: "in_progress" });
+              activateCount++;
+            }
+          }
+          if (activateCount > 0) await activateBatch.commit();
+
+          // 담당자들에게 알림
           const notifiedUsers = new Set();
           for (const taskDoc of nextSnap.docs) {
             const td = taskDoc.data();

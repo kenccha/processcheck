@@ -91,6 +91,26 @@ unsubChecklist = subscribeChecklistItems(projectId, (items) => {
 // Helpers
 // =============================================================================
 
+const WORK_TO_GATE_MAP = {
+  "발의검토": "발의승인", "기획검토": "기획승인", "WM제작": "WM승인회",
+  "Tx단계": "Tx승인회", "MasterGatePilot": "MSG승인회", "양산": "영업이관",
+};
+const GATE_TO_WORK_MAP = Object.fromEntries(Object.entries(WORK_TO_GATE_MAP).map(([k, v]) => [v, k]));
+
+function checkGateApprovalReady(taskIds) {
+  for (const id of taskIds) {
+    const t = checklistItems.find(x => x.id === id);
+    if (!t) continue;
+    const workStage = GATE_TO_WORK_MAP[t.stage];
+    if (workStage) {
+      const workTasks = checklistItems.filter(x => x.stage === workStage);
+      const allCompleted = workTasks.every(x => x.status === "completed");
+      if (!allCompleted) return { ready: false, stage: t.stage, workStage };
+    }
+  }
+  return { ready: true };
+}
+
 function getMatrixCellData(stageName, dept) {
   const tasks = checklistItems.filter(
     (t) => t.stage === stageName && t.department === dept
@@ -1007,6 +1027,11 @@ function bindEvents() {
     bulkApproveBtn.addEventListener("click", async () => {
       if (selectedTaskIds.size === 0) return;
       if (user.role !== "observer") { showToast('error', "승인 권한이 없습니다. 기획조정실만 승인할 수 있습니다."); return; }
+      const gateCheck = checkGateApprovalReady([...selectedTaskIds]);
+      if (!gateCheck.ready) {
+        showToast('error', `모든 작업이 완료되어야 승인 가능합니다. (${gateCheck.workStage} 미완료)`);
+        return;
+      }
       if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
       try {
         const { successCount, failCount } = await bulkApproveTasks([...selectedTaskIds], user.name);
