@@ -49,6 +49,27 @@ export function initTheme() {
   }
 }
 
+// ─── Notification Link Converter (for nav panel) ────────────────────────────
+
+function convertNotifLinkNav(link) {
+  if (!link) return null;
+  if (link.startsWith("/task?") || link.startsWith("/task/?")) {
+    return link.replace(/^\/task\/?/, "task.html");
+  }
+  if (link.startsWith("/project?") || link.startsWith("/project/?")) {
+    return link.replace(/^\/project\/?/, "project.html");
+  }
+  const taskMatch = link.match(/^\/projects\/([^/]+)\/tasks\/([^/]+)/);
+  if (taskMatch) return `task.html?projectId=${taskMatch[1]}&taskId=${taskMatch[2]}`;
+  const projMatch = link.match(/^\/projects\/([^/]+)/);
+  if (projMatch) return `project.html?id=${projMatch[1]}`;
+  if (link === "/projects" || link === "/projects/") return "projects.html";
+  if (link === "/dashboard" || link === "/dashboard/") return "dashboard.html";
+  // Already an HTML path
+  if (link.endsWith(".html") || link.includes(".html?")) return link;
+  return null;
+}
+
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 const BASE_NAV_LINKS = [
@@ -290,8 +311,12 @@ export function renderNav(container) {
     notifRoot.querySelectorAll("[data-notif-id]").forEach(el => {
       el.addEventListener("click", () => {
         const id = el.dataset.notifId;
+        const link = el.dataset.notifLink;
         markNotificationRead(id);
-        // link navigation could be added here
+        if (link) {
+          const htmlLink = convertNotifLinkNav(link);
+          if (htmlLink) window.location.href = htmlLink;
+        }
       });
     });
   }

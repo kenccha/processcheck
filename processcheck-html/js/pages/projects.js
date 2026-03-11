@@ -570,6 +570,7 @@ function applySorting(list) {
       case "pm": va = (a.pm || "").toLowerCase(); vb = (b.pm || "").toLowerCase(); break;
       case "progress": va = a.progress || 0; vb = b.progress || 0; break;
       case "startDate": va = new Date(a.startDate).getTime(); vb = new Date(b.startDate).getTime(); break;
+      case "dday": va = daysUntil(a.endDate) ?? 9999; vb = daysUntil(b.endDate) ?? 9999; break;
       default: va = new Date(a.startDate).getTime(); vb = new Date(b.startDate).getTime();
     }
     if (va < vb) return sortDir === "asc" ? -1 : 1;
@@ -593,6 +594,7 @@ function renderTable(filtered) {
             <th class="sortable-th" data-sort="pm" style="cursor:pointer;user-select:none;">PM ${sortArrow("pm")}</th>
             <th>현재단계</th>
             <th>중요도</th>
+            <th class="sortable-th" data-sort="dday" style="cursor:pointer;user-select:none;">D-Day ${sortArrow("dday")}</th>
             <th class="sortable-th" data-sort="progress" style="cursor:pointer;user-select:none;">진행률 ${sortArrow("progress")}</th>
             <th class="sortable-th" data-sort="startDate" style="cursor:pointer;user-select:none;">기간 ${sortArrow("startDate")}</th>
           </tr>
@@ -610,6 +612,7 @@ function renderTable(filtered) {
               <td>${escapeHtml(p.pm || "-")}</td>
               <td class="text-xs">${formatStageName(p.currentStage)}</td>
               <td><span class="risk-dot ${p.riskLevel || ""}"></span></td>
+              <td class="text-xs font-mono font-semibold whitespace-nowrap" style="color: ${(() => { const dd = daysUntil(p.endDate); if (dd === null) return "var(--slate-400)"; if (dd < 0) return "var(--danger-400)"; if (dd <= 3) return "var(--warning-400)"; if (dd <= 7) return "var(--primary-400)"; return "var(--success-400)"; })()}">${(() => { const dd = daysUntil(p.endDate); if (dd === null) return "-"; if (dd < 0) return "D+" + Math.abs(dd); if (dd === 0) return "D-Day"; return "D-" + dd; })()}</td>
               <td>
                 <div class="flex items-center gap-2">
                   <div class="progress-bar" style="width:80px">

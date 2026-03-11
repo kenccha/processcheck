@@ -5,7 +5,7 @@
 
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, deleteField,
-  query, where, Timestamp, writeBatch, onSnapshot,
+  query, where, Timestamp, writeBatch, onSnapshot, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
 
@@ -135,6 +135,270 @@ function getMockData() {
   return { mockUsers, mockProjects, mockChangeRequests: [...mockChangeRequests, ...mockChangeRequestsExt], mockNotifications, mockCustomers };
 }
 
+// ─── Seed Templates Only (separated from demo data) ──────────────────────────
+
+// ── 193개 템플릿 아이템 데이터 (seedTemplatesIfEmpty + seedDatabaseIfEmpty 공유) ──
+function _getTemplateItems() {
+  return [
+    // ── Phase 0: 발의 (22개) ──────────────────────────────────────
+    { id: "ti-1", stageId: "phase0", departmentId: "dept1", content: "제품 컨셉 정의서 작성", order: 0, isRequired: true },
+    { id: "ti-2", stageId: "phase0", departmentId: "dept1", content: "기술 타당성 사전 검토", order: 1, isRequired: true },
+    { id: "ti-3", stageId: "phase0", departmentId: "dept1", content: "선행 기술 조사 보고서", order: 2, isRequired: true },
+    { id: "ti-4", stageId: "phase0", departmentId: "dept1", content: "NABC 분석 작성", order: 3, isRequired: true },
+    { id: "ti-5", stageId: "phase0", departmentId: "dept1", content: "지적재산권 사전 검토", order: 4, isRequired: false },
+    { id: "ti-6", stageId: "phase0", departmentId: "dept1", content: "발의 심사 발표자료 준비", order: 5, isRequired: true },
+    { id: "ti-7", stageId: "phase0", departmentId: "dept2", content: "품질 목표 수립", order: 0, isRequired: true },
+    { id: "ti-8", stageId: "phase0", departmentId: "dept2", content: "해당 규격/표준 목록 사전 조사", order: 1, isRequired: true },
+    { id: "ti-9", stageId: "phase0", departmentId: "dept2", content: "유사 제품 CAPA/불만 데이터 분석", order: 2, isRequired: false },
+    { id: "ti-10", stageId: "phase0", departmentId: "dept3", content: "시장 기회 분석 보고서", order: 0, isRequired: true },
+    { id: "ti-11", stageId: "phase0", departmentId: "dept3", content: "경쟁사 제품 분석", order: 1, isRequired: true },
+    { id: "ti-12", stageId: "phase0", departmentId: "dept3", content: "목표 고객군 정의", order: 2, isRequired: true },
+    { id: "ti-13", stageId: "phase0", departmentId: "dept3", content: "예상 판매가/판매량 추정", order: 3, isRequired: false },
+    { id: "ti-14", stageId: "phase0", departmentId: "dept7", content: "사업성 검토 (ROI/수익성 분석)", order: 0, isRequired: true },
+    { id: "ti-15", stageId: "phase0", departmentId: "dept7", content: "초기 프로젝트 예산 산정", order: 1, isRequired: true },
+    { id: "ti-16", stageId: "phase0", departmentId: "dept7", content: "프로젝트 일정 초안 수립", order: 2, isRequired: true },
+    { id: "ti-17", stageId: "phase0", departmentId: "dept7", content: "발의 승인 판단 근거 자료 취합", order: 3, isRequired: true },
+    { id: "ti-18", stageId: "phase0", departmentId: "dept10", content: "규제 분류 사전 검토 (등급/품목 예비 분류)", order: 0, isRequired: true },
+    { id: "ti-19", stageId: "phase0", departmentId: "dept10", content: "인허가 경로 조사 (국내 MFDS + 해외)", order: 1, isRequired: true },
+    { id: "ti-20", stageId: "phase0", departmentId: "dept10", content: "필수 인증 목록 사전 파악", order: 2, isRequired: false },
+    { id: "ti-21", stageId: "phase0", departmentId: "dept9", content: "사용자 니즈 사전 조사", order: 0, isRequired: false },
+    { id: "ti-22", stageId: "phase0", departmentId: "dept9", content: "컨셉 스케치/무드보드", order: 1, isRequired: false },
+    // ── Phase 1: 기획 (37개) ──────────────────────────────────────
+    { id: "ti-23", stageId: "phase1", departmentId: "dept1", content: "설계 입력(Design Input) 요구사항 명세서", order: 0, isRequired: true },
+    { id: "ti-24", stageId: "phase1", departmentId: "dept1", content: "제품 사양서(Product Specification) 작성", order: 1, isRequired: true },
+    { id: "ti-25", stageId: "phase1", departmentId: "dept1", content: "소프트웨어 개발 계획 수립 (IEC 62304)", order: 2, isRequired: true },
+    { id: "ti-26", stageId: "phase1", departmentId: "dept1", content: "시스템 아키텍처 설계", order: 3, isRequired: true },
+    { id: "ti-27", stageId: "phase1", departmentId: "dept1", content: "설계 검증/확인 계획 수립", order: 4, isRequired: true },
+    { id: "ti-28", stageId: "phase1", departmentId: "dept1", content: "개발 일정 상세 수립", order: 5, isRequired: true },
+    { id: "ti-29", stageId: "phase1", departmentId: "dept1", content: "기술 위험 분석 (초기 FMEA)", order: 6, isRequired: true },
+    { id: "ti-30", stageId: "phase1", departmentId: "dept1", content: "기획 승인회 발표자료 작성", order: 7, isRequired: true },
+    { id: "ti-31", stageId: "phase1", departmentId: "dept2", content: "위험관리 계획서 수립 (ISO 14971)", order: 0, isRequired: true },
+    { id: "ti-32", stageId: "phase1", departmentId: "dept2", content: "적용 규격/표준 확정 및 적합성 매트릭스", order: 1, isRequired: true },
+    { id: "ti-33", stageId: "phase1", departmentId: "dept2", content: "설계 관리(Design Control) 절차 확인", order: 2, isRequired: true },
+    { id: "ti-34", stageId: "phase1", departmentId: "dept2", content: "시험/검증 계획서 초안", order: 3, isRequired: true },
+    { id: "ti-35", stageId: "phase1", departmentId: "dept2", content: "DHF(설계이력파일) 구성 계획", order: 4, isRequired: true },
+    { id: "ti-36", stageId: "phase1", departmentId: "dept2", content: "사용적합성(Usability) 엔지니어링 계획 (IEC 62366)", order: 5, isRequired: false },
+    { id: "ti-37", stageId: "phase1", departmentId: "dept3", content: "고객 요구사항 정의서", order: 0, isRequired: true },
+    { id: "ti-38", stageId: "phase1", departmentId: "dept3", content: "가격 전략 수립", order: 1, isRequired: true },
+    { id: "ti-39", stageId: "phase1", departmentId: "dept3", content: "마케팅 요구사항 정리 (라벨링, 포장 등)", order: 2, isRequired: false },
+    { id: "ti-40", stageId: "phase1", departmentId: "dept3", content: "기획 단계 시장성 검증 결과", order: 3, isRequired: true },
+    { id: "ti-41", stageId: "phase1", departmentId: "dept4", content: "제조 타당성 검토", order: 0, isRequired: true },
+    { id: "ti-42", stageId: "phase1", departmentId: "dept4", content: "초기 공정 흐름도 검토", order: 1, isRequired: false },
+    { id: "ti-43", stageId: "phase1", departmentId: "dept4", content: "제조 비용 사전 추정", order: 2, isRequired: false },
+    { id: "ti-44", stageId: "phase1", departmentId: "dept5", content: "주요 부품/원재료 사전 조사", order: 0, isRequired: true },
+    { id: "ti-45", stageId: "phase1", departmentId: "dept5", content: "공급업체 후보 리스트 작성", order: 1, isRequired: false },
+    { id: "ti-46", stageId: "phase1", departmentId: "dept6", content: "서비스 요구사항 정의 (A/S, 유지보수 등)", order: 0, isRequired: false },
+    { id: "ti-47", stageId: "phase1", departmentId: "dept7", content: "프로젝트 상세 예산 확정", order: 0, isRequired: true },
+    { id: "ti-48", stageId: "phase1", departmentId: "dept7", content: "자원 배분 계획 (인력/설비)", order: 1, isRequired: true },
+    { id: "ti-49", stageId: "phase1", departmentId: "dept7", content: "비용/일정 검토 결과 보고", order: 2, isRequired: true },
+    { id: "ti-50", stageId: "phase1", departmentId: "dept8", content: "임상 전략 수립 (임상 필요성 판단)", order: 0, isRequired: true },
+    { id: "ti-51", stageId: "phase1", departmentId: "dept8", content: "임상시험 예비 계획서", order: 1, isRequired: false },
+    { id: "ti-52", stageId: "phase1", departmentId: "dept9", content: "산업 디자인 요구사항 정의", order: 0, isRequired: true },
+    { id: "ti-53", stageId: "phase1", departmentId: "dept9", content: "사용자 인터페이스(UI) 요구사항 정의", order: 1, isRequired: true },
+    { id: "ti-54", stageId: "phase1", departmentId: "dept9", content: "인간공학 설계 요구사항", order: 2, isRequired: true },
+    { id: "ti-55", stageId: "phase1", departmentId: "dept9", content: "초기 디자인 컨셉 개발 (2-3안)", order: 3, isRequired: false },
+    { id: "ti-56", stageId: "phase1", departmentId: "dept10", content: "인허가 전략서 확정", order: 0, isRequired: true },
+    { id: "ti-57", stageId: "phase1", departmentId: "dept10", content: "필수 시험 항목 목록 확정", order: 1, isRequired: true },
+    { id: "ti-58", stageId: "phase1", departmentId: "dept10", content: "기술문서 작성 계획 수립", order: 2, isRequired: true },
+    { id: "ti-59", stageId: "phase1", departmentId: "dept10", content: "해외 인증 로드맵 수립 (CE, FDA 등)", order: 3, isRequired: false },
+    // ── Phase 2: WM (35개) ──────────────────────────────────────
+    { id: "ti-60", stageId: "phase2", departmentId: "dept1", content: "eBOM (설계 자재 명세서) 작성", order: 0, isRequired: true },
+    { id: "ti-61", stageId: "phase2", departmentId: "dept1", content: "상세 설계 문서 작성 (도면/3D 모델)", order: 1, isRequired: true },
+    { id: "ti-62", stageId: "phase2", departmentId: "dept1", content: "시제품(Working Model) 제작", order: 2, isRequired: true },
+    { id: "ti-63", stageId: "phase2", departmentId: "dept1", content: "소프트웨어 구현 및 단위 테스트 (IEC 62304)", order: 3, isRequired: true },
+    { id: "ti-64", stageId: "phase2", departmentId: "dept1", content: "설계 출력(Design Output) 문서화", order: 4, isRequired: true },
+    { id: "ti-65", stageId: "phase2", departmentId: "dept1", content: "설계 검증(Design Verification) 실시", order: 5, isRequired: true },
+    { id: "ti-66", stageId: "phase2", departmentId: "dept1", content: "HW/SW 통합 테스트", order: 6, isRequired: true },
+    { id: "ti-67", stageId: "phase2", departmentId: "dept1", content: "전기 안전 사전 시험 (IEC 60601-1)", order: 7, isRequired: false },
+    { id: "ti-68", stageId: "phase2", departmentId: "dept1", content: "W/M 검증 결과 보고서", order: 8, isRequired: true },
+    { id: "ti-69", stageId: "phase2", departmentId: "dept2", content: "설계 검증 시험 계획서 확정", order: 0, isRequired: true },
+    { id: "ti-70", stageId: "phase2", departmentId: "dept2", content: "위험 분석 업데이트 (FMEA 정교화)", order: 1, isRequired: true },
+    { id: "ti-71", stageId: "phase2", departmentId: "dept2", content: "신뢰성 시험 계획 수립", order: 2, isRequired: true },
+    { id: "ti-72", stageId: "phase2", departmentId: "dept2", content: "검교정 장비/시험 설비 확보", order: 3, isRequired: true },
+    { id: "ti-73", stageId: "phase2", departmentId: "dept2", content: "IQ/OQ 프로토콜 초안", order: 4, isRequired: false },
+    { id: "ti-74", stageId: "phase2", departmentId: "dept2", content: "W/M 품질 검증 보고서", order: 5, isRequired: true },
+    { id: "ti-75", stageId: "phase2", departmentId: "dept4", content: "시제품 제작 공정 검토", order: 0, isRequired: true },
+    { id: "ti-76", stageId: "phase2", departmentId: "dept4", content: "제작 공정 흐름도(Process Flow) 작성", order: 1, isRequired: true },
+    { id: "ti-77", stageId: "phase2", departmentId: "dept4", content: "시제품 조립 지원", order: 2, isRequired: true },
+    { id: "ti-78", stageId: "phase2", departmentId: "dept4", content: "공정 개선점 초기 도출", order: 3, isRequired: false },
+    { id: "ti-79", stageId: "phase2", departmentId: "dept5", content: "시제품 부품 조달", order: 0, isRequired: true },
+    { id: "ti-80", stageId: "phase2", departmentId: "dept5", content: "핵심 공급업체 선정 및 평가", order: 1, isRequired: true },
+    { id: "ti-81", stageId: "phase2", departmentId: "dept5", content: "부품 수급 리드타임 확인", order: 2, isRequired: true },
+    { id: "ti-82", stageId: "phase2", departmentId: "dept5", content: "공급업체 품질 협약서(SQA) 체결", order: 3, isRequired: false },
+    { id: "ti-83", stageId: "phase2", departmentId: "dept9", content: "외관 디자인 확정", order: 0, isRequired: true },
+    { id: "ti-84", stageId: "phase2", departmentId: "dept9", content: "사용자 인터페이스(UI/UX) 설계", order: 1, isRequired: true },
+    { id: "ti-85", stageId: "phase2", departmentId: "dept9", content: "목업/외관 시제품 제작", order: 2, isRequired: true },
+    { id: "ti-86", stageId: "phase2", departmentId: "dept9", content: "사용성 사전 평가", order: 3, isRequired: false },
+    { id: "ti-87", stageId: "phase2", departmentId: "dept9", content: "디자인 검증 결과 보고", order: 4, isRequired: true },
+    { id: "ti-88", stageId: "phase2", departmentId: "dept10", content: "인증 전략 세부 수립 (각국별 요구사항 분석)", order: 0, isRequired: true },
+    { id: "ti-89", stageId: "phase2", departmentId: "dept10", content: "기술문서 초안 작성 시작", order: 1, isRequired: true },
+    { id: "ti-90", stageId: "phase2", departmentId: "dept10", content: "필수 시험 항목 확인 및 시험소 선정", order: 2, isRequired: true },
+    { id: "ti-91", stageId: "phase2", departmentId: "dept10", content: "라벨링/IFU 초안 검토", order: 3, isRequired: false },
+    { id: "ti-92", stageId: "phase2", departmentId: "dept8", content: "임상 문헌 조사", order: 0, isRequired: true },
+    { id: "ti-93", stageId: "phase2", departmentId: "dept8", content: "임상시험 프로토콜 초안 작성", order: 1, isRequired: false },
+    { id: "ti-94", stageId: "phase2", departmentId: "dept7", content: "중간 비용 실적 검토", order: 0, isRequired: false },
+    // ── Phase 3: Tx (39개) ──────────────────────────────────────
+    { id: "ti-95", stageId: "phase3", departmentId: "dept1", content: "설계 확인(Design Validation) 실시", order: 0, isRequired: true },
+    { id: "ti-96", stageId: "phase3", departmentId: "dept1", content: "소프트웨어 검증/확인 완료 (IEC 62304)", order: 1, isRequired: true },
+    { id: "ti-97", stageId: "phase3", departmentId: "dept1", content: "기술 문서 최종 검토", order: 2, isRequired: true },
+    { id: "ti-98", stageId: "phase3", departmentId: "dept1", content: "설계 동결(Design Freeze)", order: 3, isRequired: true },
+    { id: "ti-99", stageId: "phase3", departmentId: "dept1", content: "설계 이전(Design Transfer) 문서 작성", order: 4, isRequired: true },
+    { id: "ti-100", stageId: "phase3", departmentId: "dept1", content: "성능 시험 보고서 작성", order: 5, isRequired: true },
+    { id: "ti-101", stageId: "phase3", departmentId: "dept2", content: "신뢰성 시험 실시 (낙하/진동/온습도 등)", order: 0, isRequired: true },
+    { id: "ti-102", stageId: "phase3", departmentId: "dept2", content: "EMC 시험 실시 (IEC 60601-1-2)", order: 1, isRequired: true },
+    { id: "ti-103", stageId: "phase3", departmentId: "dept2", content: "전기 안전 시험 실시 (IEC 60601-1)", order: 2, isRequired: true },
+    { id: "ti-104", stageId: "phase3", departmentId: "dept2", content: "생물학적 안전성 시험 (ISO 10993)", order: 3, isRequired: true },
+    { id: "ti-105", stageId: "phase3", departmentId: "dept2", content: "사용적합성(Usability) 검증 시험 (IEC 62366)", order: 4, isRequired: true },
+    { id: "ti-106", stageId: "phase3", departmentId: "dept2", content: "위험 분석 최종 보고서 (ISO 14971)", order: 5, isRequired: true },
+    { id: "ti-107", stageId: "phase3", departmentId: "dept2", content: "시험 성적서 취합 및 검토", order: 6, isRequired: true },
+    { id: "ti-108", stageId: "phase3", departmentId: "dept2", content: "Tx 시험 성적서 총괄 취합", order: 7, isRequired: true },
+    { id: "ti-109", stageId: "phase3", departmentId: "dept4", content: "시험 생산 준비", order: 0, isRequired: true },
+    { id: "ti-110", stageId: "phase3", departmentId: "dept4", content: "공정 FMEA (pFMEA) 작성", order: 1, isRequired: true },
+    { id: "ti-111", stageId: "phase3", departmentId: "dept4", content: "제조 작업 지시서 초안", order: 2, isRequired: true },
+    { id: "ti-112", stageId: "phase3", departmentId: "dept4", content: "시험 생산 실시 (소량)", order: 3, isRequired: false },
+    { id: "ti-113", stageId: "phase3", departmentId: "dept5", content: "시험 자재 조달", order: 0, isRequired: true },
+    { id: "ti-114", stageId: "phase3", departmentId: "dept5", content: "수입검사 기준서 작성", order: 1, isRequired: true },
+    { id: "ti-115", stageId: "phase3", departmentId: "dept5", content: "공급업체 2차 평가", order: 2, isRequired: false },
+    { id: "ti-116", stageId: "phase3", departmentId: "dept8", content: "임상시험 실시 (IRB 승인 후)", order: 0, isRequired: true },
+    { id: "ti-117", stageId: "phase3", departmentId: "dept8", content: "임상 데이터 수집/분석", order: 1, isRequired: true },
+    { id: "ti-118", stageId: "phase3", departmentId: "dept8", content: "임상시험 결과 보고서 작성", order: 2, isRequired: true },
+    { id: "ti-119", stageId: "phase3", departmentId: "dept8", content: "임상적 평가 보고서(CER) 작성", order: 3, isRequired: true },
+    { id: "ti-120", stageId: "phase3", departmentId: "dept8", content: "해외 임상 시험 진행 (대상국 해당 시)", order: 4, isRequired: false },
+    { id: "ti-121", stageId: "phase3", departmentId: "dept8", content: "임상 결과 최종 보고", order: 5, isRequired: true },
+    { id: "ti-122", stageId: "phase3", departmentId: "dept10", content: "MFDS 기술문서 작성 완료", order: 0, isRequired: true },
+    { id: "ti-123", stageId: "phase3", departmentId: "dept10", content: "MFDS 인허가 신청 (품목인증/허가)", order: 1, isRequired: true },
+    { id: "ti-124", stageId: "phase3", departmentId: "dept10", content: "GMP 적합성 평가 준비", order: 2, isRequired: true },
+    { id: "ti-125", stageId: "phase3", departmentId: "dept10", content: "CE 기술문서 작성 (해당 시)", order: 3, isRequired: false },
+    { id: "ti-126", stageId: "phase3", departmentId: "dept10", content: "FDA 510(k)/PMA 서류 준비 (해당 시)", order: 4, isRequired: false },
+    { id: "ti-127", stageId: "phase3", departmentId: "dept10", content: "라벨링/IFU 최종본 작성", order: 5, isRequired: true },
+    { id: "ti-128", stageId: "phase3", departmentId: "dept10", content: "적합성 선언서 작성", order: 6, isRequired: true },
+    { id: "ti-129", stageId: "phase3", departmentId: "dept10", content: "인증 시험 결과 보고서", order: 7, isRequired: true },
+    { id: "ti-130", stageId: "phase3", departmentId: "dept9", content: "최종 외관 디자인 확정 (양산용)", order: 0, isRequired: true },
+    { id: "ti-131", stageId: "phase3", departmentId: "dept9", content: "포장 디자인 개발", order: 1, isRequired: true },
+    { id: "ti-132", stageId: "phase3", departmentId: "dept3", content: "제품 카탈로그/브로슈어 초안", order: 0, isRequired: false },
+    { id: "ti-133", stageId: "phase3", departmentId: "dept3", content: "판매 채널 사전 확보", order: 1, isRequired: false },
+    // ── Phase 4: MSG (31개) ──────────────────────────────────────
+    { id: "ti-134", stageId: "phase4", departmentId: "dept1", content: "양산 도면 확정", order: 0, isRequired: true },
+    { id: "ti-135", stageId: "phase4", departmentId: "dept1", content: "mBOM (제조 자재 명세서) 확정", order: 1, isRequired: true },
+    { id: "ti-136", stageId: "phase4", departmentId: "dept1", content: "설계 이전(Design Transfer) 완료 확인", order: 2, isRequired: true },
+    { id: "ti-137", stageId: "phase4", departmentId: "dept1", content: "양산용 소프트웨어 릴리스", order: 3, isRequired: true },
+    { id: "ti-138", stageId: "phase4", departmentId: "dept2", content: "공정 밸리데이션 (IQ/OQ/PQ) 실시", order: 0, isRequired: true },
+    { id: "ti-139", stageId: "phase4", departmentId: "dept2", content: "최종 품질 검증 (출하 검사 기준 확정)", order: 1, isRequired: true },
+    { id: "ti-140", stageId: "phase4", departmentId: "dept2", content: "양산 품질 기준서 작성", order: 2, isRequired: true },
+    { id: "ti-141", stageId: "phase4", departmentId: "dept2", content: "검사 장비 밸리데이션", order: 3, isRequired: true },
+    { id: "ti-142", stageId: "phase4", departmentId: "dept2", content: "시생산 제품 최종 검사", order: 4, isRequired: true },
+    { id: "ti-143", stageId: "phase4", departmentId: "dept2", content: "DHF(설계이력파일) 최종 정리", order: 5, isRequired: true },
+    { id: "ti-144", stageId: "phase4", departmentId: "dept2", content: "양산 전 최종 품질 판정 보고", order: 6, isRequired: true },
+    { id: "ti-145", stageId: "phase4", departmentId: "dept4", content: "양산 공정 계획 수립", order: 0, isRequired: true },
+    { id: "ti-146", stageId: "phase4", departmentId: "dept4", content: "시생산(Pilot Run) 실시", order: 1, isRequired: true },
+    { id: "ti-147", stageId: "phase4", departmentId: "dept4", content: "양산 라인 셋업", order: 2, isRequired: true },
+    { id: "ti-148", stageId: "phase4", departmentId: "dept4", content: "작업 표준서(SOP) 확정", order: 3, isRequired: true },
+    { id: "ti-149", stageId: "phase4", departmentId: "dept4", content: "시생산 결과 분석 및 개선", order: 4, isRequired: true },
+    { id: "ti-150", stageId: "phase4", departmentId: "dept4", content: "특수공정 밸리데이션", order: 5, isRequired: false },
+    { id: "ti-151", stageId: "phase4", departmentId: "dept4", content: "양산 Capacity/Takt Time 확인", order: 6, isRequired: true },
+    { id: "ti-152", stageId: "phase4", departmentId: "dept4", content: "시생산 결과 최종 보고", order: 7, isRequired: true },
+    { id: "ti-153", stageId: "phase4", departmentId: "dept5", content: "양산 자재 조달 계획 확정", order: 0, isRequired: true },
+    { id: "ti-154", stageId: "phase4", departmentId: "dept5", content: "양산용 공급업체 계약 확정", order: 1, isRequired: true },
+    { id: "ti-155", stageId: "phase4", departmentId: "dept5", content: "안전 재고 수준 설정", order: 2, isRequired: true },
+    { id: "ti-156", stageId: "phase4", departmentId: "dept5", content: "수입검사 체계 확정", order: 3, isRequired: true },
+    { id: "ti-157", stageId: "phase4", departmentId: "dept10", content: "인허가 승인 확인", order: 0, isRequired: true },
+    { id: "ti-158", stageId: "phase4", departmentId: "dept10", content: "GMP 적합성 인정 확인", order: 1, isRequired: true },
+    { id: "ti-159", stageId: "phase4", departmentId: "dept10", content: "제조소 변경 시 변경 신고 (해당 시)", order: 2, isRequired: false },
+    { id: "ti-160", stageId: "phase4", departmentId: "dept10", content: "인허가 현황 최종 보고", order: 3, isRequired: true },
+    { id: "ti-161", stageId: "phase4", departmentId: "dept9", content: "양산용 포장/라벨 디자인 확정", order: 0, isRequired: true },
+    { id: "ti-162", stageId: "phase4", departmentId: "dept9", content: "사용 설명서(IFU) 최종 디자인 확정", order: 1, isRequired: true },
+    { id: "ti-163", stageId: "phase4", departmentId: "dept7", content: "양산 원가 산정 확정", order: 0, isRequired: true },
+    { id: "ti-164", stageId: "phase4", departmentId: "dept7", content: "출시 일정 확정", order: 1, isRequired: true },
+    // ── Phase 5: 양산/이관 (29개) ──────────────────────────────────────
+    { id: "ti-165", stageId: "phase5", departmentId: "dept1", content: "양산 초기 기술 지원", order: 0, isRequired: true },
+    { id: "ti-166", stageId: "phase5", departmentId: "dept1", content: "설계 이력 파일(DHF) 최종 이관", order: 1, isRequired: true },
+    { id: "ti-167", stageId: "phase5", departmentId: "dept2", content: "초도품 검사 실시 (FAI)", order: 0, isRequired: true },
+    { id: "ti-168", stageId: "phase5", departmentId: "dept2", content: "양산 초기 불량률 모니터링", order: 1, isRequired: true },
+    { id: "ti-169", stageId: "phase5", departmentId: "dept2", content: "출하 검사 프로세스 가동", order: 2, isRequired: true },
+    { id: "ti-170", stageId: "phase5", departmentId: "dept2", content: "시판 후 감시(PMS) 계획 수립", order: 3, isRequired: true },
+    { id: "ti-171", stageId: "phase5", departmentId: "dept3", content: "판매 개시 준비 완료 확인", order: 0, isRequired: true },
+    { id: "ti-172", stageId: "phase5", departmentId: "dept3", content: "영업 교육 실시", order: 1, isRequired: true },
+    { id: "ti-173", stageId: "phase5", departmentId: "dept3", content: "제품 카탈로그/브로슈어 최종본", order: 2, isRequired: true },
+    { id: "ti-174", stageId: "phase5", departmentId: "dept3", content: "거래처 등록/공급 계약", order: 3, isRequired: true },
+    { id: "ti-175", stageId: "phase5", departmentId: "dept3", content: "온라인 마케팅 자료 게시", order: 4, isRequired: false },
+    { id: "ti-176", stageId: "phase5", departmentId: "dept4", content: "양산 가동 개시", order: 0, isRequired: true },
+    { id: "ti-177", stageId: "phase5", departmentId: "dept4", content: "양산 안정화 (수율 확인)", order: 1, isRequired: true },
+    { id: "ti-178", stageId: "phase5", departmentId: "dept4", content: "양산 SOP 최종 확정", order: 2, isRequired: true },
+    { id: "ti-179", stageId: "phase5", departmentId: "dept4", content: "초기 공정 능력(Cpk) 확인", order: 3, isRequired: true },
+    { id: "ti-180", stageId: "phase5", departmentId: "dept5", content: "양산 자재 안정 공급 확인", order: 0, isRequired: true },
+    { id: "ti-181", stageId: "phase5", departmentId: "dept5", content: "납품 일정 관리 체계 가동", order: 1, isRequired: true },
+    { id: "ti-182", stageId: "phase5", departmentId: "dept6", content: "A/S 체계 구축", order: 0, isRequired: true },
+    { id: "ti-183", stageId: "phase5", departmentId: "dept6", content: "고객 상담 매뉴얼 작성", order: 1, isRequired: true },
+    { id: "ti-184", stageId: "phase5", departmentId: "dept6", content: "보수용 부품 재고 확보", order: 2, isRequired: true },
+    { id: "ti-185", stageId: "phase5", departmentId: "dept6", content: "CS 담당자 교육 실시", order: 3, isRequired: true },
+    { id: "ti-186", stageId: "phase5", departmentId: "dept7", content: "최종 원가 확정 및 손익 분석", order: 0, isRequired: true },
+    { id: "ti-187", stageId: "phase5", departmentId: "dept7", content: "프로젝트 종료 보고서", order: 1, isRequired: true },
+    { id: "ti-188", stageId: "phase5", departmentId: "dept7", content: "프로젝트 Lessons Learned 정리", order: 2, isRequired: false },
+    { id: "ti-189", stageId: "phase5", departmentId: "dept8", content: "시판 후 임상 추적(PMCF) 계획 수립 (해당 시)", order: 0, isRequired: false },
+    { id: "ti-190", stageId: "phase5", departmentId: "dept10", content: "최종 인허가 완료 확인서", order: 0, isRequired: true },
+    { id: "ti-191", stageId: "phase5", departmentId: "dept10", content: "시판 후 안전성 보고 체계 구축", order: 1, isRequired: true },
+    { id: "ti-192", stageId: "phase5", departmentId: "dept10", content: "해외 인허가 완료 현황 정리", order: 2, isRequired: false },
+    { id: "ti-193", stageId: "phase5", departmentId: "dept10", content: "정기 안전성 보고 계획 확정", order: 3, isRequired: false },
+  ];
+}
+
+export async function seedTemplatesIfEmpty() {
+  try {
+    const stagesSnap = await getDocs(collection(db, "templateStages"));
+    if (!stagesSnap.empty) return false; // templates already exist
+
+    console.log("📦 템플릿 데이터가 없어 자동 생성합니다...");
+    const batch = writeBatch(db);
+
+    // Template Stages (6 Phases)
+    const stages = [
+      { id: "phase0", name: "발의", order: 0, workStageName: "발의검토", gateStageName: "발의승인" },
+      { id: "phase1", name: "기획", order: 1, workStageName: "기획검토", gateStageName: "기획승인" },
+      { id: "phase2", name: "WM", order: 2, workStageName: "WM제작", gateStageName: "WM승인회" },
+      { id: "phase3", name: "Tx", order: 3, workStageName: "Tx단계", gateStageName: "Tx승인회" },
+      { id: "phase4", name: "MSG", order: 4, workStageName: "MasterGatePilot", gateStageName: "MSG승인회" },
+      { id: "phase5", name: "양산/이관", order: 5, workStageName: "양산", gateStageName: "영업이관" },
+    ];
+    for (const s of stages) {
+      batch.set(doc(db, "templateStages", s.id), { ...s, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() });
+    }
+
+    // Template Departments (10)
+    const depts = [
+      { id: "dept1", name: "개발팀", order: 0 },
+      { id: "dept2", name: "품질팀", order: 1 },
+      { id: "dept3", name: "영업팀", order: 2 },
+      { id: "dept4", name: "제조팀", order: 3 },
+      { id: "dept5", name: "구매팀", order: 4 },
+      { id: "dept6", name: "CS팀", order: 5 },
+      { id: "dept7", name: "경영관리팀", order: 6 },
+      { id: "dept8", name: "글로벌임상팀", order: 7 },
+      { id: "dept9", name: "디자인연구소", order: 8 },
+      { id: "dept10", name: "인증팀", order: 9 },
+    ];
+    for (const d of depts) {
+      batch.set(doc(db, "templateDepartments", d.id), { ...d, createdBy: "system", createdAt: Timestamp.now() });
+    }
+
+    await batch.commit();
+
+    // Template Items (193개) — 별도 batch (500 limit 대비)
+    const tItemsBatch = writeBatch(db);
+    const tItems = _getTemplateItems();
+    let count = 0;
+    for (const ti of tItems) {
+      tItemsBatch.set(doc(db, "templateItems", ti.id), { ...ti, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() });
+      count++;
+    }
+    await tItemsBatch.commit();
+    console.log(`✅ 템플릿 데이터 시드 완료 (6 phases, 10 departments, ${count} items)`);
+    return true;
+  } catch (err) {
+    console.error("❌ 템플릿 시드 실패:", err);
+    return false;
+  }
+}
+
 // ─── Seed Database ──────────────────────────────────────────────────────────
 
 export async function seedDatabaseIfEmpty() {
@@ -217,261 +481,8 @@ export async function seedDatabaseIfEmpty() {
       batch.set(doc(db, "templateDepartments", d.id), { ...d, createdBy: "system", createdAt: Timestamp.now() });
     }
 
-    // Template Items (stageId는 페이즈 ID 참조, 193개 — ISO 13485/IEC 62304/FDA 기반)
-    const tItems = [
-      // ── Phase 0: 발의 (22개) ──────────────────────────────────────
-      // 개발팀 (6)
-      { id: "ti-1", stageId: "phase0", departmentId: "dept1", content: "제품 컨셉 정의서 작성", order: 0, isRequired: true },
-      { id: "ti-2", stageId: "phase0", departmentId: "dept1", content: "기술 타당성 사전 검토", order: 1, isRequired: true },
-      { id: "ti-3", stageId: "phase0", departmentId: "dept1", content: "선행 기술 조사 보고서", order: 2, isRequired: true },
-      { id: "ti-4", stageId: "phase0", departmentId: "dept1", content: "NABC 분석 작성", order: 3, isRequired: true },
-      { id: "ti-5", stageId: "phase0", departmentId: "dept1", content: "지적재산권 사전 검토", order: 4, isRequired: false },
-      { id: "ti-6", stageId: "phase0", departmentId: "dept1", content: "발의 심사 발표자료 준비", order: 5, isRequired: true },
-      // 품질팀 (3)
-      { id: "ti-7", stageId: "phase0", departmentId: "dept2", content: "품질 목표 수립", order: 0, isRequired: true },
-      { id: "ti-8", stageId: "phase0", departmentId: "dept2", content: "해당 규격/표준 목록 사전 조사", order: 1, isRequired: true },
-      { id: "ti-9", stageId: "phase0", departmentId: "dept2", content: "유사 제품 CAPA/불만 데이터 분석", order: 2, isRequired: false },
-      // 영업팀 (4)
-      { id: "ti-10", stageId: "phase0", departmentId: "dept3", content: "시장 기회 분석 보고서", order: 0, isRequired: true },
-      { id: "ti-11", stageId: "phase0", departmentId: "dept3", content: "경쟁사 제품 분석", order: 1, isRequired: true },
-      { id: "ti-12", stageId: "phase0", departmentId: "dept3", content: "목표 고객군 정의", order: 2, isRequired: true },
-      { id: "ti-13", stageId: "phase0", departmentId: "dept3", content: "예상 판매가/판매량 추정", order: 3, isRequired: false },
-      // 경영관리팀 (4)
-      { id: "ti-14", stageId: "phase0", departmentId: "dept7", content: "사업성 검토 (ROI/수익성 분석)", order: 0, isRequired: true },
-      { id: "ti-15", stageId: "phase0", departmentId: "dept7", content: "초기 프로젝트 예산 산정", order: 1, isRequired: true },
-      { id: "ti-16", stageId: "phase0", departmentId: "dept7", content: "프로젝트 일정 초안 수립", order: 2, isRequired: true },
-      { id: "ti-17", stageId: "phase0", departmentId: "dept7", content: "발의 승인 판단 근거 자료 취합", order: 3, isRequired: true },
-      // 인증팀 (3)
-      { id: "ti-18", stageId: "phase0", departmentId: "dept10", content: "규제 분류 사전 검토 (등급/품목 예비 분류)", order: 0, isRequired: true },
-      { id: "ti-19", stageId: "phase0", departmentId: "dept10", content: "인허가 경로 조사 (국내 MFDS + 해외)", order: 1, isRequired: true },
-      { id: "ti-20", stageId: "phase0", departmentId: "dept10", content: "필수 인증 목록 사전 파악", order: 2, isRequired: false },
-      // 디자인연구소 (2)
-      { id: "ti-21", stageId: "phase0", departmentId: "dept9", content: "사용자 니즈 사전 조사", order: 0, isRequired: false },
-      { id: "ti-22", stageId: "phase0", departmentId: "dept9", content: "컨셉 스케치/무드보드", order: 1, isRequired: false },
-
-      // ── Phase 1: 기획 (37개) ──────────────────────────────────────
-      // 개발팀 (8)
-      { id: "ti-23", stageId: "phase1", departmentId: "dept1", content: "설계 입력(Design Input) 요구사항 명세서", order: 0, isRequired: true },
-      { id: "ti-24", stageId: "phase1", departmentId: "dept1", content: "제품 사양서(Product Specification) 작성", order: 1, isRequired: true },
-      { id: "ti-25", stageId: "phase1", departmentId: "dept1", content: "소프트웨어 개발 계획 수립 (IEC 62304)", order: 2, isRequired: true },
-      { id: "ti-26", stageId: "phase1", departmentId: "dept1", content: "시스템 아키텍처 설계", order: 3, isRequired: true },
-      { id: "ti-27", stageId: "phase1", departmentId: "dept1", content: "설계 검증/확인 계획 수립", order: 4, isRequired: true },
-      { id: "ti-28", stageId: "phase1", departmentId: "dept1", content: "개발 일정 상세 수립", order: 5, isRequired: true },
-      { id: "ti-29", stageId: "phase1", departmentId: "dept1", content: "기술 위험 분석 (초기 FMEA)", order: 6, isRequired: true },
-      { id: "ti-30", stageId: "phase1", departmentId: "dept1", content: "기획 승인회 발표자료 작성", order: 7, isRequired: true },
-      // 품질팀 (6)
-      { id: "ti-31", stageId: "phase1", departmentId: "dept2", content: "위험관리 계획서 수립 (ISO 14971)", order: 0, isRequired: true },
-      { id: "ti-32", stageId: "phase1", departmentId: "dept2", content: "적용 규격/표준 확정 및 적합성 매트릭스", order: 1, isRequired: true },
-      { id: "ti-33", stageId: "phase1", departmentId: "dept2", content: "설계 관리(Design Control) 절차 확인", order: 2, isRequired: true },
-      { id: "ti-34", stageId: "phase1", departmentId: "dept2", content: "시험/검증 계획서 초안", order: 3, isRequired: true },
-      { id: "ti-35", stageId: "phase1", departmentId: "dept2", content: "DHF(설계이력파일) 구성 계획", order: 4, isRequired: true },
-      { id: "ti-36", stageId: "phase1", departmentId: "dept2", content: "사용적합성(Usability) 엔지니어링 계획 (IEC 62366)", order: 5, isRequired: false },
-      // 영업팀 (4)
-      { id: "ti-37", stageId: "phase1", departmentId: "dept3", content: "고객 요구사항 정의서", order: 0, isRequired: true },
-      { id: "ti-38", stageId: "phase1", departmentId: "dept3", content: "가격 전략 수립", order: 1, isRequired: true },
-      { id: "ti-39", stageId: "phase1", departmentId: "dept3", content: "마케팅 요구사항 정리 (라벨링, 포장 등)", order: 2, isRequired: false },
-      { id: "ti-40", stageId: "phase1", departmentId: "dept3", content: "기획 단계 시장성 검증 결과", order: 3, isRequired: true },
-      // 제조팀 (3)
-      { id: "ti-41", stageId: "phase1", departmentId: "dept4", content: "제조 타당성 검토", order: 0, isRequired: true },
-      { id: "ti-42", stageId: "phase1", departmentId: "dept4", content: "초기 공정 흐름도 검토", order: 1, isRequired: false },
-      { id: "ti-43", stageId: "phase1", departmentId: "dept4", content: "제조 비용 사전 추정", order: 2, isRequired: false },
-      // 구매팀 (2)
-      { id: "ti-44", stageId: "phase1", departmentId: "dept5", content: "주요 부품/원재료 사전 조사", order: 0, isRequired: true },
-      { id: "ti-45", stageId: "phase1", departmentId: "dept5", content: "공급업체 후보 리스트 작성", order: 1, isRequired: false },
-      // CS팀 (1)
-      { id: "ti-46", stageId: "phase1", departmentId: "dept6", content: "서비스 요구사항 정의 (A/S, 유지보수 등)", order: 0, isRequired: false },
-      // 경영관리팀 (3)
-      { id: "ti-47", stageId: "phase1", departmentId: "dept7", content: "프로젝트 상세 예산 확정", order: 0, isRequired: true },
-      { id: "ti-48", stageId: "phase1", departmentId: "dept7", content: "자원 배분 계획 (인력/설비)", order: 1, isRequired: true },
-      { id: "ti-49", stageId: "phase1", departmentId: "dept7", content: "비용/일정 검토 결과 보고", order: 2, isRequired: true },
-      // 글로벌임상팀 (2)
-      { id: "ti-50", stageId: "phase1", departmentId: "dept8", content: "임상 전략 수립 (임상 필요성 판단)", order: 0, isRequired: true },
-      { id: "ti-51", stageId: "phase1", departmentId: "dept8", content: "임상시험 예비 계획서", order: 1, isRequired: false },
-      // 디자인연구소 (4)
-      { id: "ti-52", stageId: "phase1", departmentId: "dept9", content: "산업 디자인 요구사항 정의", order: 0, isRequired: true },
-      { id: "ti-53", stageId: "phase1", departmentId: "dept9", content: "사용자 인터페이스(UI) 요구사항 정의", order: 1, isRequired: true },
-      { id: "ti-54", stageId: "phase1", departmentId: "dept9", content: "인간공학 설계 요구사항", order: 2, isRequired: true },
-      { id: "ti-55", stageId: "phase1", departmentId: "dept9", content: "초기 디자인 컨셉 개발 (2-3안)", order: 3, isRequired: false },
-      // 인증팀 (4)
-      { id: "ti-56", stageId: "phase1", departmentId: "dept10", content: "인허가 전략서 확정", order: 0, isRequired: true },
-      { id: "ti-57", stageId: "phase1", departmentId: "dept10", content: "필수 시험 항목 목록 확정", order: 1, isRequired: true },
-      { id: "ti-58", stageId: "phase1", departmentId: "dept10", content: "기술문서 작성 계획 수립", order: 2, isRequired: true },
-      { id: "ti-59", stageId: "phase1", departmentId: "dept10", content: "해외 인증 로드맵 수립 (CE, FDA 등)", order: 3, isRequired: false },
-
-      // ── Phase 2: WM (35개) ──────────────────────────────────────
-      // 개발팀 (9)
-      { id: "ti-60", stageId: "phase2", departmentId: "dept1", content: "eBOM (설계 자재 명세서) 작성", order: 0, isRequired: true },
-      { id: "ti-61", stageId: "phase2", departmentId: "dept1", content: "상세 설계 문서 작성 (도면/3D 모델)", order: 1, isRequired: true },
-      { id: "ti-62", stageId: "phase2", departmentId: "dept1", content: "시제품(Working Model) 제작", order: 2, isRequired: true },
-      { id: "ti-63", stageId: "phase2", departmentId: "dept1", content: "소프트웨어 구현 및 단위 테스트 (IEC 62304)", order: 3, isRequired: true },
-      { id: "ti-64", stageId: "phase2", departmentId: "dept1", content: "설계 출력(Design Output) 문서화", order: 4, isRequired: true },
-      { id: "ti-65", stageId: "phase2", departmentId: "dept1", content: "설계 검증(Design Verification) 실시", order: 5, isRequired: true },
-      { id: "ti-66", stageId: "phase2", departmentId: "dept1", content: "HW/SW 통합 테스트", order: 6, isRequired: true },
-      { id: "ti-67", stageId: "phase2", departmentId: "dept1", content: "전기 안전 사전 시험 (IEC 60601-1)", order: 7, isRequired: false },
-      { id: "ti-68", stageId: "phase2", departmentId: "dept1", content: "W/M 검증 결과 보고서", order: 8, isRequired: true },
-      // 품질팀 (6)
-      { id: "ti-69", stageId: "phase2", departmentId: "dept2", content: "설계 검증 시험 계획서 확정", order: 0, isRequired: true },
-      { id: "ti-70", stageId: "phase2", departmentId: "dept2", content: "위험 분석 업데이트 (FMEA 정교화)", order: 1, isRequired: true },
-      { id: "ti-71", stageId: "phase2", departmentId: "dept2", content: "신뢰성 시험 계획 수립", order: 2, isRequired: true },
-      { id: "ti-72", stageId: "phase2", departmentId: "dept2", content: "검교정 장비/시험 설비 확보", order: 3, isRequired: true },
-      { id: "ti-73", stageId: "phase2", departmentId: "dept2", content: "IQ/OQ 프로토콜 초안", order: 4, isRequired: false },
-      { id: "ti-74", stageId: "phase2", departmentId: "dept2", content: "W/M 품질 검증 보고서", order: 5, isRequired: true },
-      // 제조팀 (4)
-      { id: "ti-75", stageId: "phase2", departmentId: "dept4", content: "시제품 제작 공정 검토", order: 0, isRequired: true },
-      { id: "ti-76", stageId: "phase2", departmentId: "dept4", content: "제작 공정 흐름도(Process Flow) 작성", order: 1, isRequired: true },
-      { id: "ti-77", stageId: "phase2", departmentId: "dept4", content: "시제품 조립 지원", order: 2, isRequired: true },
-      { id: "ti-78", stageId: "phase2", departmentId: "dept4", content: "공정 개선점 초기 도출", order: 3, isRequired: false },
-      // 구매팀 (4)
-      { id: "ti-79", stageId: "phase2", departmentId: "dept5", content: "시제품 부품 조달", order: 0, isRequired: true },
-      { id: "ti-80", stageId: "phase2", departmentId: "dept5", content: "핵심 공급업체 선정 및 평가", order: 1, isRequired: true },
-      { id: "ti-81", stageId: "phase2", departmentId: "dept5", content: "부품 수급 리드타임 확인", order: 2, isRequired: true },
-      { id: "ti-82", stageId: "phase2", departmentId: "dept5", content: "공급업체 품질 협약서(SQA) 체결", order: 3, isRequired: false },
-      // 디자인연구소 (5)
-      { id: "ti-83", stageId: "phase2", departmentId: "dept9", content: "외관 디자인 확정", order: 0, isRequired: true },
-      { id: "ti-84", stageId: "phase2", departmentId: "dept9", content: "사용자 인터페이스(UI/UX) 설계", order: 1, isRequired: true },
-      { id: "ti-85", stageId: "phase2", departmentId: "dept9", content: "목업/외관 시제품 제작", order: 2, isRequired: true },
-      { id: "ti-86", stageId: "phase2", departmentId: "dept9", content: "사용성 사전 평가", order: 3, isRequired: false },
-      { id: "ti-87", stageId: "phase2", departmentId: "dept9", content: "디자인 검증 결과 보고", order: 4, isRequired: true },
-      // 인증팀 (4)
-      { id: "ti-88", stageId: "phase2", departmentId: "dept10", content: "인증 전략 세부 수립 (각국별 요구사항 분석)", order: 0, isRequired: true },
-      { id: "ti-89", stageId: "phase2", departmentId: "dept10", content: "기술문서 초안 작성 시작", order: 1, isRequired: true },
-      { id: "ti-90", stageId: "phase2", departmentId: "dept10", content: "필수 시험 항목 확인 및 시험소 선정", order: 2, isRequired: true },
-      { id: "ti-91", stageId: "phase2", departmentId: "dept10", content: "라벨링/IFU 초안 검토", order: 3, isRequired: false },
-      // 글로벌임상팀 (2)
-      { id: "ti-92", stageId: "phase2", departmentId: "dept8", content: "임상 문헌 조사", order: 0, isRequired: true },
-      { id: "ti-93", stageId: "phase2", departmentId: "dept8", content: "임상시험 프로토콜 초안 작성", order: 1, isRequired: false },
-      // 경영관리팀 (1)
-      { id: "ti-94", stageId: "phase2", departmentId: "dept7", content: "중간 비용 실적 검토", order: 0, isRequired: false },
-
-      // ── Phase 3: Tx (39개) ──────────────────────────────────────
-      // 개발팀 (6)
-      { id: "ti-95", stageId: "phase3", departmentId: "dept1", content: "설계 확인(Design Validation) 실시", order: 0, isRequired: true },
-      { id: "ti-96", stageId: "phase3", departmentId: "dept1", content: "소프트웨어 검증/확인 완료 (IEC 62304)", order: 1, isRequired: true },
-      { id: "ti-97", stageId: "phase3", departmentId: "dept1", content: "기술 문서 최종 검토", order: 2, isRequired: true },
-      { id: "ti-98", stageId: "phase3", departmentId: "dept1", content: "설계 동결(Design Freeze)", order: 3, isRequired: true },
-      { id: "ti-99", stageId: "phase3", departmentId: "dept1", content: "설계 이전(Design Transfer) 문서 작성", order: 4, isRequired: true },
-      { id: "ti-100", stageId: "phase3", departmentId: "dept1", content: "성능 시험 보고서 작성", order: 5, isRequired: true },
-      // 품질팀 (8)
-      { id: "ti-101", stageId: "phase3", departmentId: "dept2", content: "신뢰성 시험 실시 (낙하/진동/온습도 등)", order: 0, isRequired: true },
-      { id: "ti-102", stageId: "phase3", departmentId: "dept2", content: "EMC 시험 실시 (IEC 60601-1-2)", order: 1, isRequired: true },
-      { id: "ti-103", stageId: "phase3", departmentId: "dept2", content: "전기 안전 시험 실시 (IEC 60601-1)", order: 2, isRequired: true },
-      { id: "ti-104", stageId: "phase3", departmentId: "dept2", content: "생물학적 안전성 시험 (ISO 10993)", order: 3, isRequired: true },
-      { id: "ti-105", stageId: "phase3", departmentId: "dept2", content: "사용적합성(Usability) 검증 시험 (IEC 62366)", order: 4, isRequired: true },
-      { id: "ti-106", stageId: "phase3", departmentId: "dept2", content: "위험 분석 최종 보고서 (ISO 14971)", order: 5, isRequired: true },
-      { id: "ti-107", stageId: "phase3", departmentId: "dept2", content: "시험 성적서 취합 및 검토", order: 6, isRequired: true },
-      { id: "ti-108", stageId: "phase3", departmentId: "dept2", content: "Tx 시험 성적서 총괄 취합", order: 7, isRequired: true },
-      // 제조팀 (4)
-      { id: "ti-109", stageId: "phase3", departmentId: "dept4", content: "시험 생산 준비", order: 0, isRequired: true },
-      { id: "ti-110", stageId: "phase3", departmentId: "dept4", content: "공정 FMEA (pFMEA) 작성", order: 1, isRequired: true },
-      { id: "ti-111", stageId: "phase3", departmentId: "dept4", content: "제조 작업 지시서 초안", order: 2, isRequired: true },
-      { id: "ti-112", stageId: "phase3", departmentId: "dept4", content: "시험 생산 실시 (소량)", order: 3, isRequired: false },
-      // 구매팀 (3)
-      { id: "ti-113", stageId: "phase3", departmentId: "dept5", content: "시험 자재 조달", order: 0, isRequired: true },
-      { id: "ti-114", stageId: "phase3", departmentId: "dept5", content: "수입검사 기준서 작성", order: 1, isRequired: true },
-      { id: "ti-115", stageId: "phase3", departmentId: "dept5", content: "공급업체 2차 평가", order: 2, isRequired: false },
-      // 글로벌임상팀 (6)
-      { id: "ti-116", stageId: "phase3", departmentId: "dept8", content: "임상시험 실시 (IRB 승인 후)", order: 0, isRequired: true },
-      { id: "ti-117", stageId: "phase3", departmentId: "dept8", content: "임상 데이터 수집/분석", order: 1, isRequired: true },
-      { id: "ti-118", stageId: "phase3", departmentId: "dept8", content: "임상시험 결과 보고서 작성", order: 2, isRequired: true },
-      { id: "ti-119", stageId: "phase3", departmentId: "dept8", content: "임상적 평가 보고서(CER) 작성", order: 3, isRequired: true },
-      { id: "ti-120", stageId: "phase3", departmentId: "dept8", content: "해외 임상 시험 진행 (대상국 해당 시)", order: 4, isRequired: false },
-      { id: "ti-121", stageId: "phase3", departmentId: "dept8", content: "임상 결과 최종 보고", order: 5, isRequired: true },
-      // 인증팀 (8)
-      { id: "ti-122", stageId: "phase3", departmentId: "dept10", content: "MFDS 기술문서 작성 완료", order: 0, isRequired: true },
-      { id: "ti-123", stageId: "phase3", departmentId: "dept10", content: "MFDS 인허가 신청 (품목인증/허가)", order: 1, isRequired: true },
-      { id: "ti-124", stageId: "phase3", departmentId: "dept10", content: "GMP 적합성 평가 준비", order: 2, isRequired: true },
-      { id: "ti-125", stageId: "phase3", departmentId: "dept10", content: "CE 기술문서 작성 (해당 시)", order: 3, isRequired: false },
-      { id: "ti-126", stageId: "phase3", departmentId: "dept10", content: "FDA 510(k)/PMA 서류 준비 (해당 시)", order: 4, isRequired: false },
-      { id: "ti-127", stageId: "phase3", departmentId: "dept10", content: "라벨링/IFU 최종본 작성", order: 5, isRequired: true },
-      { id: "ti-128", stageId: "phase3", departmentId: "dept10", content: "적합성 선언서 작성", order: 6, isRequired: true },
-      { id: "ti-129", stageId: "phase3", departmentId: "dept10", content: "인증 시험 결과 보고서", order: 7, isRequired: true },
-      // 디자인연구소 (2)
-      { id: "ti-130", stageId: "phase3", departmentId: "dept9", content: "최종 외관 디자인 확정 (양산용)", order: 0, isRequired: true },
-      { id: "ti-131", stageId: "phase3", departmentId: "dept9", content: "포장 디자인 개발", order: 1, isRequired: true },
-      // 영업팀 (2)
-      { id: "ti-132", stageId: "phase3", departmentId: "dept3", content: "제품 카탈로그/브로슈어 초안", order: 0, isRequired: false },
-      { id: "ti-133", stageId: "phase3", departmentId: "dept3", content: "판매 채널 사전 확보", order: 1, isRequired: false },
-
-      // ── Phase 4: MSG (31개) ──────────────────────────────────────
-      // 개발팀 (4)
-      { id: "ti-134", stageId: "phase4", departmentId: "dept1", content: "양산 도면 확정", order: 0, isRequired: true },
-      { id: "ti-135", stageId: "phase4", departmentId: "dept1", content: "mBOM (제조 자재 명세서) 확정", order: 1, isRequired: true },
-      { id: "ti-136", stageId: "phase4", departmentId: "dept1", content: "설계 이전(Design Transfer) 완료 확인", order: 2, isRequired: true },
-      { id: "ti-137", stageId: "phase4", departmentId: "dept1", content: "양산용 소프트웨어 릴리스", order: 3, isRequired: true },
-      // 품질팀 (7)
-      { id: "ti-138", stageId: "phase4", departmentId: "dept2", content: "공정 밸리데이션 (IQ/OQ/PQ) 실시", order: 0, isRequired: true },
-      { id: "ti-139", stageId: "phase4", departmentId: "dept2", content: "최종 품질 검증 (출하 검사 기준 확정)", order: 1, isRequired: true },
-      { id: "ti-140", stageId: "phase4", departmentId: "dept2", content: "양산 품질 기준서 작성", order: 2, isRequired: true },
-      { id: "ti-141", stageId: "phase4", departmentId: "dept2", content: "검사 장비 밸리데이션", order: 3, isRequired: true },
-      { id: "ti-142", stageId: "phase4", departmentId: "dept2", content: "시생산 제품 최종 검사", order: 4, isRequired: true },
-      { id: "ti-143", stageId: "phase4", departmentId: "dept2", content: "DHF(설계이력파일) 최종 정리", order: 5, isRequired: true },
-      { id: "ti-144", stageId: "phase4", departmentId: "dept2", content: "양산 전 최종 품질 판정 보고", order: 6, isRequired: true },
-      // 제조팀 (8)
-      { id: "ti-145", stageId: "phase4", departmentId: "dept4", content: "양산 공정 계획 수립", order: 0, isRequired: true },
-      { id: "ti-146", stageId: "phase4", departmentId: "dept4", content: "시생산(Pilot Run) 실시", order: 1, isRequired: true },
-      { id: "ti-147", stageId: "phase4", departmentId: "dept4", content: "양산 라인 셋업", order: 2, isRequired: true },
-      { id: "ti-148", stageId: "phase4", departmentId: "dept4", content: "작업 표준서(SOP) 확정", order: 3, isRequired: true },
-      { id: "ti-149", stageId: "phase4", departmentId: "dept4", content: "시생산 결과 분석 및 개선", order: 4, isRequired: true },
-      { id: "ti-150", stageId: "phase4", departmentId: "dept4", content: "특수공정 밸리데이션", order: 5, isRequired: false },
-      { id: "ti-151", stageId: "phase4", departmentId: "dept4", content: "양산 Capacity/Takt Time 확인", order: 6, isRequired: true },
-      { id: "ti-152", stageId: "phase4", departmentId: "dept4", content: "시생산 결과 최종 보고", order: 7, isRequired: true },
-      // 구매팀 (4)
-      { id: "ti-153", stageId: "phase4", departmentId: "dept5", content: "양산 자재 조달 계획 확정", order: 0, isRequired: true },
-      { id: "ti-154", stageId: "phase4", departmentId: "dept5", content: "양산용 공급업체 계약 확정", order: 1, isRequired: true },
-      { id: "ti-155", stageId: "phase4", departmentId: "dept5", content: "안전 재고 수준 설정", order: 2, isRequired: true },
-      { id: "ti-156", stageId: "phase4", departmentId: "dept5", content: "수입검사 체계 확정", order: 3, isRequired: true },
-      // 인증팀 (4)
-      { id: "ti-157", stageId: "phase4", departmentId: "dept10", content: "인허가 승인 확인", order: 0, isRequired: true },
-      { id: "ti-158", stageId: "phase4", departmentId: "dept10", content: "GMP 적합성 인정 확인", order: 1, isRequired: true },
-      { id: "ti-159", stageId: "phase4", departmentId: "dept10", content: "제조소 변경 시 변경 신고 (해당 시)", order: 2, isRequired: false },
-      { id: "ti-160", stageId: "phase4", departmentId: "dept10", content: "인허가 현황 최종 보고", order: 3, isRequired: true },
-      // 디자인연구소 (2 → 3 with IFU)
-      { id: "ti-161", stageId: "phase4", departmentId: "dept9", content: "양산용 포장/라벨 디자인 확정", order: 0, isRequired: true },
-      { id: "ti-162", stageId: "phase4", departmentId: "dept9", content: "사용 설명서(IFU) 최종 디자인 확정", order: 1, isRequired: true },
-      // 경영관리팀 (2)
-      { id: "ti-163", stageId: "phase4", departmentId: "dept7", content: "양산 원가 산정 확정", order: 0, isRequired: true },
-      { id: "ti-164", stageId: "phase4", departmentId: "dept7", content: "출시 일정 확정", order: 1, isRequired: true },
-
-      // ── Phase 5: 양산/이관 (29개) ──────────────────────────────────────
-      // 개발팀 (2)
-      { id: "ti-165", stageId: "phase5", departmentId: "dept1", content: "양산 초기 기술 지원", order: 0, isRequired: true },
-      { id: "ti-166", stageId: "phase5", departmentId: "dept1", content: "설계 이력 파일(DHF) 최종 이관", order: 1, isRequired: true },
-      // 품질팀 (4)
-      { id: "ti-167", stageId: "phase5", departmentId: "dept2", content: "초도품 검사 실시 (FAI)", order: 0, isRequired: true },
-      { id: "ti-168", stageId: "phase5", departmentId: "dept2", content: "양산 초기 불량률 모니터링", order: 1, isRequired: true },
-      { id: "ti-169", stageId: "phase5", departmentId: "dept2", content: "출하 검사 프로세스 가동", order: 2, isRequired: true },
-      { id: "ti-170", stageId: "phase5", departmentId: "dept2", content: "시판 후 감시(PMS) 계획 수립", order: 3, isRequired: true },
-      // 영업팀 (5)
-      { id: "ti-171", stageId: "phase5", departmentId: "dept3", content: "판매 개시 준비 완료 확인", order: 0, isRequired: true },
-      { id: "ti-172", stageId: "phase5", departmentId: "dept3", content: "영업 교육 실시", order: 1, isRequired: true },
-      { id: "ti-173", stageId: "phase5", departmentId: "dept3", content: "제품 카탈로그/브로슈어 최종본", order: 2, isRequired: true },
-      { id: "ti-174", stageId: "phase5", departmentId: "dept3", content: "거래처 등록/공급 계약", order: 3, isRequired: true },
-      { id: "ti-175", stageId: "phase5", departmentId: "dept3", content: "온라인 마케팅 자료 게시", order: 4, isRequired: false },
-      // 제조팀 (4)
-      { id: "ti-176", stageId: "phase5", departmentId: "dept4", content: "양산 가동 개시", order: 0, isRequired: true },
-      { id: "ti-177", stageId: "phase5", departmentId: "dept4", content: "양산 안정화 (수율 확인)", order: 1, isRequired: true },
-      { id: "ti-178", stageId: "phase5", departmentId: "dept4", content: "양산 SOP 최종 확정", order: 2, isRequired: true },
-      { id: "ti-179", stageId: "phase5", departmentId: "dept4", content: "초기 공정 능력(Cpk) 확인", order: 3, isRequired: true },
-      // 구매팀 (2)
-      { id: "ti-180", stageId: "phase5", departmentId: "dept5", content: "양산 자재 안정 공급 확인", order: 0, isRequired: true },
-      { id: "ti-181", stageId: "phase5", departmentId: "dept5", content: "납품 일정 관리 체계 가동", order: 1, isRequired: true },
-      // CS팀 (4)
-      { id: "ti-182", stageId: "phase5", departmentId: "dept6", content: "A/S 체계 구축", order: 0, isRequired: true },
-      { id: "ti-183", stageId: "phase5", departmentId: "dept6", content: "고객 상담 매뉴얼 작성", order: 1, isRequired: true },
-      { id: "ti-184", stageId: "phase5", departmentId: "dept6", content: "보수용 부품 재고 확보", order: 2, isRequired: true },
-      { id: "ti-185", stageId: "phase5", departmentId: "dept6", content: "CS 담당자 교육 실시", order: 3, isRequired: true },
-      // 경영관리팀 (3)
-      { id: "ti-186", stageId: "phase5", departmentId: "dept7", content: "최종 원가 확정 및 손익 분석", order: 0, isRequired: true },
-      { id: "ti-187", stageId: "phase5", departmentId: "dept7", content: "프로젝트 종료 보고서", order: 1, isRequired: true },
-      { id: "ti-188", stageId: "phase5", departmentId: "dept7", content: "프로젝트 Lessons Learned 정리", order: 2, isRequired: false },
-      // 글로벌임상팀 (1)
-      { id: "ti-189", stageId: "phase5", departmentId: "dept8", content: "시판 후 임상 추적(PMCF) 계획 수립 (해당 시)", order: 0, isRequired: false },
-      // 인증팀 (4)
-      { id: "ti-190", stageId: "phase5", departmentId: "dept10", content: "최종 인허가 완료 확인서", order: 0, isRequired: true },
-      { id: "ti-191", stageId: "phase5", departmentId: "dept10", content: "시판 후 안전성 보고 체계 구축", order: 1, isRequired: true },
-      { id: "ti-192", stageId: "phase5", departmentId: "dept10", content: "해외 인허가 완료 현황 정리", order: 2, isRequired: false },
-      { id: "ti-193", stageId: "phase5", departmentId: "dept10", content: "정기 안전성 보고 계획 확정", order: 3, isRequired: false },
-    ];
+    // Template Items (193개 — 공유 함수 호출)
+    const tItems = _getTemplateItems();
     for (const ti of tItems) {
       batch.set(doc(db, "templateItems", ti.id), { ...ti, createdBy: "system", createdAt: Timestamp.now(), lastModifiedBy: "system", lastModifiedAt: Timestamp.now() });
     }
@@ -836,6 +847,15 @@ export async function updateChecklistItem(id, data) {
   if (data.dueDate) payload.dueDate = Timestamp.fromDate(data.dueDate);
   if (data.completedDate) payload.completedDate = Timestamp.fromDate(data.completedDate);
   await updateDoc(doc(db, "checklistItems", id), payload);
+}
+
+export async function updateChecklistItemStatus(itemId, newStatus) {
+  const payload = { status: newStatus, updatedAt: serverTimestamp() };
+  if (newStatus === "completed") {
+    payload.completedDate = serverTimestamp();
+    payload.approvalStatus = "pending";
+  }
+  await updateDoc(doc(db, "checklistItems", itemId), payload);
 }
 
 export async function createChecklistItem(data) {

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
+import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -12,6 +13,7 @@ import {
   subscribeNotifications,
   markNotificationRead,
   approveTask,
+  rejectTask,
   fallbackLoadProjects,
   fallbackLoadChecklistItemsByAssignee,
   fallbackLoadNotifications,
@@ -468,26 +470,30 @@ function renderProjectsTab() {
     ${projectCards
       .map(
         (p) => `
-      <div class="dash-project-row cursor-pointer" data-project-id="${p.id}">
+      <div class="dash-project-row${p.overdueCount > 0 ? " delayed" : ""} cursor-pointer" data-project-id="${p.id}">
         <div class="dash-project-main">
-          <div class="flex items-center gap-2 flex-1" style="min-width: 0;">
-            <span class="font-semibold text-sm truncate" style="color: var(--slate-100)">${escapeHtml(p.name)}</span>
-            ${p.currentPhase ? `<span class="badge badge-primary" style="font-size: 0.625rem; padding: 0.0625rem 0.375rem; flex-shrink: 0;">${escapeHtml(p.currentPhase)}</span>` : ""}
+          <div class="flex items-center gap-3 flex-1" style="min-width: 0;">
+            <div class="dash-dday" style="color: ${getDDayColor(p.dDay)}; min-width: 3.5rem; text-align: center;">
+              ${formatDDay(p.dDay)}
+            </div>
+            <div style="min-width:0;flex:1;">
+              <div style="display:flex;align-items:center;gap:0.375rem;margin-bottom:0.2rem;">
+                <span class="font-semibold text-sm truncate" style="color: var(--slate-100);">${escapeHtml(p.name)}</span>
+                ${p.currentPhase ? `<span class="badge badge-primary" style="font-size: 0.6rem; padding: 0.1rem 0.375rem; flex-shrink: 0;">${escapeHtml(p.currentPhase)}</span>` : ""}
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                ${
+                  p.delayReason
+                    ? `<span style="font-size:0.7rem;color:var(--danger-400);font-weight:500;">${p.maxDelay}일 지연 — ${escapeHtml(p.delayReason.department)} ${escapeHtml(p.delayReason.title)}</span>`
+                    : `<span style="font-size:0.7rem;color:var(--success-400);">정상 진행</span>`
+                }
+              </div>
+            </div>
           </div>
-          <div class="dash-dday" style="color: ${getDDayColor(p.dDay)}">
-            ${formatDDay(p.dDay)}
-          </div>
-        </div>
-        <div class="dash-project-detail">
-          ${
-            p.delayReason
-              ? `<span class="dash-delay-reason"><span style="color: var(--danger-400); font-weight: 600;">${p.maxDelay}일 지연</span> — ${escapeHtml(p.delayReason.department)} ${escapeHtml(p.delayReason.title)}</span>`
-              : `<span style="color: var(--success-400); font-size: 0.75rem;">정상 진행</span>`
-          }
-          <div class="dash-project-meta">
-            ${p.overdueCount > 0 ? `<span style="color: var(--danger-400);">지연 ${p.overdueCount}</span>` : ""}
-            ${p.pendingAssignment > 0 ? `<span style="color: var(--warning-400);">배분 필요 ${p.pendingAssignment}</span>` : ""}
-            ${p.pendingApprovalCount > 0 ? `<span style="color: var(--primary-400);">승인 대기 ${p.pendingApprovalCount}</span>` : ""}
+          <div class="dash-project-meta" style="flex-shrink:0;">
+            ${p.overdueCount > 0 ? `<span style="color: var(--danger-400); font-weight: 500;">지연 ${p.overdueCount}</span>` : ""}
+            ${p.pendingAssignment > 0 ? `<span style="color: var(--warning-400);">배분 ${p.pendingAssignment}</span>` : ""}
+            ${p.pendingApprovalCount > 0 ? `<span style="color: var(--primary-400);">승인 ${p.pendingApprovalCount}</span>` : ""}
             <span class="text-soft">PM: ${escapeHtml(p.pm || "-")}</span>
           </div>
         </div>
@@ -629,7 +635,10 @@ function renderApprovalsTab() {
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <span class="text-xs text-soft">${task.completedDate ? formatDate(task.completedDate) : ""}</span>
-            ${canApprove ? `<button class="dash-approve-btn" data-approve-id="${task.id}" title="승인"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>` : ""}
+            ${canApprove ? `
+              <button class="dash-approve-btn" data-approve-id="${task.id}" title="승인"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+              <button class="dash-reject-btn" data-reject-id="${task.id}" title="반려"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            ` : ""}
           </div>
         </div>
       `
@@ -763,7 +772,7 @@ function bindClickHandlers() {
   // Task rows → navigate
   app.querySelectorAll(".dash-row[data-task-id]").forEach((row) => {
     row.addEventListener("click", (e) => {
-      if (e.target.closest(".dash-approve-btn")) return;
+      if (e.target.closest(".dash-approve-btn") || e.target.closest(".dash-reject-btn")) return;
       const projectId = row.dataset.taskProject;
       const taskId = row.dataset.taskId;
       window.location.href = `task.html?projectId=${projectId}&taskId=${taskId}`;
@@ -779,8 +788,30 @@ function bindClickHandlers() {
       btn.innerHTML = `<span class="text-xs">...</span>`;
       try {
         await approveTask(taskId, user.name);
+        showToast("success", "승인 완료");
       } catch (err) {
         console.error("승인 실패:", err);
+        showToast("error", "승인 실패: " + (err.message || "오류 발생"));
+        btn.innerHTML = `<span class="text-xs text-danger">실패</span>`;
+      }
+    });
+  });
+
+  // Reject buttons
+  app.querySelectorAll(".dash-reject-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const taskId = btn.dataset.rejectId;
+      const reason = prompt("반려 사유를 입력하세요:");
+      if (!reason) return;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="text-xs">...</span>`;
+      try {
+        await rejectTask(taskId, user.name, reason);
+        showToast("success", "반려 완료");
+      } catch (err) {
+        console.error("반려 실패:", err);
+        showToast("error", "반려 실패: " + (err.message || "오류 발생"));
         btn.innerHTML = `<span class="text-xs text-danger">실패</span>`;
       }
     });

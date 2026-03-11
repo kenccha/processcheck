@@ -13,7 +13,9 @@ import {
   bulkUpdateAssignee,
   getUsers,
   createChecklistItem,
+  updateChecklistItemStatus,
 } from "../firestore-service.js";
+import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import {
   departments,
   projectStages,
@@ -168,6 +170,14 @@ function render() {
   `;
 
   bindEvents();
+
+  // UXA-01: Auto-scroll to current (active) phase in phase view
+  if (activeTab === "work" && checklistView === "phase") {
+    requestAnimationFrame(() => {
+      const activePhase = app.querySelector('[data-active-phase="true"]');
+      if (activePhase) activePhase.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
 }
 
 // =============================================================================
@@ -392,6 +402,11 @@ function renderTaskRow(task) {
             ${task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending") ? '<span class="badge badge-warning" style="font-size:0.55rem;padding:0.1rem 0.3rem;">승인대기</span>' : ""}
           </div>
         </div>
+        <select class="inline-status-select" data-status-item="${task.id}" data-current="${task.status}" onclick="event.stopPropagation()">
+          <option value="pending" ${task.status==="pending"?"selected":""}>대기</option>
+          <option value="in_progress" ${task.status==="in_progress"?"selected":""}>진행</option>
+          <option value="completed" ${task.status==="completed"?"selected":""}>완료</option>
+        </select>
         <svg width="14" height="14" fill="none" stroke="var(--slate-400)" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:0.25rem;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       </div>
     </div>
@@ -402,7 +417,14 @@ function renderPhaseView() {
   const filtered = getFilteredTasks();
   if (filtered.length === 0) return renderEmptyState();
 
-  return PHASE_GROUPS.map(phase => {
+  // Find the first phase with incomplete tasks (active phase)
+  const activePhaseIdx = PHASE_GROUPS.findIndex(phase => {
+    const phaseTasks = checklistItems.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
+    if (phaseTasks.length === 0) return false;
+    return phaseTasks.some(t => t.status !== "completed" || (t.approvalStatus && t.approvalStatus !== "approved"));
+  });
+
+  return PHASE_GROUPS.map((phase, idx) => {
     const phaseTasks = filtered.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
     if (phaseTasks.length === 0) return "";
 
@@ -419,9 +441,10 @@ function renderPhaseView() {
 
     const workTasks = phaseTasks.filter(t => !GATE_STAGES.includes(t.stage));
     const completed = workTasks.filter(t => t.status === "completed").length;
+    const isActive = idx === activePhaseIdx;
 
     return `
-      <div class="card mb-3">
+      <div class="card mb-3${isActive ? " phase-group-active" : ""}" ${isActive ? 'data-active-phase="true"' : ""}>
         <div style="padding:0.625rem 0.75rem;border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:0.5rem;">
             <span style="font-size:0.85rem;font-weight:600;color:var(--slate-200);">${phase.name}</span>
@@ -915,12 +938,33 @@ function bindEvents() {
   const deptFilter = app.querySelector("#filter-dept");
   if (deptFilter) deptFilter.addEventListener("change", (e) => { selectedDepartment = e.target.value; checklistFilter = ""; render(); });
 
-  // Task click → navigate
+  // Inline status change (UXA-06)
+  app.querySelectorAll("[data-status-item]").forEach(sel => {
+    sel.addEventListener("change", async (e) => {
+      e.stopPropagation();
+      const itemId = sel.dataset.statusItem;
+      const newStatus = sel.value;
+      try {
+        await updateChecklistItemStatus(itemId, newStatus);
+        showToast("success", `상태가 '${newStatus === "pending" ? "대기" : newStatus === "in_progress" ? "진행" : "완료"}'(으)로 변경되었습니다.`);
+      } catch (err) {
+        console.error("상태 변경 실패:", err);
+        showToast("error", "상태 변경에 실패했습니다.");
+        sel.value = sel.dataset.current; // revert
+      }
+    });
+  });
+
+  // Task click → peek panel (UXA-05) on middle area, full navigate on chevron
   app.querySelectorAll("[data-task-id]").forEach(el => {
     el.addEventListener("click", (e) => {
-      // Don't navigate if clicking checkbox
-      if (e.target.closest(".task-checkbox")) return;
-      window.location.href = `task.html?projectId=${projectId}&taskId=${el.dataset.taskId}`;
+      // Don't navigate if clicking checkbox or status select
+      if (e.target.closest(".task-checkbox") || e.target.closest(".inline-status-select")) return;
+      const taskId = el.dataset.taskId;
+      const task = checklistItems.find(t => t.id === taskId);
+      if (task) {
+        openTaskPeek(task);
+      }
     });
   });
 
@@ -1046,6 +1090,71 @@ function bindEvents() {
       exportToPDF(`${project.name} 프로젝트 보고서`, content);
     });
   }
+}
+
+// ─── UXA-05: Task Peek Slide-Over ───────────────────────────────────────────
+
+function openTaskPeek(task) {
+  const dd = daysUntil(task.dueDate);
+  const ddText = dd === null ? "-" : dd < 0 ? `D+${Math.abs(dd)}` : dd === 0 ? "D-Day" : `D-${dd}`;
+  const ddColor = dd === null ? "var(--slate-400)" : dd < 0 ? "var(--danger-400)" : dd <= 3 ? "var(--warning-400)" : "var(--success-400)";
+
+  const statusLabels = { pending: "대기", in_progress: "진행중", completed: "완료", rejected: "반려" };
+  const approvalLabels = { pending: "승인 대기", approved: "승인됨", rejected: "반려됨" };
+
+  const body = `
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="badge ${getStatusBadgeClass(task.status)}">${statusLabels[task.status] || task.status}</span>
+        <span style="font-weight:700;font-size:1.1rem;color:${ddColor};">${ddText}</span>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">단계</div>
+        <div style="font-size:0.85rem;color:var(--slate-200);">${escapeHtml(formatStageName(task.stage))}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">부서</div>
+          <div style="font-size:0.85rem;color:var(--slate-200);">${escapeHtml(task.department || "-")}</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">담당자</div>
+          <div style="font-size:0.85rem;color:var(--slate-200);">${escapeHtml(task.assignee || "미배분")}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">마감일</div>
+          <div style="font-size:0.85rem;color:var(--slate-200);">${formatDate(task.dueDate)}</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">중요도</div>
+          <div><span class="risk-dot ${task.importance || "green"}"></span> ${task.importance === "red" ? "긴급" : task.importance === "yellow" ? "중요" : "보통"}</div>
+        </div>
+      </div>
+      ${task.approvalStatus ? `
+      <div>
+        <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.25rem;">승인 상태</div>
+        <div style="font-size:0.85rem;color:var(--slate-200);">${approvalLabels[task.approvalStatus] || task.approvalStatus}${task.approvedBy ? ` (${escapeHtml(task.approvedBy)})` : ""}</div>
+      </div>` : ""}
+      ${task.comments && task.comments.length > 0 ? `
+      <div>
+        <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.5rem;">코멘트 (${task.comments.length})</div>
+        ${task.comments.slice(-3).map(c => `
+          <div style="padding:0.5rem;background:var(--surface-2);border-radius:var(--radius-lg);margin-bottom:0.375rem;font-size:0.8rem;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;">
+              <span style="font-weight:500;color:var(--slate-200);">${escapeHtml(c.userName || "")}</span>
+              <span style="font-size:0.65rem;color:var(--slate-400);">${c.createdAt ? formatDate(new Date(c.createdAt)) : ""}</span>
+            </div>
+            <div style="color:var(--slate-300);">${escapeHtml(c.content || "")}</div>
+          </div>
+        `).join("")}
+      </div>` : ""}
+    </div>
+  `;
+
+  const footer = `<a href="task.html?projectId=${projectId}&taskId=${task.id}" class="btn-primary btn-sm" style="text-decoration:none;">상세 보기</a>`;
+  openSlideOver(escapeHtml(task.title), body, footer);
 }
 
 function updateBulkBar() {
