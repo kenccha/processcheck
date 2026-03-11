@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-security-hardening 01-01-PLAN.md
-last_updated: "2026-03-11T21:46:55.469Z"
+stopped_at: Completed 01-security-hardening 01-03-PLAN.md
+last_updated: "2026-03-11T21:49:22.334Z"
 last_activity: 2026-03-12 — Roadmap created (6 phases, 46 requirements mapped)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 33
 ---
 
@@ -51,6 +51,7 @@ Progress: [███░░░░░░░] 33%
 
 *Updated after each plan completion*
 | Phase 01-security-hardening P01 | 12 | 2 tasks | 3 files |
+| Phase 01-security-hardening P03 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,7 @@ Progress: [███░░░░░░░] 33%
 - [Init]: Phase 3 and Phase 4 have no dependency between them — can execute in either order after Phase 2
 - [Phase 01-security-hardening]: startSessionWatcher called once per renderNav() — all protected pages covered without per-page modifications
 - [Phase 01-security-hardening]: IS_PROD check is UI-layer defense only; Firestore rules (Plan 02) provide actual enforcement for demo user access control
+- [Phase 01-security-hardening]: escapeHtml() applied to n.id and n.link in data-* HTML attribute positions — defense-in-depth even though Firestore auto-IDs are alphanumeric
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T21:46:55.467Z
-Stopped at: Completed 01-security-hardening 01-01-PLAN.md
+Last session: 2026-03-11T21:49:22.332Z
+Stopped at: Completed 01-security-hardening 01-03-PLAN.md
 Resume file: None

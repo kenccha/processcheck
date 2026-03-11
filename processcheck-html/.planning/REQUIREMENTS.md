@@ -12,7 +12,7 @@ Requirements for production-ready release. Each maps to roadmap phases.
 - [ ] **SEC-01**: Firestore 보안 규칙이 역할 기반 쓰기 접근을 강제한다 (현재 `write: true` → 인증+역할 기반)
 - [ ] **SEC-02**: Firebase Storage 보안 규칙이 인증된 사용자만 파일 업로드/다운로드를 허용한다
 - [x] **SEC-03**: 데모 카드 로그인이 프로덕션에서 비활성화된다 (localhost만 허용 또는 플래그)
-- [ ] **SEC-04**: 모든 innerHTML 사용처에서 사용자 입력이 escapeHtml()로 처리된다 (XSS 방지)
+- [x] **SEC-04**: 모든 innerHTML 사용처에서 사용자 입력이 escapeHtml()로 처리된다 (XSS 방지)
 - [x] **SEC-05**: 세션이 24시간 후 만료되며, 만료 시 로그인 페이지로 리다이렉트된다
 
 ### Bug Fixes
@@ -128,7 +128,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | SEC-01 | Phase 1 | Pending |
 | SEC-02 | Phase 1 | Pending |
 | SEC-03 | Phase 1 | Complete |
-| SEC-04 | Phase 1 | Pending |
+| SEC-04 | Phase 1 | Complete |
 | SEC-05 | Phase 1 | Complete |
 | BUG-01 | Phase 2 | Pending |
 | BUG-02 | Phase 2 | Pending |
