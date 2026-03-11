@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProcessCheck 사용자 플로우 — 개선 포인트 분석</title>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
+  }
+}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f9fa;--bg-card:#fff;--bg-sidebar:#fff;--bg-panel:#fff;--bg-input:#fff;
+  --text:#1a1a2e;--text-secondary:#555;--text-muted:#888;
+  --border:#e0e0e0;--border-light:#eee;
+  --accent:#4361ee;--accent-hover:#3a56d4;
+  --p0:#dc2626;--p1:#ea580c;--p2:#ca8a04;--p3:#6b7280;
+  --status-open:#ef4444;--status-progress:#3b82f6;--status-resolved:#22c55e;
+  --type-question:#8b5cf6;--type-suggest:#3b82f6;--type-bug:#ef4444;--type-memo:#6b7280;
+  --shadow:0 1px 3px rgba(0,0,0,.08);--shadow-lg:0 4px 12px rgba(0,0,0,.12);
+  --radius:6px;--radius-lg:10px;
+  --sidebar-w:280px;--panel-w:320px;--topbar-h:44px;--dashboard-h:0px;
+}
+[data-theme="dark"]{
+  --bg:#111827;--bg-card:#1f2937;--bg-sidebar:#1f2937;--bg-panel:#1f2937;--bg-input:#374151;
+  --text:#e5e7eb;--text-secondary:#9ca3af;--text-muted:#6b7280;
+  --border:#374151;--border-light:#4b5563;
+  --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 4px 12px rgba(0,0,0,.4);
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+
+/* Layout */
+.layout{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{height:var(--topbar-h);background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0;z-index:100}
+.topbar h1{font-size:14px;font-weight:600;white-space:nowrap}
+.topbar-actions{display:flex;gap:6px;margin-left:auto;align-items:center}
+
+.main-area{display:flex;flex:1;overflow:hidden}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.iframe-wrap{flex:1;position:relative;overflow:hidden}
+.iframe-wrap iframe{width:100%;height:100%;border:none}
+.panel{width:0;overflow:hidden;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s ease;flex-shrink:0}
+.panel.open{width:var(--panel-w)}
+
+/* Dashboard overlay */
+.dashboard{background:var(--bg-card);border-bottom:1px solid var(--border);overflow:hidden;transition:max-height .3s ease;max-height:0}
+.dashboard.open{max-height:300px}
+.dashboard-inner{padding:12px 16px}
+.dash-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.dash-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;flex:1;min-width:100px}
+.dash-card .label{font-size:11px;color:var(--text-muted);margin-bottom:2px}
+.dash-card .value{font-size:20px;font-weight:700}
+.dash-card .sub{font-size:10px;color:var(--text-secondary);margin-top:2px}
+.bar-chart{margin-top:4px}
+.bar-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.bar-label{width:70px;font-size:11px;color:var(--text-secondary);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:14px;background:var(--bg);border-radius:3px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:3px;transition:width .3s ease}
+.bar-count{font-size:10px;color:var(--text-muted);width:20px;text-align:right}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-sm{padding:2px 6px;font-size:11px}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-icon{padding:4px 6px;font-size:14px}
+.btn-icon:hover{background:var(--accent);color:#fff}
+
+/* Sidebar */
+.sidebar-header{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.sidebar-filters{display:flex;gap:4px;flex-wrap:wrap}
+.sidebar-filters select{font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text)}
+.sidebar-list{flex:1;overflow-y:auto;padding:6px}
+.sidebar-footer{padding:6px 10px;border-top:1px solid var(--border);flex-shrink:0}
+
+/* Improvement cards */
+.ip-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:all .15s;position:relative;border-left:3px solid var(--border)}
+.ip-card:hover{box-shadow:var(--shadow-lg);transform:translateX(2px)}
+.ip-card.selected{box-shadow:0 0 0 2px var(--accent)}
+.ip-card[data-priority="P0"]{border-left-color:var(--p0)}
+.ip-card[data-priority="P1"]{border-left-color:var(--p1)}
+.ip-card[data-priority="P2"]{border-left-color:var(--p2)}
+.ip-card[data-priority="P3"]{border-left-color:var(--p3)}
+.ip-card-head{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.ip-card-title{font-size:12px;font-weight:600;flex:1;line-height:1.3}
+.priority-badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;color:#fff;flex-shrink:0}
+.priority-badge.P0{background:var(--p0)}
+.priority-badge.P1{background:var(--p1)}
+.priority-badge.P2{background:var(--p2)}
+.priority-badge.P3{background:var(--p3)}
+.status-badge{font-size:10px;padding:1px 5px;border-radius:3px;color:#fff;cursor:pointer;flex-shrink:0}
+.status-badge.open{background:var(--status-open)}
+.status-badge.in_progress{background:var(--status-progress)}
+.status-badge.resolved{background:var(--status-resolved)}
+.ip-card-meta{font-size:10px;color:var(--text-muted);display:flex;gap:6px}
+.ip-card-desc{font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;display:none}
+.ip-card.expanded .ip-card-desc{display:block}
+
+/* Panel (comments) */
+.panel-header{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.panel-header h3{font-size:13px;font-weight:600;flex:1}
+.panel-body{flex:1;overflow-y:auto;padding:8px}
+.panel-footer{padding:8px;border-top:1px solid var(--border);flex-shrink:0}
+
+/* Comment form */
+.comment-form{display:flex;flex-direction:column;gap:6px}
+.comment-form input,.comment-form textarea,.comment-form select{
+  font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-input);color:var(--text);font-family:inherit;resize:vertical}
+.comment-form textarea{min-height:50px}
+.comment-form-row{display:flex;gap:4px}
+.comment-form-row>*{flex:1}
+
+/* Comment items */
+.comment-item{background:var(--bg);border:1px solid var(--border-light);border-radius:var(--radius);padding:8px;margin-bottom:6px}
+.comment-item-head{display:flex;align-items:center;gap:4px;margin-bottom:3px;font-size:11px}
+.comment-author{font-weight:600}
+.comment-time{color:var(--text-muted);margin-left:auto;font-size:10px}
+.comment-type{font-size:10px;padding:1px 5px;border-radius:3px;color:#fff}
+.comment-type.question{background:var(--type-question)}
+.comment-type.suggest{background:var(--type-suggest)}
+.comment-type.bug{background:var(--type-bug)}
+.comment-type.memo{background:var(--type-memo)}
+.comment-body{font-size:12px;color:var(--text-secondary);line-height:1.4}
+.comment-ref{font-size:10px;color:var(--accent);margin-top:3px}
+
+/* Add form modal (inline) */
+.add-form{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px;margin-bottom:8px;display:none}
+.add-form.open{display:block}
+.add-form label{display:block;font-size:11px;color:var(--text-secondary);margin-bottom:2px;margin-top:6px}
+.add-form label:first-child{margin-top:0}
+.add-form input,.add-form textarea,.add-form select{
+  width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-input);color:var(--text);font-family:inherit}
+.add-form textarea{min-height:40px;resize:vertical}
+.add-form-actions{display:flex;gap:4px;margin-top:8px;justify-content:flex-end}
+
+/* Filter chips (for panel) */
+.filter-chips{display:flex;gap:3px;flex-wrap:wrap;padding:4px 8px}
+.filter-chip{font-size:10px;padding:2px 6px;border-radius:10px;border:1px solid var(--border);background:var(--bg);cursor:pointer;color:var(--text-secondary)}
+.filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* Empty state */
+.empty{text-align:center;padding:20px;color:var(--text-muted);font-size:12px}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+/* Responsive */
+@media(max-width:768px){
+  .sidebar{width:220px;min-width:220px}
+  .panel.open{width:260px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Top bar -->
+  <div class="topbar">
+    <h1>ProcessCheck 플로우 개선 포인트 분석</h1>
+    <div class="topbar-actions">
+      <button class="btn btn-sm" id="btnDashboard" title="개선 현황 요약">📊 현황</button>
+      <button class="btn btn-sm" id="btnComments" title="코멘트 패널 토글">💬 코멘트</button>
+      <span style="width:1px;height:18px;background:var(--border);display:inline-block"></span>
+      <button class="btn btn-sm" id="btnCopyMd" title="마크다운 복사">📋 목록 복사</button>
+      <button class="btn btn-sm" id="btnExportJson" title="JSON 내보내기">📥 JSON 내보내기</button>
+      <button class="btn btn-sm" id="btnImportJson" title="JSON 가져오기">📤 JSON 가져오기</button>
+      <input type="file" id="fileImport" accept=".json" style="display:none">
+      <span style="width:1px;height:18px;background:var(--border);display:inline-block"></span>
+      <button class="btn btn-icon btn-sm" id="btnTheme" title="테마 토글">🌙</button>
+    </div>
+  </div>
+
+  <!-- Dashboard (collapsible) -->
+  <div class="dashboard" id="dashboard">
+    <div class="dashboard-inner">
+      <div class="dash-row">
+        <div class="dash-card">
+          <div class="label">전체 개선 포인트</div>
+          <div class="value" id="dashTotal">0</div>
+        </div>
+        <div class="dash-card">
+          <div class="label">우선순위별</div>
+          <div class="value" style="font-size:13px" id="dashPriority"></div>
+        </div>
+        <div class="dash-card">
+          <div class="label">코멘트</div>
+          <div class="value" id="dashComments">0</div>
+          <div class="sub" id="dashCommentTypes"></div>
+        </div>
+        <div class="dash-card">
+          <div class="label">상태</div>
+          <div class="value" style="font-size:13px" id="dashStatus"></div>
+        </div>
+      </div>
+      <div class="label" style="margin-bottom:4px;font-size:11px;color:var(--text-muted)">탭별 개선 포인트 분포</div>
+      <div class="bar-chart" id="dashBarChart"></div>
+    </div>
+  </div>
+
+  <!-- Main area -->
+  <div class="main-area">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-weight:600;font-size:12px">개선 포인트</span>
+          <span class="btn btn-sm" id="btnAddIp" style="margin-left:auto">+ 추가</span>
+        </div>
+        <div class="sidebar-filters">
+          <select id="filterPriority"><option value="">우선순위</option><option value="P0">P0</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option></select>
+          <select id="filterTab" ><option value="">탭</option></select>
+          <select id="filterStatus"><option value="">상태</option><option value="open">Open</option><option value="in_progress">진행중</option><option value="resolved">해결</option></select>
+        </div>
+      </div>
+
+      <!-- Add form -->
+      <div class="add-form" id="addForm">
+        <label>제목 *</label><input id="addTitle" placeholder="개선 포인트 제목">
+        <label>탭</label><input id="addTab" placeholder="예: 실무자, 매니저">
+        <label>노드</label><input id="addNode" placeholder="예: 로그인, 대시보드">
+        <label>설명</label><textarea id="addDesc" placeholder="상세 설명"></textarea>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1"><label>우선순위</label><select id="addPriority" style="width:100%"><option value="P1">P1</option><option value="P0">P0</option><option value="P2">P2</option><option value="P3">P3</option></select></div>
+          <div style="flex:1"><label>상태</label><select id="addStatus" style="width:100%"><option value="open">Open</option><option value="in_progress">진행중</option><option value="resolved">해결</option></select></div>
+        </div>
+        <div class="add-form-actions">
+          <button class="btn btn-sm" id="btnCancelAdd">취소</button>
+          <button class="btn btn-sm btn-primary" id="btnSaveAdd">저장</button>
+        </div>
+      </div>
+
+      <div class="sidebar-list" id="ipList"></div>
+      <div class="sidebar-footer" style="font-size:10px;color:var(--text-muted);text-align:center">
+        클릭하여 상세 보기 · 상태 뱃지 클릭으로 상태 변경
+      </div>
+    </div>
+
+    <!-- iframe -->
+    <div class="iframe-wrap">
+      <iframe id="flowIframe" src="user-flows.html"></iframe>
+    </div>
+
+    <!-- Comment panel -->
+    <div class="panel" id="commentPanel">
+      <div class="panel-header">
+        <h3>💬 코멘트</h3>
+        <select id="commentFilter" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text)">
+          <option value="">전체</option>
+          <option value="question">질문</option>
+          <option value="suggest">제안</option>
+          <option value="bug">버그</option>
+          <option value="memo">메모</option>
+        </select>
+        <button class="btn btn-sm btn-icon" id="btnClosePanel" title="닫기">✕</button>
+      </div>
+      <div class="panel-body" id="commentList"></div>
+      <div class="panel-footer">
+        <div class="comment-form">
+          <div class="comment-form-row">
+            <input id="cmtAuthor" placeholder="작성자">
+            <select id="cmtType">
+              <option value="memo">메모</option>
+              <option value="question">질문</option>
+              <option value="suggest">제안</option>
+              <option value="bug">버그</option>
+            </select>
+          </div>
+          <select id="cmtRef">
+            <option value="">연결할 개선 포인트 (선택)</option>
+          </select>
+          <textarea id="cmtBody" placeholder="코멘트 내용"></textarea>
+          <button class="btn btn-sm btn-primary" id="btnAddComment" style="align-self:flex-end">등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ── Storage keys ── */
+const STORAGE_KEY_IP = "flow-annotations-ip";
+const STORAGE_KEY_CMT = "flow-annotations-cmt";
+const STORAGE_KEY_THEME = "flow-annotations-theme";
+
+/* ── Default data ── */
+const DEFAULT_POINTS = [
+  { id:1, tab:"실무자", node:"로그인", title:"실제 비밀번호 인증 없음", desc:"데모 카드 로그인만 존재, 실제 비밀번호 기반 인증 미구현. 보안 취약.", priority:"P1", status:"open" },
+  { id:2, tab:"실무자", node:"작업 완료", title:"파일 업로드 Firebase Storage 미연동", desc:"UI만 있고 실제 Storage 업로드 미구현. 첨부파일이 저장되지 않음.", priority:"P2", status:"open" },
+  { id:3, tab:"매니저", node:"매니저 승인", title:"스테이지 자동 전환 미구현", desc:"모든 작업 승인 완료 후 다음 스테이지로 자동 전환되지 않음. 수동 관리 필요.", priority:"P1", status:"open" },
+  { id:4, tab:"설계변경", node:"규모 판정", title:"자동 규모 판정 로직 없음", desc:"경미/중간/대규모 판정을 사용자가 수동 선택. 기준 기반 자동 판정 필요.", priority:"P2", status:"open" },
+  { id:5, tab:"실무자", node:"대시보드", title:"실시간 Push Notification 없음", desc:"알림이 페이지 로드 시에만 갱신됨. 브라우저 Push Notification 미지원.", priority:"P3", status:"open" },
+  { id:6, tab:"기획조정실", node:"게이트 승인", title:"부서별 개별 승인 흐름 미구현", desc:"gate stage에서 부서별로 개별 승인/반려하는 흐름 없음. 일괄 승인만 가능.", priority:"P1", status:"open" },
+  { id:7, tab:"고객 포털", node:"이메일 인증", title:"보안 강화 필요", desc:"이메일 매칭만으로 인증. OTP, 비밀번호, 2FA 등 추가 보안 필요.", priority:"P2", status:"open" },
+  { id:8, tab:"실무자", node:"프로젝트 목록", title:"검색 성능 최적화 필요", desc:"대량 프로젝트 시 클라이언트 필터링 성능 저하 예상. 서버사이드 검색 필요.", priority:"P3", status:"open" },
+  { id:9, tab:"실무자", node:"작업 시작", title:"의존성 체크 없음", desc:"선행 작업 완료 여부 확인 없이 다음 작업 시작 가능. 작업 순서 보장 미흡.", priority:"P1", status:"open" },
+  { id:10, tab:"매니저", node:"출시 준비", title:"자동 리포트 생성 기능 없음", desc:"출시 준비 현황을 수동으로 확인해야 함. 자동 요약 리포트 생성 필요.", priority:"P2", status:"open" },
+];
+
+/* ── State ── */
+let points = [];
+let comments = [];
+let selectedPointId = null;
+let nextId = 11;
+
+/* ── Load / Save ── */
+function loadData(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_IP);
+    points = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_POINTS));
+  } catch(e){ points = JSON.parse(JSON.stringify(DEFAULT_POINTS)); }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CMT);
+    comments = raw ? JSON.parse(raw) : [];
+  } catch(e){ comments = []; }
+  nextId = points.reduce((mx,p)=> Math.max(mx, p.id), 0) + 1;
+}
+function savePoints(){ localStorage.setItem(STORAGE_KEY_IP, JSON.stringify(points)); }
+function saveComments(){ localStorage.setItem(STORAGE_KEY_CMT, JSON.stringify(comments)); }
+
+/* ── Theme ── */
+function initTheme(){
+  const saved = localStorage.getItem(STORAGE_KEY_THEME);
+  if(saved === "dark") document.documentElement.setAttribute("data-theme","dark");
+  updateThemeBtn();
+}
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if(isDark){ document.documentElement.removeAttribute("data-theme"); localStorage.setItem(STORAGE_KEY_THEME,"light"); }
+  else { document.documentElement.setAttribute("data-theme","dark"); localStorage.setItem(STORAGE_KEY_THEME,"dark"); }
+  updateThemeBtn();
+}
+function updateThemeBtn(){
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  document.getElementById("btnTheme").textContent = isDark ? "☀️" : "🌙";
+}
+
+/* ── Helpers ── */
+const STATUS_LABELS = { open:"Open", in_progress:"진행중", resolved:"해결" };
+const STATUS_CYCLE = ["open","in_progress","resolved"];
+const TYPE_LABELS = { question:"질문", suggest:"제안", bug:"버그", memo:"메모" };
+const PRIORITY_COLORS = { P0:"var(--p0)", P1:"var(--p1)", P2:"var(--p2)", P3:"var(--p3)" };
+
+function getTabs(){ return [...new Set(points.map(p=>p.tab))].sort(); }
+function countBy(arr,key){ const m={}; arr.forEach(a=>{ const v=a[key]||"unknown"; m[v]=(m[v]||0)+1; }); return m; }
+
+/* ── Dashboard ── */
+function renderDashboard(){
+  const $t = document.getElementById("dashTotal");
+  const $p = document.getElementById("dashPriority");
+  const $c = document.getElementById("dashComments");
+  const $ct = document.getElementById("dashCommentTypes");
+  const $s = document.getElementById("dashStatus");
+  const $bar = document.getElementById("dashBarChart");
+
+  $t.textContent = points.length;
+
+  const pc = countBy(points,"priority");
+  $p.innerHTML = ["P0","P1","P2","P3"].map(k=>
+    `<span style="color:${PRIORITY_COLORS[k]};margin-right:6px">${k}:${pc[k]||0}</span>`
+  ).join("");
+
+  $c.textContent = comments.length;
+  const tc = countBy(comments,"type");
+  $ct.innerHTML = Object.entries(TYPE_LABELS).map(([k,v])=>`${v}:${tc[k]||0}`).join(" · ");
+
+  const sc = countBy(points,"status");
+  $s.innerHTML = STATUS_CYCLE.map(k=>
+    `<span style="margin-right:6px"><span class="status-badge ${k}" style="font-size:10px;pointer-events:none">${STATUS_LABELS[k]}</span> ${sc[k]||0}</span>`
+  ).join("");
+
+  // Bar chart by tab
+  const tabs = getTabs();
+  const tabCounts = {};
+  points.forEach(p=>{ tabCounts[p.tab]=(tabCounts[p.tab]||0)+1; });
+  const maxCount = Math.max(1, ...Object.values(tabCounts));
+  $bar.innerHTML = tabs.map(t=>{
+    const cnt = tabCounts[t]||0;
+    const pct = (cnt/maxCount*100).toFixed(0);
+    return `<div class="bar-row">
+      <div class="bar-label">${t}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+      <div class="bar-count">${cnt}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ── Sidebar: Tab filter dropdown ── */
+function renderTabFilter(){
+  const sel = document.getElementById("filterTab");
+  const cur = sel.value;
+  const tabs = getTabs();
+  sel.innerHTML = '<option value="">탭</option>' + tabs.map(t=>`<option value="${t}"${t===cur?" selected":""}>${t}</option>`).join("");
+}
+
+/* ── Sidebar: IP list ── */
+function renderIPList(){
+  const $list = document.getElementById("ipList");
+  const fp = document.getElementById("filterPriority").value;
+  const ft = document.getElementById("filterTab").value;
+  const fs = document.getElementById("filterStatus").value;
+
+  let filtered = points;
+  if(fp) filtered = filtered.filter(p=>p.priority===fp);
+  if(ft) filtered = filtered.filter(p=>p.tab===ft);
+  if(fs) filtered = filtered.filter(p=>p.status===fs);
+
+  if(!filtered.length){
+    $list.innerHTML = '<div class="empty">조건에 맞는 개선 포인트가 없습니다.</div>';
+    return;
+  }
+
+  $list.innerHTML = filtered.map(p=>{
+    const sel = p.id===selectedPointId ? " selected":"";
+    const exp = p.id===selectedPointId ? " expanded":"";
+    return `<div class="ip-card${sel}${exp}" data-id="${p.id}" data-priority="${p.priority}">
+      <div class="ip-card-head">
+        <span class="priority-badge ${p.priority}">${p.priority}</span>
+        <span class="ip-card-title">${esc(p.title)}</span>
+        <span class="status-badge ${p.status}" data-action="toggle-status" data-id="${p.id}">${STATUS_LABELS[p.status]}</span>
+      </div>
+      <div class="ip-card-meta">
+        <span>📑 ${esc(p.tab)}</span>
+        <span>🔗 ${esc(p.node)}</span>
+      </div>
+      <div class="ip-card-desc">${esc(p.desc)}</div>
+    </div>`;
+  }).join("");
+}
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ── Sidebar events ── */
+function initSidebar(){
+  const $list = document.getElementById("ipList");
+  $list.addEventListener("click", e=>{
+    const statusBtn = e.target.closest("[data-action='toggle-status']");
+    if(statusBtn){
+      e.stopPropagation();
+      const id = parseInt(statusBtn.dataset.id);
+      const pt = points.find(p=>p.id===id);
+      if(!pt) return;
+      const ci = STATUS_CYCLE.indexOf(pt.status);
+      pt.status = STATUS_CYCLE[(ci+1)%STATUS_CYCLE.length];
+      savePoints(); renderAll();
+      return;
+    }
+    const card = e.target.closest(".ip-card");
+    if(!card) return;
+    const id = parseInt(card.dataset.id);
+    selectedPointId = selectedPointId===id ? null : id;
+    renderIPList();
+  });
+
+  // Filters
+  ["filterPriority","filterTab","filterStatus"].forEach(id=>{
+    document.getElementById(id).addEventListener("change", renderIPList);
+  });
+
+  // Add form
+  document.getElementById("btnAddIp").addEventListener("click",()=>{
+    document.getElementById("addForm").classList.toggle("open");
+  });
+  document.getElementById("btnCancelAdd").addEventListener("click",()=>{
+    document.getElementById("addForm").classList.remove("open");
+  });
+  document.getElementById("btnSaveAdd").addEventListener("click",()=>{
+    const title = document.getElementById("addTitle").value.trim();
+    if(!title){ alert("제목을 입력하세요."); return; }
+    points.push({
+      id: nextId++,
+      tab: document.getElementById("addTab").value.trim()||"기타",
+      node: document.getElementById("addNode").value.trim()||"-",
+      title,
+      desc: document.getElementById("addDesc").value.trim(),
+      priority: document.getElementById("addPriority").value,
+      status: document.getElementById("addStatus").value,
+    });
+    savePoints();
+    document.getElementById("addForm").classList.remove("open");
+    ["addTitle","addTab","addNode","addDesc"].forEach(id=>document.getElementById(id).value="");
+    renderAll();
+  });
+}
+
+/* ── Comment panel ── */
+function renderComments(){
+  const $list = document.getElementById("commentList");
+  const typeFilter = document.getElementById("commentFilter").value;
+  let filtered = comments;
+  if(typeFilter) filtered = filtered.filter(c=>c.type===typeFilter);
+
+  // Sort newest first
+  filtered = [...filtered].sort((a,b)=>b.ts-a.ts);
+
+  if(!filtered.length){
+    $list.innerHTML = '<div class="empty">코멘트가 없습니다.</div>';
+  } else {
+    $list.innerHTML = filtered.map(c=>{
+      const refPoint = c.refId ? points.find(p=>p.id===c.refId) : null;
+      const date = new Date(c.ts);
+      const timeStr = date.toLocaleDateString("ko-KR") + " " + date.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
+      return `<div class="comment-item">
+        <div class="comment-item-head">
+          <span class="comment-author">${esc(c.author)}</span>
+          <span class="comment-type ${c.type}">${TYPE_LABELS[c.type]||c.type}</span>
+          <span class="comment-time">${timeStr}</span>
+        </div>
+        <div class="comment-body">${esc(c.body)}</div>
+        ${refPoint ? `<div class="comment-ref">→ #${refPoint.id} ${esc(refPoint.title)}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
+
+  // Update ref dropdown
+  const $ref = document.getElementById("cmtRef");
+  const curVal = $ref.value;
+  $ref.innerHTML = '<option value="">연결할 개선 포인트 (선택)</option>' +
+    points.map(p=>`<option value="${p.id}"${String(p.id)===curVal?" selected":""}>#${p.id} ${esc(p.title)}</option>`).join("");
+}
+
+function initCommentPanel(){
+  document.getElementById("btnComments").addEventListener("click",()=>{
+    document.getElementById("commentPanel").classList.toggle("open");
+  });
+  document.getElementById("btnClosePanel").addEventListener("click",()=>{
+    document.getElementById("commentPanel").classList.remove("open");
+  });
+  document.getElementById("commentFilter").addEventListener("change", renderComments);
+
+  document.getElementById("btnAddComment").addEventListener("click",()=>{
+    const author = document.getElementById("cmtAuthor").value.trim();
+    const body = document.getElementById("cmtBody").value.trim();
+    if(!author||!body){ alert("작성자와 내용을 입력하세요."); return; }
+    const type = document.getElementById("cmtType").value;
+    const refVal = document.getElementById("cmtRef").value;
+    comments.push({
+      id: Date.now(),
+      author,
+      body,
+      type,
+      refId: refVal ? parseInt(refVal) : null,
+      ts: Date.now(),
+    });
+    saveComments();
+    document.getElementById("cmtBody").value = "";
+    renderAll();
+  });
+}
+
+/* ── Export / Import ── */
+function initExport(){
+  // Copy Markdown
+  document.getElementById("btnCopyMd").addEventListener("click",()=>{
+    const lines = ["# ProcessCheck 개선 포인트 목록\n"];
+    const grouped = {};
+    points.forEach(p=>{
+      if(!grouped[p.tab]) grouped[p.tab]=[];
+      grouped[p.tab].push(p);
+    });
+    Object.keys(grouped).sort().forEach(tab=>{
+      lines.push(`\n## ${tab}\n`);
+      grouped[tab].forEach(p=>{
+        const statusMark = p.status==="resolved" ? "x" : " ";
+        lines.push(`- [${statusMark}] **[${p.priority}]** ${p.title} (노드: ${p.node})`);
+        if(p.desc) lines.push(`  - ${p.desc}`);
+      });
+    });
+    if(comments.length){
+      lines.push(`\n---\n## 코멘트 (${comments.length}건)\n`);
+      comments.sort((a,b)=>a.ts-b.ts).forEach(c=>{
+        const ref = c.refId ? ` → #${c.refId}` : "";
+        lines.push(`- **${c.author}** [${TYPE_LABELS[c.type]}]${ref}: ${c.body}`);
+      });
+    }
+    navigator.clipboard.writeText(lines.join("\n")).then(()=>alert("클립보드에 복사되었습니다."));
+  });
+
+  // Export JSON
+  document.getElementById("btnExportJson").addEventListener("click",()=>{
+    const data = { version:1, points, comments, exportedAt:new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `flow-annotations-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+  });
+
+  // Import JSON
+  document.getElementById("btnImportJson").addEventListener("click",()=>{
+    document.getElementById("fileImport").click();
+  });
+  document.getElementById("fileImport").addEventListener("change", e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      try {
+        const data = JSON.parse(ev.target.result);
+        if(data.points && Array.isArray(data.points)){
+          points = data.points;
+          nextId = points.reduce((mx,p)=>Math.max(mx,p.id),0)+1;
+          savePoints();
+        }
+        if(data.comments && Array.isArray(data.comments)){
+          comments = data.comments;
+          saveComments();
+        }
+        renderAll();
+        alert("데이터를 가져왔습니다.");
+      }catch(err){ alert("유효하지 않은 JSON 파일입니다."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+}
+
+/* ── Dashboard toggle ── */
+function initDashboardToggle(){
+  document.getElementById("btnDashboard").addEventListener("click",()=>{
+    document.getElementById("dashboard").classList.toggle("open");
+  });
+}
+
+/* ── Theme toggle ── */
+function initThemeToggle(){
+  document.getElementById("btnTheme").addEventListener("click", toggleTheme);
+}
+
+/* ── Render all ── */
+function renderAll(){
+  renderDashboard();
+  renderTabFilter();
+  renderIPList();
+  renderComments();
+}
+
+/* ── Init ── */
+function init(){
+  initTheme();
+  loadData();
+  initSidebar();
+  initCommentPanel();
+  initExport();
+  initDashboardToggle();
+  initThemeToggle();
+  renderAll();
+}
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init);
+else init();
+
+})();
+</script>
+<script src="js/review-bootstrap.js"></script>
+<script src="js/deliverable-nav.js"></script>
+</body>
+</html>

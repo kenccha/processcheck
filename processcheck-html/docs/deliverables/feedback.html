@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>디자인 리뷰 — 피드백 모아보기</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
+  }
+}
+</script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  background: #0f172a; color: #e2e8f0; line-height: 1.6; min-height: 100vh;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: #1e293b; border-radius: 12px; padding: 20px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.stat-label { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+.stat-value.cyan { color: #06b6d4; }
+.stat-value.yellow { color: #fbbf24; }
+.stat-value.green { color: #22c55e; }
+.stat-value.red { color: #ef4444; }
+
+/* Filters */
+.filters {
+  display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+}
+.filter-btn {
+  padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+  background: #1e293b; color: #94a3b8; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.filter-btn:hover { background: #334155; color: #e2e8f0; }
+.filter-btn.active { background: rgba(6,182,212,0.15); color: #06b6d4; border-color: rgba(6,182,212,0.3); }
+.filter-search {
+  padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+  background: #1e293b; color: #e2e8f0; font-size: 13px; flex: 1; min-width: 200px;
+  outline: none; font-family: inherit;
+}
+.filter-search:focus { border-color: #06b6d4; }
+
+/* Feedback Table */
+.fb-table { width: 100%; border-collapse: collapse; }
+.fb-table th {
+  text-align: left; padding: 10px 14px; font-size: 11px; color: #64748b;
+  border-bottom: 1px solid rgba(255,255,255,0.06); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.fb-table td {
+  padding: 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 13px; vertical-align: top;
+}
+.fb-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* Tags */
+.tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  font-weight: 600; white-space: nowrap;
+}
+.tag-suggestion { background: rgba(6,182,212,0.15); color: #06b6d4; }
+.tag-bug { background: rgba(239,68,68,0.15); color: #ef4444; }
+.tag-question { background: rgba(168,85,247,0.15); color: #a78bfa; }
+.tag-open { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.tag-in_progress { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.tag-resolved { background: rgba(34,197,94,0.15); color: #22c55e; }
+.tag-wontfix { background: rgba(107,114,128,0.15); color: #6b7280; }
+.tag-high { background: rgba(239,68,68,0.1); color: #f87171; }
+.tag-medium { background: rgba(251,191,36,0.1); color: #fbbf24; }
+.tag-low { background: rgba(107,114,128,0.1); color: #9ca3af; }
+
+.fb-content { max-width: 500px; color: #cbd5e1; }
+.fb-content-text { margin-bottom: 4px; }
+.fb-content-screenshots { display: flex; gap: 4px; margin-top: 6px; overflow-x: auto; }
+.fb-content-ss { width: 64px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: border-color 0.15s; }
+.fb-content-ss:hover { border-color: #06b6d4; }
+.fb-resolution { font-size: 12px; color: #22c55e; margin-top: 4px; }
+#ss-modal { display: none; position: fixed; inset: 0; z-index: 30000; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; cursor: zoom-out; }
+#ss-modal.open { display: flex; }
+#ss-modal img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
+.fb-author { color: #94a3b8; white-space: nowrap; }
+.fb-time { color: #64748b; white-space: nowrap; font-size: 12px; }
+.fb-page-link {
+  color: #06b6d4; text-decoration: none; font-weight: 500; font-size: 12px;
+}
+.fb-page-link:hover { text-decoration: underline; }
+.fb-votes { display: flex; align-items: center; gap: 4px; }
+.fb-votes button {
+  background: none; border: 1px solid rgba(255,255,255,0.1); color: #94a3b8;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.fb-votes button:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.fb-actions button {
+  background: none; border: 1px solid rgba(255,255,255,0.1); color: #94a3b8;
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.fb-actions button:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.fb-empty { text-align: center; padding: 60px; color: #64748b; font-size: 15px; }
+
+@media (max-width: 768px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .fb-table { display: block; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<div id="ss-modal"><img id="ss-modal-img"></div>
+<div class="container">
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="stat-label">전체 피드백</div><div class="stat-value cyan" id="stat-total">0</div></div>
+    <div class="stat-card"><div class="stat-label">미해결</div><div class="stat-value yellow" id="stat-open">0</div></div>
+    <div class="stat-card"><div class="stat-label">해결됨</div><div class="stat-value green" id="stat-resolved">0</div></div>
+    <div class="stat-card"><div class="stat-label">높은 우선순위</div><div class="stat-value red" id="stat-high">0</div></div>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-filter="all">전체</button>
+    <button class="filter-btn" data-filter="open">미해결</button>
+    <button class="filter-btn" data-filter="in_progress">진행중</button>
+    <button class="filter-btn" data-filter="resolved">해결됨</button>
+    <span style="color:#334155">|</span>
+    <button class="filter-btn" data-filter="suggestion">💡 제안</button>
+    <button class="filter-btn" data-filter="bug">🐛 문제</button>
+    <button class="filter-btn" data-filter="question">❓ 질문</button>
+    <input class="filter-search" id="search" placeholder="🔍 검색...">
+  </div>
+
+  <table class="fb-table">
+    <thead>
+      <tr>
+        <th>유형</th>
+        <th>페이지</th>
+        <th>내용</th>
+        <th>작성자</th>
+        <th>우선순위</th>
+        <th>상태</th>
+        <th>👍</th>
+        <th>처리</th>
+      </tr>
+    </thead>
+    <tbody id="fb-body">
+      <tr><td colspan="8" class="fb-empty">로딩 중...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script type="module">
+import { subscribeAllFeedbacks, voteFeedback, unvoteFeedback, updateFeedbackStatus, getCurrentUser, timeAgo, PAGES } from "./js/feedback-system.js";
+
+let allItems = [];
+let currentFilter = "all";
+let searchQuery = "";
+
+const user = getCurrentUser();
+const userName = user?.name || "";
+
+// Subscribe to all feedbacks
+subscribeAllFeedbacks((items) => {
+  allItems = items;
+  updateStats(items);
+  renderTable();
+});
+
+// Stats
+function updateStats(items) {
+  document.getElementById("stat-total").textContent = items.length;
+  document.getElementById("stat-open").textContent = items.filter(i => i.status === "open" || i.status === "in_progress").length;
+  document.getElementById("stat-resolved").textContent = items.filter(i => i.status === "resolved").length;
+  document.getElementById("stat-high").textContent = items.filter(i => i.priority === "high" && i.status !== "resolved").length;
+}
+
+// Filters
+document.getElementById("filters").addEventListener("click", (e) => {
+  if (e.target.matches(".filter-btn")) {
+    // Toggle same-type filter or set new one
+    const filter = e.target.dataset.filter;
+    if (filter === currentFilter) {
+      currentFilter = "all";
+    } else {
+      currentFilter = filter;
+    }
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    const activeBtn = document.querySelector(`[data-filter="${currentFilter}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+    renderTable();
+  }
+});
+
+document.getElementById("search").addEventListener("input", (e) => {
+  searchQuery = e.target.value.toLowerCase();
+  renderTable();
+});
+
+function filterItems() {
+  return allItems.filter(item => {
+    // Status/type filter
+    if (currentFilter !== "all") {
+      if (["open", "in_progress", "resolved", "wontfix"].includes(currentFilter)) {
+        if (item.status !== currentFilter) return false;
+      } else if (["suggestion", "bug", "question"].includes(currentFilter)) {
+        if (item.type !== currentFilter) return false;
+      }
+    }
+    // Search
+    if (searchQuery) {
+      const text = `${item.content} ${item.author?.name} ${item.pageName} ${item.section} ${item.resolution}`.toLowerCase();
+      if (!text.includes(searchQuery)) return false;
+    }
+    return true;
+  });
+}
+
+function renderTable() {
+  const filtered = filterItems();
+  const tbody = document.getElementById("fb-body");
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="fb-empty">피드백이 없습니다</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(item => {
+    const typeLabel = { suggestion: "💡 제안", bug: "🐛 문제", question: "❓ 질문" }[item.type] || "💡 제안";
+    const statusLabel = { open: "미해결", in_progress: "진행중", resolved: "해결", wontfix: "보류" }[item.status] || "미해결";
+    const priorityLabel = { high: "높음", medium: "보통", low: "낮음" }[item.priority] || "보통";
+    const page = PAGES.find(p => p.id === item.pageId);
+    const pageFile = page?.file || "";
+    const voted = (item.votedBy || []).includes(userName);
+
+    return `<tr>
+      <td><span class="tag tag-${item.type || "suggestion"}">${typeLabel}</span></td>
+      <td>${page ? `<a href="${pageFile}" class="fb-page-link">${page.icon} ${page.name}</a>` : item.pageName || ""}</td>
+      <td class="fb-content">
+        <div class="fb-content-text">${esc(item.content)}</div>
+        ${item.section ? `<span class="tag" style="background:rgba(255,255,255,0.05);color:#64748b">${esc(item.section)}</span>` : ""}
+        ${(() => {
+          const ssArr = (item.screenshots && item.screenshots.length > 0)
+            ? item.screenshots
+            : (item.screenshot && item.screenshot.length > 100 ? [item.screenshot] : []);
+          return ssArr.length > 0 ? `<div class="fb-content-screenshots">${ssArr.map(ss => `<img class="fb-content-ss" src="${ss}" data-full="${ss}">`).join("")}</div>` : "";
+        })()}
+        ${item.resolution ? `<div class="fb-resolution">→ ${esc(item.resolution)}</div>` : ""}
+      </td>
+      <td class="fb-author">${esc(item.author?.name || "익명")}<br><span class="fb-time">${timeAgo(item.createdAt)}</span></td>
+      <td><span class="tag tag-${item.priority || "medium"}">${priorityLabel}</span></td>
+      <td><span class="tag tag-${item.status}">${statusLabel}</span></td>
+      <td class="fb-votes"><button class="${voted ? "fp-vote-active" : ""}" data-vote="${item.id}">👍 ${item.votes || 0}</button></td>
+      <td class="fb-actions">
+        ${item.status !== "resolved" ? `<button data-resolve="${item.id}">처리</button>` : ""}
+        ${item.status === "open" ? `<button data-progress="${item.id}">진행중</button>` : ""}
+      </td>
+    </tr>`;
+  }).join("");
+
+  // Vote handlers
+  tbody.querySelectorAll("[data-vote]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!userName) { alert("로그인 후 투표 가능"); return; }
+      const id = btn.dataset.vote;
+      const item = allItems.find(i => i.id === id);
+      if ((item?.votedBy || []).includes(userName)) {
+        await unvoteFeedback(id, userName);
+      } else {
+        await voteFeedback(id, userName);
+      }
+    });
+  });
+
+  // Resolve handlers
+  tbody.querySelectorAll("[data-resolve]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const resolution = prompt("처리 내용:");
+      if (resolution === null) return;
+      await updateFeedbackStatus(btn.dataset.resolve, "resolved", resolution, userName);
+    });
+  });
+
+  // Progress handlers
+  tbody.querySelectorAll("[data-progress]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateFeedbackStatus(btn.dataset.progress, "in_progress", "", userName);
+    });
+  });
+
+  // Screenshot preview
+  tbody.querySelectorAll(".fb-content-ss").forEach(img => {
+    img.addEventListener("click", () => {
+      document.getElementById("ss-modal-img").src = img.dataset.full;
+      document.getElementById("ss-modal").classList.add("open");
+    });
+  });
+}
+
+// Close screenshot modal
+document.getElementById("ss-modal")?.addEventListener("click", () => {
+  document.getElementById("ss-modal").classList.remove("open");
+});
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+</script>
+
+<script src="js/deliverable-nav.js"></script>
+</body>
+</html>

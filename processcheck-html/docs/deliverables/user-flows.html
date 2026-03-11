@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProcessCheck - 역할별 사용자 플로우 다이어그램</title>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
+  }
+}
+</script>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ===== Header ===== */
+.header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #fff;
+  padding: 32px 40px 24px;
+  border-bottom: 3px solid #e94560;
+}
+.header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.header p { font-size: 14px; color: #a0aec0; }
+
+/* ===== Tab Navigation ===== */
+.tab-nav {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 24px;
+  overflow-x: auto;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.tab-btn {
+  padding: 14px 24px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  position: relative;
+}
+.tab-btn:hover { color: #1a1a2e; background: #f8fafc; }
+.tab-btn.active {
+  color: #0f3460;
+  border-bottom-color: #e94560;
+}
+.tab-btn .badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.tab-btn .badge-worker { background: #dbeafe; color: #1e40af; }
+.tab-btn .badge-manager { background: #fef3c7; color: #92400e; }
+.tab-btn .badge-observer { background: #ede9fe; color: #5b21b6; }
+.tab-btn .badge-change { background: #fce7f3; color: #9d174d; }
+.tab-btn .badge-portal { background: #d1fae5; color: #065f46; }
+
+/* ===== Tab Content ===== */
+.tab-content { display: none; padding: 32px 24px; max-width: 1400px; margin: 0 auto; }
+.tab-content.active { display: block; }
+
+/* ===== Legend ===== */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 12px;
+  margin-bottom: 28px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  align-items: center;
+}
+.legend-title { font-weight: 700; font-size: 13px; color: #475569; margin-right: 8px; }
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+.legend-shape {
+  width: 28px;
+  height: 20px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.legend-shape.start { background: #16a34a; border-radius: 10px; }
+.legend-shape.end { background: #dc2626; border-radius: 10px; }
+.legend-shape.screen { background: #2563eb; }
+.legend-shape.action { background: #ea580c; transform: rotate(0deg); clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 24px; height: 24px; }
+.legend-shape.condition { background: #7c3aed; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 24px; height: 24px; }
+
+/* ===== Flow Container ===== */
+.flow-container {
+  position: relative;
+  overflow-x: auto;
+  padding: 20px 0;
+}
+
+.flow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-width: fit-content;
+  padding: 20px 40px;
+}
+
+/* ===== Nodes ===== */
+.flow-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+}
+
+.node {
+  position: relative;
+  padding: 14px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+  min-width: 160px;
+  max-width: 240px;
+  z-index: 2;
+  user-select: none;
+}
+.node:hover { transform: translateY(-2px); z-index: 10; }
+
+/* Node Types */
+.node-start {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  border-radius: 28px;
+  box-shadow: 0 4px 12px rgba(22,163,74,0.3);
+}
+.node-start:hover { box-shadow: 0 6px 20px rgba(22,163,74,0.45); }
+
+.node-end {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  border-radius: 28px;
+  box-shadow: 0 4px 12px rgba(220,38,38,0.3);
+}
+.node-end:hover { box-shadow: 0 6px 20px rgba(220,38,38,0.45); }
+
+.node-screen {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+}
+.node-screen:hover { box-shadow: 0 6px 20px rgba(37,99,235,0.45); }
+
+.node-action {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(234,88,12,0.3);
+  border-left: 4px solid #f97316;
+}
+.node-action:hover { box-shadow: 0 6px 20px rgba(234,88,12,0.45); }
+
+.node-condition {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+  border: 2px dashed rgba(255,255,255,0.3);
+  min-width: 140px;
+}
+.node-condition:hover { box-shadow: 0 6px 20px rgba(124,58,237,0.45); }
+
+.node-sub {
+  background: #f1f5f9;
+  color: #334155;
+  border-radius: 8px;
+  border: 2px solid #cbd5e1;
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 130px;
+  padding: 10px 16px;
+}
+.node-sub:hover { border-color: #94a3b8; background: #e2e8f0; }
+
+/* ===== Arrows ===== */
+.arrow-down {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+.arrow-down .line {
+  width: 2px;
+  height: 32px;
+  background: #94a3b8;
+}
+.arrow-down .head {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #94a3b8;
+}
+.arrow-down .label {
+  position: absolute;
+  left: 14px;
+  top: 8px;
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  font-weight: 500;
+  background: #f0f2f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ===== Branch Layout ===== */
+.branch-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 40px;
+  position: relative;
+  margin: 0;
+}
+.branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+.branch-label {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+}
+.branch-label.yes { background: #dcfce7; color: #166534; }
+.branch-label.no { background: #fee2e2; color: #991b1b; }
+.branch-label.neutral { background: #e0e7ff; color: #3730a3; }
+
+/* ===== Horizontal connector ===== */
+.h-connector {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.h-connector .h-line {
+  width: 40px;
+  height: 2px;
+  background: #94a3b8;
+}
+.h-connector .h-arrow {
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid #94a3b8;
+}
+.h-connector .h-label {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  font-weight: 500;
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f0f2f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ===== Section Headers ===== */
+.section-header {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.section-header p {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* ===== Flow Section ===== */
+.flow-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  overflow-x: auto;
+}
+.flow-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+/* ===== Tooltip ===== */
+.node[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: pre-line;
+  max-width: 280px;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  line-height: 1.5;
+  pointer-events: none;
+}
+.node[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1e293b;
+  z-index: 999;
+  pointer-events: none;
+}
+
+/* ===== Popup Overlay ===== */
+.popup-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.popup-overlay.active { display: flex; }
+.popup-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 520px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  position: relative;
+  animation: popupIn 0.25s ease;
+}
+@keyframes popupIn {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.popup-card .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all 0.2s;
+}
+.popup-card .close-btn:hover { background: #e2e8f0; color: #1a1a2e; }
+.popup-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+  padding-right: 40px;
+}
+.popup-card .popup-type {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+.popup-type.screen { background: #dbeafe; color: #1e40af; }
+.popup-type.action { background: #ffedd5; color: #9a3412; }
+.popup-type.condition { background: #ede9fe; color: #5b21b6; }
+.popup-type.start { background: #dcfce7; color: #166534; }
+.popup-type.end { background: #fee2e2; color: #991b1b; }
+.popup-card .popup-desc {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+.popup-card .popup-section { margin-bottom: 14px; }
+.popup-card .popup-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.popup-card .popup-list {
+  list-style: none;
+  padding: 0;
+}
+.popup-card .popup-list li {
+  font-size: 13px;
+  color: #334155;
+  padding: 4px 0 4px 18px;
+  position: relative;
+}
+.popup-card .popup-list li::before {
+  content: '\25B8';
+  position: absolute;
+  left: 0;
+  color: #94a3b8;
+}
+
+/* ===== Sub-flow indicator ===== */
+.sub-flow-group {
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 20px 16px 16px;
+  position: relative;
+  margin: 8px 0;
+  background: rgba(241,245,249,0.5);
+}
+.sub-flow-group .group-label {
+  position: absolute;
+  top: -11px;
+  left: 20px;
+  background: #f0f2f5;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .header { padding: 20px 16px 16px; }
+  .header h1 { font-size: 22px; }
+  .tab-nav { padding: 0 8px; }
+  .tab-btn { padding: 12px 14px; font-size: 13px; }
+  .tab-content { padding: 16px 12px; }
+  .flow-section { padding: 16px; }
+  .branch-container { gap: 20px; }
+  .node { min-width: 120px; max-width: 180px; font-size: 12px; padding: 10px 14px; }
+}
+
+/* ===== Phase Pipeline (for change request flow) ===== */
+.phase-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 8px 0;
+}
+.phase-pill {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #475569;
+  position: relative;
+}
+.phase-pill.active { background: #2563eb; }
+.phase-arrow {
+  font-size: 16px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* ===== Scale cards ===== */
+.scale-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.scale-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  background: #fff;
+}
+.scale-card h4 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scale-card h4 .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.scale-card.minor h4 .dot { background: #16a34a; }
+.scale-card.medium h4 .dot { background: #eab308; }
+.scale-card.major h4 .dot { background: #dc2626; }
+.scale-card.minor { border-color: #bbf7d0; }
+.scale-card.medium { border-color: #fef08a; }
+.scale-card.major { border-color: #fecaca; }
+.scale-card p { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ProcessCheck - 사용자 플로우 다이어그램</h1>
+  <p>개발 프로세스 관리 시스템 (역할별 워크플로우 시각화)</p>
+</div>
+
+<nav class="tab-nav" id="tabNav">
+  <button class="tab-btn active" data-tab="worker">
+    실무자 <span class="badge badge-worker">Worker</span>
+  </button>
+  <button class="tab-btn" data-tab="manager">
+    매니저 <span class="badge badge-manager">Manager</span>
+  </button>
+  <button class="tab-btn" data-tab="observer">
+    기획조정실 <span class="badge badge-observer">Observer</span>
+  </button>
+  <button class="tab-btn" data-tab="change">
+    설계변경 <span class="badge badge-change">Change</span>
+  </button>
+  <button class="tab-btn" data-tab="portal">
+    고객 포털 <span class="badge badge-portal">Portal</span>
+  </button>
+</nav>
+
+<!-- ============================================================ -->
+<!-- TAB 1: Worker Flow -->
+<!-- ============================================================ -->
+<div class="tab-content active" id="tab-worker">
+  <div class="section-header">
+    <h2>실무자 (Worker) 플로우</h2>
+    <p>실무자는 실제 업무를 담당하며, 작업을 수행하고 완료 보고를 합니다. 매니저의 승인을 받아야 최종 완료됩니다.</p>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">범례:</span>
+    <div class="legend-item"><div class="legend-shape start"></div> 시작/끝</div>
+    <div class="legend-item"><div class="legend-shape screen"></div> 화면</div>
+    <div class="legend-item"><div class="legend-shape action" style="width:18px;height:18px;"></div> 행동</div>
+    <div class="legend-item"><div class="legend-shape condition" style="width:18px;height:18px;"></div> 조건분기</div>
+    <div class="legend-item" style="margin-left:auto; font-size:11px; color:#94a3b8;">노드를 클릭하면 상세 설명을 볼 수 있습니다</div>
+  </div>
+
+  <!-- Main Flow: Login -> Dashboard -> Task -->
+  <div class="flow-section">
+    <h3>메인 플로우: 로그인 - 대시보드 - 작업 수행</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-start"
+          data-tooltip="데모 카드 또는 Microsoft OAuth로 로그인"
+          data-popup="login-start">
+          로그인
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">데모카드 / Microsoft OAuth</span>
+        </div>
+
+        <div class="node node-condition"
+          data-tooltip="로그인 방식에 따라 분기"
+          data-popup="login-method">
+          로그인 방식?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label neutral">데모 카드</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="3개의 샘플 사용자 카드 중 선택\n김철수(실무자), 이영희(매니저), 박민수(기획조정실)"
+              data-popup="demo-card">
+              카드 선택 클릭
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label neutral">Microsoft</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="Firebase Auth + Microsoft OAuth\nsignInWithPopup 또는 signInWithRedirect"
+              data-popup="ms-login">
+              Microsoft 인증
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">인증 완료</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="나의 작업 목록, 승인 대기, 알림 확인\n실무자: subscribeChecklistItemsByAssignee"
+          data-popup="worker-dashboard">
+          대시보드 (dashboard.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">작업 항목 클릭</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="작업 상세 정보, 타임라인, 코멘트\n현재 상태, 담당자, 마감일 확인"
+          data-popup="task-detail">
+          작업 상세 (task.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">pending 상태일 때</span>
+        </div>
+
+        <div class="node node-action"
+          data-tooltip="작업 시작 버튼 클릭\nstatus: pending -> in_progress"
+          data-popup="task-start">
+          "작업 시작" 클릭
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">status: in_progress</span>
+        </div>
+
+        <div class="sub-flow-group">
+          <span class="group-label">작업 수행 중</span>
+          <div class="flow-diagram">
+            <div class="branch-container" style="gap: 24px;">
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="파일을 첨부하여 작업 결과물 업로드"
+                  data-popup="file-attach">
+                  파일 첨부
+                </div>
+              </div>
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="작업 관련 코멘트 작성"
+                  data-popup="comment-add">
+                  코멘트 추가
+                </div>
+              </div>
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="체크리스트 항목별 진행 확인"
+                  data-popup="checklist-check">
+                  체크리스트 확인
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">작업 완료 시</span>
+        </div>
+
+        <div class="node node-action"
+          data-tooltip="작업 완료 버튼 클릭\nstatus: completed, approvalStatus: pending\n매니저에게 자동 알림 생성"
+          data-popup="task-complete">
+          "작업 완료" 클릭
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">approvalStatus: pending</span>
+        </div>
+
+        <div class="node node-condition"
+          data-tooltip="매니저가 work stage 작업을 검토\napprovalStatus 변경 대기"
+          data-popup="approval-wait">
+          매니저 승인 대기
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label yes">승인됨</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="작업이 최종 승인됨\napprovalStatus: approved"
+              data-popup="task-approved">
+              작업 완료
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label no">반려됨</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="반려 사유 확인 후 재작업\nrestartTask() 호출\nstatus: rejected -> in_progress"
+              data-popup="task-restart">
+              "재작업 시작"
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div>
+              <span class="label" style="left:14px;">다시 작업 수행</span>
+            </div>
+            <div class="node node-sub" style="font-size:11px; opacity:0.7; border-style:dashed;">
+              작업 수행 (위로 반복)
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub Flow: Project browsing -->
+  <div class="flow-section">
+    <h3>보조 플로우: 프로젝트 목록 탐색</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+        <div class="node node-screen"
+          data-tooltip="대시보드의 프로젝트 통계 카드 클릭\n또는 네비게이션 메뉴에서 이동"
+          data-popup="nav-projects">
+          대시보드
+        </div>
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">프로젝트 카드 클릭 / 메뉴</span>
+        </div>
+        <div class="node node-screen"
+          data-tooltip="7가지 뷰 모드 (테이블/매트릭스/카드 등)\n프로젝트 목록 검색, 필터, 정렬"
+          data-popup="projects-list">
+          프로젝트 목록 (projects.html)
+        </div>
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">프로젝트 선택</span>
+        </div>
+        <div class="node node-screen"
+          data-tooltip="개요, 체크리스트, 설계변경, 출시준비 탭\n5개 통계 카드 표시"
+          data-popup="project-detail">
+          프로젝트 상세 (project.html)
+        </div>
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">체크리스트 탭</span>
+        </div>
+        <div class="node node-sub"
+          data-tooltip="나에게 배정된 작업 확인\n진행 상태별 필터"
+          data-popup="my-checklist">
+          나의 체크리스트 항목 확인
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 2: Manager Flow -->
+<!-- ============================================================ -->
+<div class="tab-content" id="tab-manager">
+  <div class="section-header">
+    <h2>매니저 (Manager) 플로우</h2>
+    <p>매니저는 부서 관리자로서, work stage 작업의 승인/반려와 체크리스트 관리를 담당합니다.</p>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">범례:</span>
+    <div class="legend-item"><div class="legend-shape start"></div> 시작/끝</div>
+    <div class="legend-item"><div class="legend-shape screen"></div> 화면</div>
+    <div class="legend-item"><div class="legend-shape action" style="width:18px;height:18px;"></div> 행동</div>
+    <div class="legend-item"><div class="legend-shape condition" style="width:18px;height:18px;"></div> 조건분기</div>
+  </div>
+
+  <!-- Main: Approval Flow -->
+  <div class="flow-section">
+    <h3>메인 플로우: 로그인 - 승인 처리</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-start"
+          data-tooltip="데모 카드(이영희) 또는 Microsoft OAuth"
+          data-popup="mgr-login">
+          로그인
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">인증 완료</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="승인 대기 목록 + 부서별 작업 현황\nsubscribeAllChecklistItems -> 자기 부서 필터\n통계 카드: 작업대기, 승인대기, 프로젝트, 알림, 고객요청"
+          data-popup="mgr-dashboard">
+          대시보드 (dashboard.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">승인대기 항목 클릭</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="실무자가 완료한 작업 상세 확인\n타임라인, 첨부파일, 코멘트"
+          data-popup="mgr-task">
+          작업 상세 (task.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">작업 내용 검토</span>
+        </div>
+
+        <div class="node node-action"
+          data-tooltip="work stage 작업의 결과물 검토\n파일 확인, 코멘트 읽기"
+          data-popup="mgr-review">
+          작업 내용 검토
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
+
+        <div class="node node-condition"
+          data-tooltip="승인 또는 반려 결정\nwork stage만 매니저가 승인 가능"
+          data-popup="mgr-decision">
+          승인 / 반려?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label yes">승인</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="approveTask() 호출\napprovalStatus: approved\n담당자에게 알림 자동 생성"
+              data-popup="mgr-approve">
+              "승인" 버튼 클릭
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="작업 승인 처리 완료\n대시보드로 돌아가 다음 승인 대기 항목 처리"
+              data-popup="mgr-done">
+              승인 완료
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label no">반려</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="rejectTask() 호출\n반려 사유 입력 필수\n담당자에게 반려 알림 자동 생성"
+              data-popup="mgr-reject">
+              "반려" + 사유 입력
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="반려 처리 완료\n실무자에게 재작업 요청됨"
+              data-popup="mgr-rejected">
+              반려 완료
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub Flow: Project & Checklist Management -->
+  <div class="flow-section">
+    <h3>보조 플로우: 프로젝트 관리 및 체크리스트</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-screen"
+          data-tooltip="프로젝트 목록에서 관리할 프로젝트 선택"
+          data-popup="mgr-projects">
+          프로젝트 상세 (project.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label neutral">체크리스트 탭</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="체크리스트 탭에서 '작업 추가' 버튼\n모달에서 작업명, 담당자, 마감일 등 입력"
+              data-popup="mgr-add-task">
+              작업 추가 (모달)
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="개요 탭에서 '템플릿 적용' 버튼\napplyTemplateToProject() 호출\n프로젝트 유형에 맞게 193개 템플릿 필터링"
+              data-popup="mgr-template">
+              템플릿 적용
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label neutral">관리자 메뉴</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-screen"
+              data-tooltip="매트릭스/트리/리스트 3가지 뷰\n자기 부서 템플릿 항목 편집 가능"
+              data-popup="mgr-admin">
+              체크리스트 관리자
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="자기 부서 소속 템플릿 항목 수정\n항목명, 담당자, 필수 여부 등 편집"
+              data-popup="mgr-edit-template">
+              부서 템플릿 편집
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 3: Observer Flow -->
+<!-- ============================================================ -->
+<div class="tab-content" id="tab-observer">
+  <div class="section-header">
+    <h2>기획조정실 (Observer) 플로우</h2>
+    <p>기획조정실은 전체 프로젝트를 모니터링하고, gate stage(위원회) 작업의 최종 승인을 담당합니다.</p>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">범례:</span>
+    <div class="legend-item"><div class="legend-shape start"></div> 시작/끝</div>
+    <div class="legend-item"><div class="legend-shape screen"></div> 화면</div>
+    <div class="legend-item"><div class="legend-shape action" style="width:18px;height:18px;"></div> 행동</div>
+    <div class="legend-item"><div class="legend-shape condition" style="width:18px;height:18px;"></div> 조건분기</div>
+  </div>
+
+  <!-- Main: Gate Approval -->
+  <div class="flow-section">
+    <h3>메인 플로우: 위원회 (Gate) 승인</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-start"
+          data-tooltip="데모 카드(박민수) 또는 Microsoft OAuth"
+          data-popup="obs-login">
+          로그인
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">인증 완료</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="전체 프로젝트 현황 + 위원회 승인 대기\nsubscribeAllChecklistItems (전체)\n통계 카드 5개 표시"
+          data-popup="obs-dashboard">
+          대시보드 (dashboard.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">위원회 승인 대기 클릭</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="gate stage 작업 상세\n해당 work stage 모든 작업이 매니저 승인 완료 여부 확인"
+          data-popup="obs-task">
+          작업 상세 (task.html)
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">gate stage 검토</span>
+        </div>
+
+        <div class="node node-condition"
+          data-tooltip="gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관\nwork stage의 모든 작업 승인 완료 후 진행"
+          data-popup="obs-gate-check">
+          Gate Stage 승인?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label yes">최종 승인</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="approveTask() 호출\ngate stage 승인 시 고객 포털 알림 자동 생성\nrecalculateProjectStats() 호출"
+              data-popup="obs-approve">
+              "승인" 클릭
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="위원회 승인 완료\n다음 phase로 프로젝트 진행"
+              data-popup="obs-done">
+              Gate 승인 완료
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label no">반려</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="반려 사유 입력\n해당 phase의 작업을 재검토 필요"
+              data-popup="obs-reject">
+              "반려" + 사유 입력
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="Gate 반려\n해당 phase 작업 재수행 필요"
+              data-popup="obs-rejected">
+              Gate 반려
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub: Monitoring & Admin -->
+  <div class="flow-section">
+    <h3>보조 플로우: 전체 모니터링 및 관리</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-screen"
+          data-tooltip="전체 프로젝트를 매트릭스 뷰로 확인\n6 phase x 부서별 진행 현황"
+          data-popup="obs-matrix">
+          프로젝트 목록 - 매트릭스 뷰
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">프로젝트 선택</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="모든 탭 접근 가능\n개요, 체크리스트, 설계변경, 출시준비"
+          data-popup="obs-project-detail">
+          프로젝트 상세 (모든 탭)
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:16px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label neutral">체크리스트 관리</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-screen"
+              data-tooltip="모든 부서의 템플릿 편집 가능\n스테이지/부서 추가/삭제 권한"
+              data-popup="obs-admin">
+              체크리스트 관리자
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="스테이지 추가/삭제\n부서 추가/삭제\n모든 부서 템플릿 항목 편집"
+              data-popup="obs-template-edit">
+              전체 템플릿 관리
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label neutral">고객/영업</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-screen"
+              data-tooltip="거래처 목록, 계약 현황\n고객별 프로젝트 연결"
+              data-popup="obs-customers">
+              고객 관리 (customers.html)
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-screen"
+              data-tooltip="전체 프로젝트 출시 준비 현황\nD-Day 기반 체크리스트\n거래처별 준비 상태"
+              data-popup="obs-sales">
+              영업 대시보드 (sales.html)
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 4: Change Request Flow -->
+<!-- ============================================================ -->
+<div class="tab-content" id="tab-change">
+  <div class="section-header">
+    <h2>설계변경 프로세스 플로우</h2>
+    <p>설계변경은 규모(경미/중간/대규모)에 따라 차등 프로세스가 적용됩니다. 월 약 50건 처리.</p>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">범례:</span>
+    <div class="legend-item"><div class="legend-shape start"></div> 시작/끝</div>
+    <div class="legend-item"><div class="legend-shape screen"></div> 화면</div>
+    <div class="legend-item"><div class="legend-shape action" style="width:18px;height:18px;"></div> 행동</div>
+    <div class="legend-item"><div class="legend-shape condition" style="width:18px;height:18px;"></div> 조건분기</div>
+  </div>
+
+  <!-- Registration Flow -->
+  <div class="flow-section">
+    <h3>변경 요청 등록</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-start"
+          data-tooltip="프로젝트 상세 페이지에서 설계변경 탭 진입"
+          data-popup="cr-start">
+          프로젝트 상세 - 설계변경 탭
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">"변경 요청 등록" 클릭</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="변경 요청 등록 모달\n요청 제목, 설명, 요청 출처(내부/고객) 입력"
+          data-popup="cr-modal">
+          변경 요청 등록 모달
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
+
+        <div class="node node-condition"
+          data-tooltip="내부 발의 또는 고객 요청으로 구분\nrequestSource 필드"
+          data-popup="cr-source">
+          요청 출처?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label neutral">내부</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="requestSource: internal\n부서 내 개선 사항이나 기술적 변경"
+              data-popup="cr-internal">
+              내부 발의 등록
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label neutral">고객</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="requestSource: customer\n고객(대리점/법인) 드롭다운에서 선택\ncustomerId, customerName 연결"
+              data-popup="cr-customer">
+              고객 출처 선택 + 상세 입력
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">등록 완료</span>
+        </div>
+
+        <div class="node node-condition"
+          data-tooltip="변경 규모 판정\n경미(minor), 중간(medium), 대규모(major)"
+          data-popup="cr-scale">
+          규모 판정
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="scale-cards">
+          <div class="scale-card minor">
+            <h4><span class="dot"></span> 경미 (Minor)</h4>
+            <p>단순 수정, 최소 영향</p>
+            <div class="phase-pipeline">
+              <span class="phase-pill active">접수</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">승인</span>
+            </div>
+            <p style="margin-top:8px; font-size:12px; color:#16a34a;">2단계 | 필수 항목만 | 3개 phase (발의/Tx/양산이관)</p>
+          </div>
+          <div class="scale-card medium">
+            <h4><span class="dot"></span> 중간 (Medium)</h4>
+            <p>부분 변경, 검토 필요</p>
+            <div class="phase-pipeline">
+              <span class="phase-pill active">접수</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">검토</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">승인</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">적용</span>
+            </div>
+            <p style="margin-top:8px; font-size:12px; color:#ca8a04;">4단계 | 필수 항목만 | 전체 phase</p>
+          </div>
+          <div class="scale-card major">
+            <h4><span class="dot"></span> 대규모 (Major)</h4>
+            <p>전면 변경, 전체 프로세스 적용</p>
+            <div class="phase-pipeline">
+              <span class="phase-pill active">발의</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">기획</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">WM</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">Tx</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">MSG</span>
+              <span class="phase-arrow">&rarr;</span>
+              <span class="phase-pill active">양산/이관</span>
+            </div>
+            <p style="margin-top:8px; font-size:12px; color:#dc2626;">6 phase 전체 | 전체 항목 (193개) | 신규개발과 동일</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval processing -->
+  <div class="flow-section">
+    <h3>변경 요청 승인 처리</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-screen"
+          data-tooltip="등록된 변경 요청 목록 확인"
+          data-popup="cr-list">
+          설계변경 탭 - 요청 목록
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">요청 선택</span>
+        </div>
+
+        <div class="node node-action"
+          data-tooltip="PM 또는 매니저가 변경 요청 검토\n내용 확인, 영향도 분석"
+          data-popup="cr-review">
+          변경 요청 검토
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
+
+        <div class="node node-condition"
+          data-tooltip="PM/매니저만 승인/반려 가능\n반려 시 사유 입력 필수"
+          data-popup="cr-decision">
+          승인 / 반려?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label yes">승인</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="updateChangeRequest() 호출\n고객 출처 시 portalNotifications 자동 생성"
+              data-popup="cr-approve">
+              변경 요청 승인
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="규모별 템플릿 자동 적용\napplyTemplateToProject(projectId, 'change', scale)"
+              data-popup="cr-apply">
+              체크리스트 자동 생성
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="설계변경 프로세스 시작\n실무자에게 작업 배정"
+              data-popup="cr-done">
+              프로세스 시작
+            </div>
+          </div>
+          <div class="branch">
+            <span class="branch-label no">반려</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="반려 사유 저장\n고객 출처 시 portalNotifications 생성"
+              data-popup="cr-reject-action">
+              반려 사유 입력
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="변경 요청 반려 완료\n요청자에게 통보"
+              data-popup="cr-reject-done">
+              반려 완료
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 5: Customer Portal Flow -->
+<!-- ============================================================ -->
+<div class="tab-content" id="tab-portal">
+  <div class="section-header">
+    <h2>고객 포털 플로우</h2>
+    <p>대리점/법인이 자사 관련 프로젝트의 진행 단계를 확인하는 읽기 전용 포털입니다.</p>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">범례:</span>
+    <div class="legend-item"><div class="legend-shape start"></div> 시작/끝</div>
+    <div class="legend-item"><div class="legend-shape screen"></div> 화면</div>
+    <div class="legend-item"><div class="legend-shape action" style="width:18px;height:18px;"></div> 행동</div>
+    <div class="legend-item"><div class="legend-shape condition" style="width:18px;height:18px;"></div> 조건분기</div>
+  </div>
+
+  <div class="flow-section">
+    <h3>고객 포털 인증 및 이용</h3>
+    <div class="flow-container">
+      <div class="flow-diagram">
+
+        <div class="node node-start"
+          data-tooltip="고객 포털 페이지 접속\ncustomer-portal.html"
+          data-popup="portal-start">
+          고객 포털 접속
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">이메일 입력</span>
+        </div>
+
+        <div class="node node-screen"
+          data-tooltip="이메일 주소 입력 화면\n등록된 portalLoginEmail과 매칭"
+          data-popup="portal-email">
+          이메일 인증 화면
+        </div>
+
+        <div class="arrow-down"><div class="line"></div><div class="head"></div>
+          <span class="label">인증 요청</span>
+        </div>
+
+        <div class="node node-condition"
+          data-tooltip="portalLoginEmail 일치 확인\nportalEnabled 체크\nsessionStorage에 세션 저장"
+          data-popup="portal-auth">
+          인증 확인?
+        </div>
+
+        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
+
+        <div class="branch-container">
+          <div class="branch">
+            <span class="branch-label yes">인증 성공</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-screen"
+              data-tooltip="자사 관련 프로젝트 목록\n각 프로젝트의 현재 phase, 진행률 표시\n읽기 전용"
+              data-popup="portal-projects">
+              프로젝트 진행 현황 (읽기 전용)
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+
+            <div class="branch-container" style="gap: 24px;">
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="프로젝트 상세 진행 단계 확인\n6 phase 진행 바, 현재 단계 표시"
+                  data-popup="portal-detail">
+                  프로젝트 진행 단계 확인
+                </div>
+              </div>
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="Gate 승인 시 자동 생성된 알림\n변경 요청 처리 결과 알림"
+                  data-popup="portal-notif">
+                  포털 알림 확인
+                </div>
+              </div>
+              <div class="branch">
+                <div class="node node-sub"
+                  data-tooltip="고객이 요청한 설계변경의 처리 현황\n승인/반려/진행중 상태 확인"
+                  data-popup="portal-change">
+                  변경 요청 현황 확인
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div class="branch">
+            <span class="branch-label no">인증 실패</span>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-action"
+              data-tooltip="등록되지 않은 이메일이거나\nportalEnabled: false인 경우"
+              data-popup="portal-fail">
+              오류 메시지 표시
+            </div>
+            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
+            <div class="node node-end"
+              data-tooltip="관리자에게 문의 안내"
+              data-popup="portal-end-fail">
+              접근 거부
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Popup Overlay ===== -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup-card" id="popupCard">
+    <button class="close-btn" id="popupClose">&times;</button>
+    <div id="popupContent"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== Tab Switching =====
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + target).classList.add('active');
+    });
+  });
+
+  // ===== Popup Data =====
+  const popupData = {
+    // --- Worker Flow ---
+    'login-start': {
+      title: '로그인',
+      type: 'start',
+      typeLabel: '시작',
+      desc: 'ProcessCheck 시스템에 접속하여 인증을 수행합니다.',
+      data: ['데모 카드 3개: 김철수(실무자), 이영희(매니저), 박민수(기획조정실)', 'Microsoft OAuth: Firebase Auth 연동', 'DB 시딩 중에는 스피너 표시'],
+      actions: ['데모 카드 클릭으로 즉시 로그인', 'Microsoft 계정으로 로그인 버튼 클릭']
+    },
+    'login-method': {
+      title: '로그인 방식 선택',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '데모 카드 로그인과 Microsoft OAuth 로그인 중 선택합니다.',
+      data: ['데모 카드: localStorage 기반 세션', 'Microsoft: Firebase Auth + Firestore 사용자 조회'],
+      actions: ['데모 카드 클릭 시 즉시 대시보드 이동', 'Microsoft 인증 후 기존 사용자면 대시보드, 신규면 역할/부서 선택']
+    },
+    'demo-card': {
+      title: '데모 카드 로그인',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '3개의 샘플 사용자 카드 중 하나를 선택하여 즉시 로그인합니다.',
+      data: ['김철수: 실무자(worker), 개발팀', '이영희: 매니저(manager), 개발팀', '박민수: 기획조정실(observer), 경영관리팀'],
+      actions: ['카드 클릭 시 localStorage에 사용자 정보 저장', '대시보드(dashboard.html)로 즉시 이동']
+    },
+    'ms-login': {
+      title: 'Microsoft OAuth 인증',
+      type: 'action',
+      typeLabel: '행동',
+      desc: 'Firebase Auth를 통해 Microsoft 계정으로 인증합니다.',
+      data: ['OAuthProvider("microsoft.com") 사용', 'signInWithPopup 또는 signInWithRedirect', '기존 사용자: 이메일로 Firestore 조회'],
+      actions: ['Microsoft 로그인 팝업 열기', '신규 사용자: 역할 + 부서(10개) 선택 화면', 'authProvider: "microsoft" 필드로 구분']
+    },
+    'worker-dashboard': {
+      title: '대시보드 (실무자 뷰)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '실무자에게 배정된 작업 목록과 알림을 확인하는 메인 화면입니다.',
+      data: ['나의 작업 대기 목록 (마감 3일 이내)', '승인 대기 중인 작업', '최근 알림 목록', '프로젝트 수'],
+      actions: ['통계 카드 클릭으로 섹션 스크롤/페이지 이동', '작업 항목 클릭으로 task.html 이동', '알림 클릭으로 해당 페이지 이동']
+    },
+    'task-detail': {
+      title: '작업 상세 (task.html)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '개별 작업의 상세 정보를 확인하고 작업을 수행하는 화면입니다.',
+      data: ['작업명, 담당자, 마감일, 중요도', '현재 상태 (pending/in_progress/completed/rejected)', '타임라인 (날짜 + 행위자)', '첨부 파일, 코멘트 목록'],
+      actions: ['"작업 시작" 버튼 (pending -> in_progress)', '"작업 완료" 버튼 (in_progress -> completed)', '파일 첨부, 코멘트 작성', '"재작업 시작" 버튼 (rejected -> in_progress)']
+    },
+    'task-start': {
+      title: '"작업 시작" 클릭',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '대기 중인 작업을 시작 상태로 변경합니다.',
+      data: ['status 변경: pending -> in_progress', '시작 시간 기록'],
+      actions: ['작업 상태가 "진행 중"으로 변경', '타임라인에 시작 이벤트 기록']
+    },
+    'file-attach': {
+      title: '파일 첨부',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '작업 결과물이나 관련 파일을 첨부합니다.',
+      data: ['파일명, 크기, 업로드 시간'],
+      actions: ['파일 선택 및 업로드 (UI만 존재, Storage 미연동)']
+    },
+    'comment-add': {
+      title: '코멘트 추가',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '작업에 관련된 코멘트를 추가합니다.',
+      data: ['코멘트 내용, 작성자, 작성 시간'],
+      actions: ['코멘트 텍스트 입력 후 등록']
+    },
+    'checklist-check': {
+      title: '체크리스트 확인',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '작업에 포함된 체크리스트 항목을 확인합니다.',
+      data: ['항목별 완료 여부', '필수/선택 항목 구분'],
+      actions: ['체크리스트 항목 체크/해제']
+    },
+    'task-complete': {
+      title: '"작업 완료" 클릭',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '작업을 완료 상태로 변경하고 매니저에게 승인을 요청합니다.',
+      data: ['status: completed', 'approvalStatus: pending (자동 설정)', '완료 시간 기록'],
+      actions: ['completeTask() 호출', '매니저에게 승인 요청 알림 자동 생성', '대시보드에서 "승인 대기" 카운트 증가']
+    },
+    'approval-wait': {
+      title: '매니저 승인 대기',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '매니저가 work stage 작업을 검토하여 승인 또는 반려합니다.',
+      data: ['approvalStatus: pending 상태', '검토자(매니저) 이름 + 완료일 표시', 'work stage만 매니저가 승인 가능'],
+      actions: ['매니저의 승인 결과를 대기', '승인 시 -> 작업 완료', '반려 시 -> 재작업 필요']
+    },
+    'task-approved': {
+      title: '작업 완료',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '매니저의 승인을 받아 작업이 최종 완료되었습니다.',
+      data: ['approvalStatus: approved', 'approvedBy: 매니저 이름', 'approvedAt: 승인 시간'],
+      actions: []
+    },
+    'task-restart': {
+      title: '"재작업 시작" 클릭',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '반려된 작업을 재작업 상태로 변경합니다.',
+      data: ['status 변경: rejected -> in_progress', '반려 사유 확인 가능'],
+      actions: ['restartTask() 호출', '작업 수행 단계로 돌아감', '타임라인에 재작업 시작 이벤트 기록']
+    },
+    'nav-projects': {
+      title: '프로젝트 목록으로 이동',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '대시보드에서 프로젝트 목록으로 이동합니다.',
+      data: ['프로젝트 통계 카드 클릭', '네비게이션 메뉴에서 이동'],
+      actions: ['projects.html로 이동']
+    },
+    'projects-list': {
+      title: '프로젝트 목록 (projects.html)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '전체 프로젝트를 다양한 뷰로 확인합니다.',
+      data: ['7가지 뷰: 테이블, 매트릭스, 카드, 간트, 칸반, 타임라인, 캘린더', '프로젝트 유형별 탭: 신규개발, 설계변경', '검색, 필터, 정렬 기능'],
+      actions: ['뷰 모드 전환', '프로젝트 선택하여 상세 페이지 이동', '정렬: 이름, 상태, PM, 진행률, 시작일']
+    },
+    'project-detail': {
+      title: '프로젝트 상세 (project.html)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '개별 프로젝트의 상세 정보와 진행 현황을 확인합니다.',
+      data: ['5개 통계 카드: 전체작업, 진행중, 지연, 매니저승인대기, 위원회승인대기', '프로젝트 상태 요약 카드', '4개 탭: 개요, 체크리스트, 설계변경, 출시준비'],
+      actions: ['통계 카드 클릭으로 체크리스트 탭 + 필터 적용', '탭 전환', '체크리스트 항목 확인']
+    },
+    'my-checklist': {
+      title: '나의 체크리스트 확인',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '프로젝트 상세에서 나에게 배정된 체크리스트 항목을 확인합니다.',
+      data: ['담당자 기준 필터링', '진행 상태별 필터'],
+      actions: ['항목 클릭으로 작업 상세 이동']
+    },
+
+    // --- Manager Flow ---
+    'mgr-login': {
+      title: '로그인 (매니저)',
+      type: 'start',
+      typeLabel: '시작',
+      desc: '매니저로 로그인합니다.',
+      data: ['데모 카드: 이영희(매니저, 개발팀)', 'Microsoft OAuth: 매니저 역할 사용자'],
+      actions: ['로그인 후 대시보드 이동']
+    },
+    'mgr-dashboard': {
+      title: '대시보드 (매니저 뷰)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '매니저는 자기 부서의 승인 대기 항목과 작업 현황을 확인합니다.',
+      data: ['승인 대기 작업 목록 (자기 부서)', '부서별 작업 현황', '통계 카드 5개', 'subscribeAllChecklistItems -> 자기 부서 필터'],
+      actions: ['승인 대기 항목 클릭으로 task.html 이동', '통계 카드 클릭', '알림 확인']
+    },
+    'mgr-task': {
+      title: '작업 상세 (매니저 검토)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '실무자가 완료한 작업의 상세 내용을 검토합니다.',
+      data: ['작업 결과물 (첨부파일)', '타임라인 (작업 이력)', '코멘트 내용', '작업 완료 시간'],
+      actions: ['"승인" 버튼 클릭', '"반려" 버튼 + 사유 입력']
+    },
+    'mgr-review': {
+      title: '작업 내용 검토',
+      type: 'action',
+      typeLabel: '행동',
+      desc: 'work stage 작업의 결과물을 검토합니다.',
+      data: ['파일 첨부 내용 확인', '코멘트 확인', '체크리스트 완료 여부'],
+      actions: ['내용 확인 후 승인/반려 결정']
+    },
+    'mgr-decision': {
+      title: '승인/반려 결정',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: 'work stage 작업에 대한 승인 또는 반려를 결정합니다.',
+      data: ['work stage만 매니저 승인 가능', 'GATE_STAGES 배열로 판별'],
+      actions: ['승인: approveTask() 호출', '반려: rejectTask() + 사유 입력']
+    },
+    'mgr-approve': {
+      title: '"승인" 버튼 클릭',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '작업을 승인 처리합니다.',
+      data: ['approvalStatus: approved', 'approvedBy: 매니저 이름', 'approvedAt: 승인 시간'],
+      actions: ['approveTask() 호출', '담당자에게 승인 알림 자동 생성', 'recalculateProjectStats() 호출']
+    },
+    'mgr-reject': {
+      title: '"반려" + 사유 입력',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '작업을 반려하고 사유를 기록합니다.',
+      data: ['approvalStatus: rejected', '반려 사유 필수 입력'],
+      actions: ['rejectTask() 호출', '담당자에게 반려 알림 자동 생성', '실무자에게 "재작업 시작" 버튼 활성화']
+    },
+    'mgr-done': {
+      title: '승인 완료',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '작업 승인 처리가 완료되었습니다.',
+      data: ['작업 상태가 최종 승인으로 변경'],
+      actions: ['대시보드로 돌아가 다음 승인 대기 항목 처리']
+    },
+    'mgr-rejected': {
+      title: '반려 완료',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '반려 처리가 완료되었습니다.',
+      data: ['실무자에게 재작업 요청됨'],
+      actions: ['실무자가 재작업 시작 후 다시 승인 대기']
+    },
+    'mgr-projects': {
+      title: '프로젝트 상세 (매니저)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '프로젝트 상세에서 체크리스트 관리와 템플릿 적용을 수행합니다.',
+      data: ['4개 탭: 개요, 체크리스트, 설계변경, 출시준비', '부서별 작업 현황'],
+      actions: ['체크리스트 탭에서 작업 관리', '개요 탭에서 템플릿 적용']
+    },
+    'mgr-add-task': {
+      title: '작업 추가 (모달)',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '체크리스트 탭에서 새 작업을 추가합니다.',
+      data: ['작업명, 담당자, 마감일 등 입력'],
+      actions: ['"작업 추가" 버튼 클릭', '모달에서 정보 입력 후 저장']
+    },
+    'mgr-template': {
+      title: '템플릿 적용',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '193개 템플릿 항목을 프로젝트 유형에 맞게 적용합니다.',
+      data: ['신규개발: 전체 193개', '설계변경 minor: 필수만 + 3 phase', '설계변경 medium: 필수만 + 전체 phase', '설계변경 major: 전체 항목'],
+      actions: ['applyTemplateToProject() 호출', '체크리스트 항목 자동 생성']
+    },
+    'mgr-admin': {
+      title: '체크리스트 관리자',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '체크리스트 템플릿을 관리하는 관리 화면입니다.',
+      data: ['3가지 뷰: 매트릭스, 트리, 리스트', '자기 부서 항목만 편집 가능'],
+      actions: ['뷰 모드 전환', '자기 부서 템플릿 항목 편집']
+    },
+    'mgr-edit-template': {
+      title: '부서 템플릿 편집',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '자기 부서 소속 템플릿 항목을 수정합니다.',
+      data: ['항목명, 담당자, 필수 여부 등'],
+      actions: ['항목 편집', '드래그앤드롭 순서 변경 (트리 뷰)']
+    },
+
+    // --- Observer Flow ---
+    'obs-login': {
+      title: '로그인 (기획조정실)',
+      type: 'start',
+      typeLabel: '시작',
+      desc: '기획조정실로 로그인합니다.',
+      data: ['데모 카드: 박민수(기획조정실, 경영관리팀)', 'Microsoft OAuth: observer 역할 사용자'],
+      actions: ['로그인 후 대시보드 이동']
+    },
+    'obs-dashboard': {
+      title: '대시보드 (기획조정실 뷰)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '전체 프로젝트 현황과 위원회 승인 대기를 확인합니다.',
+      data: ['전체 프로젝트 현황', '위원회(Gate) 승인 대기 목록', '통계 카드 5개', 'subscribeAllChecklistItems (전체)'],
+      actions: ['위원회 승인 대기 항목 클릭', '통계 카드 클릭', '전체 프로젝트 모니터링']
+    },
+    'obs-task': {
+      title: '작업 상세 (Gate 검토)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: 'gate stage 작업의 최종 승인을 위한 검토 화면입니다.',
+      data: ['해당 work stage 모든 작업 승인 완료 여부', 'Gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관'],
+      actions: ['"승인" 또는 "반려" 결정']
+    },
+    'obs-gate-check': {
+      title: 'Gate Stage 승인 결정',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: 'gate stage(위원회) 작업에 대한 최종 승인/반려를 결정합니다.',
+      data: ['GATE_STAGES 배열로 gate stage 판별', 'observer만 gate stage 승인 가능', 'work stage 모든 작업 승인 완료 후 진행'],
+      actions: ['최종 승인: 다음 phase로 진행', '반려: 해당 phase 재검토']
+    },
+    'obs-approve': {
+      title: '"승인" 클릭 (Gate)',
+      type: 'action',
+      typeLabel: '행동',
+      desc: 'gate stage 작업을 최종 승인합니다.',
+      data: ['approvalStatus: approved', 'gate 승인 시 고객 포털 알림 자동 생성'],
+      actions: ['approveTask() 호출', 'recalculateProjectStats() 호출', '고객 포털에 알림 생성']
+    },
+    'obs-reject': {
+      title: '"반려" + 사유 (Gate)',
+      type: 'action',
+      typeLabel: '행동',
+      desc: 'gate stage 작업을 반려합니다.',
+      data: ['반려 사유 입력 필수', '해당 phase 작업 재검토 필요'],
+      actions: ['rejectTask() 호출', '관련 담당자에게 알림']
+    },
+    'obs-done': {
+      title: 'Gate 승인 완료',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '위원회 승인이 완료되어 다음 phase로 진행합니다.',
+      data: ['프로젝트 진행 단계 업데이트'],
+      actions: []
+    },
+    'obs-rejected': {
+      title: 'Gate 반려',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '위원회에서 반려되어 해당 phase 작업을 재수행해야 합니다.',
+      data: ['해당 phase 작업 재수행 필요'],
+      actions: []
+    },
+    'obs-matrix': {
+      title: '프로젝트 목록 - 매트릭스 뷰',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '전체 프로젝트를 매트릭스 뷰로 한눈에 파악합니다.',
+      data: ['6 phase 열 (발의, 기획, WM, Tx, MSG, 양산/이관)', '각 셀: 작업 진행(completed/total) + 승인 상태', '부서별 현황'],
+      actions: ['프로젝트 선택하여 상세 이동', '전체 프로젝트 현황 모니터링']
+    },
+    'obs-project-detail': {
+      title: '프로젝트 상세 (전체 접근)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '기획조정실은 모든 탭에 접근할 수 있습니다.',
+      data: ['개요, 체크리스트, 설계변경, 출시준비 탭 전체', '5개 통계 카드'],
+      actions: ['모든 탭 탐색', '체크리스트 전체 확인']
+    },
+    'obs-admin': {
+      title: '체크리스트 관리자 (전체 권한)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '모든 부서의 템플릿을 관리할 수 있습니다.',
+      data: ['모든 부서 템플릿 열람/편집', '스테이지/부서 추가/삭제 권한', '3가지 뷰 모드'],
+      actions: ['스테이지 추가/삭제', '부서 추가/삭제', '모든 부서 템플릿 편집']
+    },
+    'obs-template-edit': {
+      title: '전체 템플릿 관리',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '스테이지, 부서, 모든 부서 템플릿 항목을 관리합니다.',
+      data: ['193개 템플릿 항목', '6 phases x 10 departments'],
+      actions: ['스테이지 추가/삭제', '부서 추가/삭제', '모든 항목 편집']
+    },
+    'obs-customers': {
+      title: '고객 관리 (customers.html)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '거래처(대리점, 해외법인, 병원, 온라인) 정보를 관리합니다.',
+      data: ['고객 목록, 유형, 지역', '계약 상태, 담당 영업', '연결된 제품 목록'],
+      actions: ['고객 정보 열람', '고객별 프로젝트 연결 확인']
+    },
+    'obs-sales': {
+      title: '영업 대시보드 (sales.html)',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '전체 프로젝트의 출시 준비 현황을 확인합니다.',
+      data: ['D-Day 기반 출시 체크리스트', '거래처별 준비 상태', '프로젝트별 출시 준비 진행률'],
+      actions: ['출시 준비 현황 모니터링', '거래처별 상태 확인']
+    },
+
+    // --- Change Request Flow ---
+    'cr-start': {
+      title: '설계변경 탭',
+      type: 'start',
+      typeLabel: '시작',
+      desc: '프로젝트 상세 페이지의 설계변경 탭에서 변경 요청을 관리합니다.',
+      data: ['기존 변경 요청 목록', '요청 상태 (in_review, approved, rejected)'],
+      actions: ['"변경 요청 등록" 버튼 클릭']
+    },
+    'cr-modal': {
+      title: '변경 요청 등록 모달',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '새로운 설계변경 요청을 등록하는 모달 화면입니다.',
+      data: ['요청 제목, 설명', '요청 출처: 내부(internal) / 고객(customer)', '고객 출처 시 고객 드롭다운'],
+      actions: ['요청 정보 입력', '출처 선택', '등록 버튼 클릭']
+    },
+    'cr-source': {
+      title: '요청 출처 선택',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '변경 요청의 출처를 내부 또는 고객으로 구분합니다.',
+      data: ['requestSource: "internal" 또는 "customer"', '고객 출처 시 추가 필드 필요'],
+      actions: ['내부: 부서 내 개선/기술 변경', '고객: 대리점/법인 요청']
+    },
+    'cr-internal': {
+      title: '내부 발의 등록',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '내부에서 발의된 설계변경 요청을 등록합니다.',
+      data: ['requestSource: "internal"'],
+      actions: ['요청 정보 저장 후 목록에 추가']
+    },
+    'cr-customer': {
+      title: '고객 출처 등록',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '고객 요청에 의한 설계변경을 등록합니다.',
+      data: ['requestSource: "customer"', 'customerId, customerName 연결', 'customerContactName, customerRequestDetail 입력'],
+      actions: ['고객 드롭다운에서 거래처 선택', '상세 요청 내용 입력', '저장']
+    },
+    'cr-scale': {
+      title: '규모 판정',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '변경 규모에 따라 적용할 프로세스가 달라집니다.',
+      data: ['경미(minor): 2단계, 필수 항목만, 3개 phase', '중간(medium): 4단계, 필수 항목만, 전체 phase', '대규모(major): 6 phase 전체, 전체 항목'],
+      actions: ['규모 선택에 따라 체크리스트 생성 범위 결정']
+    },
+    'cr-list': {
+      title: '변경 요청 목록',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '등록된 설계변경 요청 목록을 확인합니다.',
+      data: ['요청 제목, 출처, 상태', '등록일, 처리자'],
+      actions: ['요청 선택하여 상세 확인']
+    },
+    'cr-review': {
+      title: '변경 요청 검토',
+      type: 'action',
+      typeLabel: '행동',
+      desc: 'PM 또는 매니저가 변경 요청 내용을 검토합니다.',
+      data: ['요청 내용, 영향도 분석', 'PM/매니저만 승인/반려 가능'],
+      actions: ['내용 확인 후 승인/반려 결정']
+    },
+    'cr-decision': {
+      title: '승인/반려 결정',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '변경 요청의 승인 여부를 결정합니다.',
+      data: ['PM/매니저만 권한 보유', '반려 시 사유 입력 필수'],
+      actions: ['승인: 체크리스트 자동 생성', '반려: 사유 저장']
+    },
+    'cr-approve': {
+      title: '변경 요청 승인',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '변경 요청을 승인하고 프로세스를 시작합니다.',
+      data: ['updateChangeRequest() 호출', '고객 출처 시 portalNotifications 자동 생성'],
+      actions: ['상태 변경: approved', '체크리스트 생성 단계로 진행']
+    },
+    'cr-apply': {
+      title: '체크리스트 자동 생성',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '규모에 따라 템플릿 기반 체크리스트를 자동 생성합니다.',
+      data: ['applyTemplateToProject(projectId, "change", scale)', 'minor: ~50-60개, medium: ~140-150개, major: 193개'],
+      actions: ['규모별 필터링 적용', '체크리스트 항목 자동 생성']
+    },
+    'cr-done': {
+      title: '프로세스 시작',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '설계변경 프로세스가 시작되어 실무자에게 작업이 배정됩니다.',
+      data: [],
+      actions: []
+    },
+    'cr-reject-action': {
+      title: '반려 사유 입력',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '변경 요청을 반려하고 사유를 기록합니다.',
+      data: ['반려 사유 저장', '고객 출처 시 portalNotifications 생성'],
+      actions: ['updateChangeRequest() 호출']
+    },
+    'cr-reject-done': {
+      title: '반려 완료',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '변경 요청이 반려되었습니다.',
+      data: ['요청자에게 통보'],
+      actions: []
+    },
+
+    // --- Portal Flow ---
+    'portal-start': {
+      title: '고객 포털 접속',
+      type: 'start',
+      typeLabel: '시작',
+      desc: '대리점/법인이 고객 포털에 접속합니다.',
+      data: ['customer-portal.html 페이지', '별도 인증 필요 (Firebase Auth와 별개)'],
+      actions: ['이메일 주소 입력']
+    },
+    'portal-email': {
+      title: '이메일 인증 화면',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '이메일 주소를 입력하여 포털 접근 권한을 확인합니다.',
+      data: ['이메일 입력 필드', '등록된 portalLoginEmail과 매칭'],
+      actions: ['이메일 입력 후 인증 요청']
+    },
+    'portal-auth': {
+      title: '인증 확인',
+      type: 'condition',
+      typeLabel: '조건분기',
+      desc: '입력한 이메일이 등록된 포털 계정과 일치하는지 확인합니다.',
+      data: ['portalLoginEmail 일치 여부', 'portalEnabled 활성화 여부', 'sessionStorage에 세션 저장'],
+      actions: ['성공: 포털 메인 화면 표시', '실패: 오류 메시지 표시']
+    },
+    'portal-projects': {
+      title: '프로젝트 진행 현황',
+      type: 'screen',
+      typeLabel: '화면',
+      desc: '자사와 관련된 프로젝트의 진행 단계를 확인합니다.',
+      data: ['관련 프로젝트 목록', '각 프로젝트 현재 phase', '진행률 표시', '읽기 전용 (수정 불가)'],
+      actions: ['프로젝트 상세 진행 단계 확인', '포털 알림 확인', '변경 요청 현황 확인']
+    },
+    'portal-detail': {
+      title: '프로젝트 진행 단계 확인',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '개별 프로젝트의 상세 진행 단계를 확인합니다.',
+      data: ['6 phase 진행 바', '현재 단계 표시', '예상 완료일'],
+      actions: ['읽기 전용 조회']
+    },
+    'portal-notif': {
+      title: '포털 알림 확인',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: 'Gate 승인 시 자동 생성된 알림을 확인합니다.',
+      data: ['Gate 승인 알림', '변경 요청 처리 결과 알림', 'portalNotifications 컬렉션'],
+      actions: ['알림 목록 확인']
+    },
+    'portal-change': {
+      title: '변경 요청 현황 확인',
+      type: 'action',
+      typeLabel: '보조 행동',
+      desc: '고객이 요청한 설계변경의 처리 현황을 확인합니다.',
+      data: ['요청 상태: 승인/반려/진행중', '처리 사유'],
+      actions: ['읽기 전용 조회']
+    },
+    'portal-fail': {
+      title: '인증 실패',
+      type: 'action',
+      typeLabel: '행동',
+      desc: '등록되지 않은 이메일이거나 포털이 비활성화된 경우입니다.',
+      data: ['portalLoginEmail 불일치', 'portalEnabled: false'],
+      actions: ['오류 메시지 표시', '관리자 문의 안내']
+    },
+    'portal-end-fail': {
+      title: '접근 거부',
+      type: 'end',
+      typeLabel: '끝',
+      desc: '포털 접근이 거부되었습니다.',
+      data: ['관리자에게 문의 필요'],
+      actions: []
+    }
+  };
+
+  // ===== Popup Logic =====
+  const overlay = document.getElementById('popupOverlay');
+  const popupContent = document.getElementById('popupContent');
+  const closeBtn = document.getElementById('popupClose');
+
+  function showPopup(key) {
+    const data = popupData[key];
+    if (!data) return;
+
+    let html = '';
+    html += '<span class="popup-type ' + data.type + '">' + data.typeLabel + '</span>';
+    html += '<h3>' + data.title + '</h3>';
+    html += '<p class="popup-desc">' + data.desc + '</p>';
+
+    if (data.data && data.data.length > 0) {
+      html += '<div class="popup-section">';
+      html += '<div class="popup-section-title">표시 데이터</div>';
+      html += '<ul class="popup-list">';
+      data.data.forEach(function(item) {
+        html += '<li>' + item + '</li>';
+      });
+      html += '</ul></div>';
+    }
+
+    if (data.actions && data.actions.length > 0) {
+      html += '<div class="popup-section">';
+      html += '<div class="popup-section-title">가능한 액션</div>';
+      html += '<ul class="popup-list">';
+      data.actions.forEach(function(item) {
+        html += '<li>' + item + '</li>';
+      });
+      html += '</ul></div>';
+    }
+
+    popupContent.innerHTML = html;
+    overlay.classList.add('active');
+  }
+
+  function hidePopup() {
+    overlay.classList.remove('active');
+  }
+
+  // Attach click listeners to nodes with data-popup
+  document.querySelectorAll('[data-popup]').forEach(function(node) {
+    node.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showPopup(this.dataset.popup);
+    });
+  });
+
+  closeBtn.addEventListener('click', hidePopup);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) hidePopup();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hidePopup();
+  });
+
+})();
+</script>
+<script src="js/review-bootstrap.js"></script>
+<script src="js/deliverable-nav.js"></script>
+
+</body>
+</html>

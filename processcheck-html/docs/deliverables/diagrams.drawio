@@ -1,0 +1,733 @@
+<mxfile host="app.diagrams.net" modified="2026-03-11T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram id="tab1" name="사이트맵 (Sitemap)">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="s_title" value="ProcessCheck 사이트맵" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="s_leg1" value="실선 = 네비게이션 바 링크" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="30" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_leg2" value="점선 = 페이지 내 링크" style="text;html=1;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="55" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Root: Login -->
+        <mxCell id="s1" value="index.html&#xa;로그인 페이지&#xa;&#xa;역할: 전체 (공개)&#xa;인증: 불필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="660" y="100" width="180" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Level 1 nodes -->
+        <mxCell id="s2" value="landing.html&#xa;랜딩 페이지&#xa;&#xa;역할: 전체 (공개)&#xa;인증: 불필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="170" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s3" value="dashboard.html&#xa;대시보드&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="240" y="300" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s4" value="projects.html&#xa;프로젝트 목록 (7개 뷰)&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="450" y="300" width="190" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s5" value="customers.html&#xa;고객 관리&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="670" y="300" width="170" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s6" value="sales.html&#xa;영업 출시 대시보드&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="870" y="300" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s7" value="admin-checklists.html&#xa;체크리스트 템플릿 관리&#xa;(매트릭스/트리/리스트 뷰)&#xa;&#xa;역할: manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="300" width="190" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s8" value="manual.html&#xa;사용자 매뉴얼&#xa;&#xa;역할: 전체 (공개)&#xa;인증: 불필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="300" width="170" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s9" value="customer-portal.html&#xa;고객 포털 (읽기 전용)&#xa;&#xa;역할: 외부 고객&#xa;인증: 이메일 인증" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="530" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Level 2 nodes -->
+        <mxCell id="s10" value="project.html&#xa;프로젝트 상세&#xa;(개요/체크리스트/설계변경/출시준비 탭)&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="400" y="530" width="210" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s11" value="task.html&#xa;작업 상세&#xa;(타임라인/승인/코멘트/파일)&#xa;&#xa;역할: worker / manager / observer&#xa;인증: 필요" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="680" y="530" width="200" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- EDGES: Login to Level 1 (solid = nav links) -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#82b366;strokeWidth=2;" edge="1" source="s1" target="s2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" source="s1" target="s3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Nav bar links (solid) between main pages -->
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=1.5;" edge="1" source="s3" target="s4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=1.5;" edge="1" source="s3" target="s5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=1.5;" edge="1" source="s3" target="s6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#9673a6;strokeWidth=1.5;" edge="1" source="s3" target="s7" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#999999;strokeWidth=1.5;" edge="1" source="s3" target="s8" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Dotted links (in-page links) -->
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;dashed=1;dashPattern=8 4;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="s4" target="s10" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;dashed=1;dashPattern=8 4;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="s10" target="s11" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;dashed=1;dashPattern=8 4;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="s3" target="s10" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;dashed=1;dashPattern=8 4;strokeColor=#d6b656;strokeWidth=1.5;" edge="1" source="s3" target="s11" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;dashed=1;dashPattern=8 4;strokeColor=#999999;strokeWidth=1.5;" edge="1" source="s5" target="s9" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Color Legend boxes -->
+        <mxCell id="s_cl1" value="" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="90" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl1t" value="로그인 (공개)" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="87" width="100" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl2" value="" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="112" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl2t" value="주요 페이지 (인증 필요)" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="109" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl3" value="" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="134" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl3t" value="상세 페이지 (인증 필요)" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="131" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl4" value="" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="156" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl4t" value="관리 페이지 (manager/observer)" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="153" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl5" value="" style="rounded=1;fillColor=#e6e6e6;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="178" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_cl5t" value="공개 페이지 (인증 불필요)" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="175" width="160" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="tab2" name="데이터 모델 (ERD)">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="d_title" value="Firestore 데이터 모델 (10 Collections)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== users (green) ===== -->
+        <mxCell id="d_users" value="&lt;b&gt;users&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="220" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_u1" value="id: string (PK)&#xa;name: string&#xa;email: string&#xa;role: worker | manager | observer&#xa;department: string&#xa;profileImage?: string&#xa;authProvider?: string" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_users">
+          <mxGeometry y="30" width="220" height="170" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== projects (blue) ===== -->
+        <mxCell id="d_proj" value="&lt;b&gt;projects&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="340" y="100" width="250" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_p1" value="id: string (PK)&#xa;name: string&#xa;productType: string&#xa;projectType: 신규개발 | 설계변경&#xa;changeScale?: minor | medium | major&#xa;status: active | completed | on_hold&#xa;progress: number (0-100)&#xa;startDate: Date&#xa;endDate: Date&#xa;pm: string&#xa;riskLevel: green | yellow | red&#xa;currentStage: ProjectStage" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_proj">
+          <mxGeometry y="30" width="250" height="230" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== checklistItems (blue) ===== -->
+        <mxCell id="d_chk" value="&lt;b&gt;checklistItems&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="660" y="100" width="260" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_c1" value="id: string (PK)&#xa;projectId: string (FK-&gt;projects)&#xa;templateItemId: string (FK-&gt;templateItems)&#xa;stage: ProjectStage (12 stages)&#xa;department: Department&#xa;title: string&#xa;description: string&#xa;assignee: string&#xa;reviewer: string&#xa;status: pending|in_progress|completed|rejected&#xa;importance: green | yellow | red&#xa;dueDate: Date&#xa;completedDate?: Date&#xa;approvalStatus?: pending|approved|rejected&#xa;approvedBy?: string&#xa;approvedAt?: Date&#xa;rejectionReason?: string" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_chk">
+          <mxGeometry y="30" width="260" height="310" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== templateStages (purple) ===== -->
+        <mxCell id="d_ts" value="&lt;b&gt;templateStages&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="220" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_ts1" value="id: string (PK, phase0-5)&#xa;name: string&#xa;order: number&#xa;workStageName: string&#xa;gateStageName: string&#xa;createdBy: string&#xa;createdAt: Date&#xa;lastModifiedBy: string&#xa;lastModifiedAt: Date" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_ts">
+          <mxGeometry y="30" width="220" height="170" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== templateItems (purple) ===== -->
+        <mxCell id="d_ti" value="&lt;b&gt;templateItems&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="340" y="430" width="250" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_ti1" value="id: string (PK)&#xa;stageId: string (FK-&gt;templateStages)&#xa;departmentId: string&#xa;content: string&#xa;order: number&#xa;isRequired: boolean&#xa;createdBy: string&#xa;createdAt: Date&#xa;lastModifiedBy: string&#xa;lastModifiedAt: Date" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_ti">
+          <mxGeometry y="30" width="250" height="190" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== notifications (pink) ===== -->
+        <mxCell id="d_noti" value="&lt;b&gt;notifications&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="100" width="240" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_n1" value="id: string (PK)&#xa;userId: string (FK-&gt;users)&#xa;type: task_assigned | approval_request&#xa;       | deadline_approaching | change_request&#xa;title: string&#xa;message: string&#xa;link?: string&#xa;read: boolean&#xa;createdAt: Date" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_noti">
+          <mxGeometry y="30" width="240" height="170" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== changeRequests (blue) ===== -->
+        <mxCell id="d_cr" value="&lt;b&gt;changeRequests&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="100" width="260" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_cr1" value="id: string (PK)&#xa;projectId: string (FK-&gt;projects)&#xa;title: string&#xa;description: string&#xa;requestedBy: string&#xa;requestedAt: Date&#xa;affectedDepartments: Department[]&#xa;scale: minor | medium | major&#xa;status: pending|in_review|approved|rejected&#xa;requestSource: internal | customer&#xa;customerId?: string (FK-&gt;customers)&#xa;customerName?: string&#xa;customerRequestDetail?: string" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_cr">
+          <mxGeometry y="30" width="260" height="250" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== customers (orange) ===== -->
+        <mxCell id="d_cust" value="&lt;b&gt;customers&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="380" width="240" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_cu1" value="id: string (PK)&#xa;name: string&#xa;type: dealer | subsidiary | hospital | online&#xa;region: string&#xa;contactName: string&#xa;salesRep: string&#xa;contractStatus: string&#xa;products: string[]&#xa;portalEnabled?: boolean&#xa;portalLoginEmail?: string" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_cust">
+          <mxGeometry y="30" width="240" height="210" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== launchChecklists (orange) ===== -->
+        <mxCell id="d_lc" value="&lt;b&gt;launchChecklists&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="460" width="250" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_lc1" value="id: string (PK)&#xa;projectId: string (FK-&gt;projects)&#xa;customerId?: string (FK-&gt;customers)&#xa;title: string&#xa;items: Array&#xa;dDay: Date&#xa;status: string" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_lc">
+          <mxGeometry y="30" width="250" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== portalNotifications (pink) ===== -->
+        <mxCell id="d_pn" value="&lt;b&gt;portalNotifications&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;collapsible=0;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="660" y="520" width="260" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_pn1" value="id: string (PK)&#xa;customerId: string (FK-&gt;customers)&#xa;projectId?: string (FK-&gt;projects)&#xa;message: string&#xa;type: string&#xa;read: boolean&#xa;createdAt: Date" style="text;whiteSpace=wrap;html=0;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="d_pn">
+          <mxGeometry y="30" width="260" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- RELATIONSHIP EDGES -->
+        <!-- projects 1:N checklistItems -->
+        <mxCell id="r1" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_proj" target="d_chk" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- users 1:N notifications -->
+        <mxCell id="r2" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#b85450;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_users" target="d_noti" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- templateStages 1:N templateItems -->
+        <mxCell id="r3" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#9673a6;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_ts" target="d_ti" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- projects 1:N changeRequests -->
+        <mxCell id="r4" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=11;fontStyle=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="d_proj" target="d_cr" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- customers 1:N changeRequests -->
+        <mxCell id="r5" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#d6b656;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_cust" target="d_cr" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- projects 1:N launchChecklists -->
+        <mxCell id="r6" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=11;fontStyle=1;dashed=1;dashPattern=4 4;" edge="1" source="d_proj" target="d_lc" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- customers 1:N launchChecklists -->
+        <mxCell id="r7" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#d6b656;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_cust" target="d_lc" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- customers 1:N portalNotifications -->
+        <mxCell id="r8" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#b85450;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="d_cust" target="d_pn" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- templateItems -.-> checklistItems -->
+        <mxCell id="r9" value="generates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=10;dashed=1;dashPattern=8 4;" edge="1" source="d_ti" target="d_chk" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="d_leg" value="색상 범례:&#xa;파랑 = 프로젝트 도메인&#xa;초록 = 사용자 도메인&#xa;보라 = 템플릿 도메인&#xa;주황 = 고객 도메인&#xa;분홍 = 알림 도메인" style="text;html=0;fontSize=11;align=left;verticalAlign=top;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="180" height="110" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="tab3" name="프로세스 맵 (Process Map)">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="p_title" value="6 Phase 승인 워크플로우 (Swimlane Diagram)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase Column Headers -->
+        <mxCell id="ph_h1" value="Phase 1: 발의" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ph_h2" value="Phase 2: 기획" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ph_h3" value="Phase 3: WM" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ph_h4" value="Phase 4: Tx" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ph_h5" value="Phase 5: MSG" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ph_h6" value="Phase 6: 양산/이관" style="text;html=1;fontSize=14;fontStyle=1;align=center;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1730" y="70" width="280" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Swimlane: Worker -->
+        <mxCell id="swim_w" value="실무자 (Worker)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="30" y="110" width="2000" height="200" as="geometry"/>
+        </mxCell>
+        <!-- Worker tasks -->
+        <mxCell id="w1" value="발의검토&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="210" y="60" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="w2" value="기획검토&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="520" y="60" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="w3" value="WM제작&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="830" y="60" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="w4" value="Tx단계&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="1140" y="60" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="w5" value="MasterGatePilot&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="1440" y="60" width="130" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="w6" value="양산&#xa;작업 수행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_w">
+          <mxGeometry x="1760" y="60" width="120" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Swimlane: Manager -->
+        <mxCell id="swim_m" value="매니저 (Manager)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="30" y="320" width="2000" height="220" as="geometry"/>
+        </mxCell>
+        <!-- Manager approval diamonds -->
+        <mxCell id="m1" value="발의검토&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="215" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="m2" value="기획검토&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="525" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="m3" value="WM제작&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="835" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="m4" value="Tx단계&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="1145" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="m5" value="MGP&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="1450" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="m6" value="양산&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim_m">
+          <mxGeometry x="1765" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <!-- Reject labels -->
+        <mxCell id="m1r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="185" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="m2r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="495" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="m3r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="805" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="m4r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="1115" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="m5r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="1420" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="m6r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_m">
+          <mxGeometry x="1735" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Swimlane: Observer -->
+        <mxCell id="swim_o" value="기획조정실 (Observer)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="30" y="550" width="2000" height="220" as="geometry"/>
+        </mxCell>
+        <!-- Observer gate diamonds -->
+        <mxCell id="o1" value="발의승인&#xa;위원회?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="215" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="o2" value="기획승인&#xa;위원회?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="525" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="o3" value="WM승인회?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="835" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="o4" value="Tx승인회?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="1145" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="o5" value="MSG승인회?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="1450" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="o6" value="영업이관&#xa;승인?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="swim_o">
+          <mxGeometry x="1765" y="30" width="110" height="80" as="geometry"/>
+        </mxCell>
+        <!-- Reject labels for observer -->
+        <mxCell id="o1r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="185" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="o2r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="495" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="o3r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="805" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="o4r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="1115" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="o5r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="1420" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="o6r" value="반려" style="text;html=1;fontSize=10;fontColor=#cc0000;fontStyle=1;" vertex="1" parent="swim_o">
+          <mxGeometry x="1735" y="120" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- FLOW ARROWS: Worker -> Manager (completion triggers approval) -->
+        <mxCell id="f_w1m1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w1" target="m1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_w2m2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w2" target="m2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_w3m3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w3" target="m3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_w4m4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w4" target="m4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_w5m5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w5" target="m5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_w6m6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" source="w6" target="m6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Manager -> Observer (approved goes to gate) -->
+        <mxCell id="f_m1o1" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m1" target="o1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_m2o2" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m2" target="o2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_m3o3" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m3" target="o3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_m4o4" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m4" target="o4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_m5o5" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m5" target="o5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_m6o6" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="m6" target="o6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Observer approved -> next Worker phase -->
+        <mxCell id="f_o1w2" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="o1" target="w2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_o2w3" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="o2" target="w3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_o3w4" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="o3" target="w4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_o4w5" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="o4" target="w5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_o5w6" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=1.5;fontColor=#009900;fontSize=10;" edge="1" source="o5" target="w6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- End node after last observer approval -->
+        <mxCell id="p_end" value="프로젝트 완료" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="830" width="130" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_o6end" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#009900;strokeWidth=2;fontColor=#009900;fontSize=10;" edge="1" source="o6" target="p_end" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Start node -->
+        <mxCell id="p_start" value="프로젝트 시작" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;fontColor=#ffffff;strokeColor=#333333;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="175" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_startw1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;" edge="1" source="p_start" target="w1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Reject loop arrows (Manager -> Worker) -->
+        <mxCell id="rej_m1w1" value="반려 (재작업)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#cc0000;strokeWidth=1.5;dashed=1;dashPattern=6 3;fontColor=#cc0000;fontSize=9;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="m1" target="w1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="195" y="390"/><mxPoint x="195" y="280"/><mxPoint x="245" y="280"/></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Task Status Legend -->
+        <mxCell id="p_leg_title" value="태스크 상태 전이" style="text;html=1;fontSize=13;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="840" width="200" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st1" value="pending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#999999;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="880" width="80" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st2" value="in_progress" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="880" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st3" value="completed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="310" y="880" width="80" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st4" value="approval&#xa;pending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="430" y="880" width="80" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st5" value="approved" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#009900;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="550" y="870" width="80" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_st6" value="rejected" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#cc0000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="550" y="900" width="80" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_st12" value="" style="strokeColor=#333333;strokeWidth=1.5;" edge="1" source="p_st1" target="p_st2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_st23" value="" style="strokeColor=#333333;strokeWidth=1.5;" edge="1" source="p_st2" target="p_st3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_st34" value="" style="strokeColor=#333333;strokeWidth=1.5;" edge="1" source="p_st3" target="p_st4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_st45" value="" style="strokeColor=#009900;strokeWidth=1.5;" edge="1" source="p_st4" target="p_st5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_st46" value="" style="strokeColor=#cc0000;strokeWidth=1.5;" edge="1" source="p_st4" target="p_st6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Design Change Scale Legend -->
+        <mxCell id="p_dc_title" value="설계변경 규모별 프로세스" style="text;html=1;fontSize=13;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="950" width="250" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_dc1" value="경미 (minor): 발의 + 양산/이관 = 2단계" style="text;html=1;fontSize=11;align=left;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="985" width="280" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_dc2" value="중간 (medium): 발의 + 기획 + Tx + 양산/이관 = 4단계" style="text;html=1;fontSize=11;align=left;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1020" width="350" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_dc3" value="대규모 (major): 전체 6 Phase (신규개발과 동일)" style="text;html=1;fontSize=11;align=left;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1055" width="320" height="25" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="tab4" name="시스템 아키텍처 (Architecture)">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="a_title" value="ProcessCheck 시스템 아키텍처 (3-Tier)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="450" y="20" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== CLIENT LAYER ===== -->
+        <mxCell id="a_cl" value="클라이언트 레이어 (Client Layer)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="1400" height="260" as="geometry"/>
+        </mxCell>
+
+        <!-- Next.js App -->
+        <mxCell id="a_next" value="Next.js App (Primary)" style="swimlane;startSize=25;fillColor=#e6effc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;rounded=1;" vertex="1" parent="a_cl">
+          <mxGeometry x="30" y="50" width="620" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n1" value="React 18" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_next">
+          <mxGeometry x="20" y="40" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n2" value="TypeScript 5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_next">
+          <mxGeometry x="140" y="40" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n3" value="Tailwind CSS 3.4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_next">
+          <mxGeometry x="260" y="40" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n4" value="App Router&#xa;(all &quot;use client&quot;)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_next">
+          <mxGeometry x="400" y="40" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n5" value="AuthContext.tsx&#xa;(useAuth, useRequireAuth)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_next">
+          <mxGeometry x="20" y="100" width="170" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n6" value="firestoreService.ts&#xa;(CRUD + Subscriptions)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_next">
+          <mxGeometry x="210" y="100" width="170" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_n7" value="Static Export&#xa;(output: &quot;export&quot;)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_next">
+          <mxGeometry x="400" y="100" width="130" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- HTML Port -->
+        <mxCell id="a_html" value="HTML Port (processcheck-html/)" style="swimlane;startSize=25;fillColor=#e6effc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;rounded=1;" vertex="1" parent="a_cl">
+          <mxGeometry x="700" y="50" width="650" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h1" value="Vanilla JS&#xa;(ES Modules)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_html">
+          <mxGeometry x="20" y="40" width="110" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h2" value="CSS Custom&#xa;Properties" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_html">
+          <mxGeometry x="150" y="40" width="110" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h3" value="11 HTML Pages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_html">
+          <mxGeometry x="280" y="40" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h4" value="Firebase SDK v11.3&#xa;(CDN importmap)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="a_html">
+          <mxGeometry x="420" y="40" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h5" value="auth.js&#xa;(localStorage session)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_html">
+          <mxGeometry x="20" y="100" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h6" value="firestore-service.js&#xa;(CRUD + onSnapshot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_html">
+          <mxGeometry x="190" y="100" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_h7" value="No Build Step&#xa;(python -m http.server)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="a_html">
+          <mxGeometry x="370" y="100" width="160" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== SERVICE LAYER ===== -->
+        <mxCell id="a_sl" value="서비스 레이어 (Firebase Services)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="390" width="1400" height="280" as="geometry"/>
+        </mxCell>
+
+        <!-- Firebase Auth -->
+        <mxCell id="a_auth" value="Firebase Authentication" style="swimlane;startSize=25;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=12;fontStyle=1;rounded=1;" vertex="1" parent="a_sl">
+          <mxGeometry x="30" y="50" width="350" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_au1" value="Microsoft OAuth&#xa;(OAuthProvider)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="a_auth">
+          <mxGeometry x="20" y="40" width="140" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_au2" value="Demo Card Login&#xa;(localStorage)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="a_auth">
+          <mxGeometry x="180" y="40" width="140" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_au3" value="signInWithRedirect&#xa;+ signOut" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="a_auth">
+          <mxGeometry x="20" y="110" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_au4" value="Customer Portal&#xa;(Email Auth)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="a_auth">
+          <mxGeometry x="180" y="110" width="130" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Firestore -->
+        <mxCell id="a_fs" value="Cloud Firestore" style="swimlane;startSize=25;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=12;fontStyle=1;rounded=1;" vertex="1" parent="a_sl">
+          <mxGeometry x="420" y="50" width="580" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs1" value="10 Collections&#xa;(실시간 구독)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="a_fs">
+          <mxGeometry x="20" y="40" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs2" value="onSnapshot&#xa;(Real-time Sync)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="a_fs">
+          <mxGeometry x="160" y="40" width="130" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs3" value="Auto Seed&#xa;(seedDatabaseIfEmpty)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="a_fs">
+          <mxGeometry x="310" y="40" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs4" value="193 Template Items&#xa;(체크리스트 템플릿)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="a_fs">
+          <mxGeometry x="20" y="110" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs5" value="applyTemplateToProject&#xa;(유형별 필터링)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="a_fs">
+          <mxGeometry x="200" y="110" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fs6" value="recalculateProjectStats&#xa;(자동 계산)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="a_fs">
+          <mxGeometry x="380" y="110" width="160" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Storage -->
+        <mxCell id="a_stor" value="Firebase Storage" style="swimlane;startSize=25;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=12;fontStyle=1;rounded=1;" vertex="1" parent="a_sl">
+          <mxGeometry x="1050" y="50" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_st1" value="파일 업로드 (UI only)&#xa;Storage 연동 미구현" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=2;" vertex="1" parent="a_stor">
+          <mxGeometry x="40" y="40" width="200" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== DEPLOYMENT LAYER ===== -->
+        <mxCell id="a_dl" value="배포 레이어 (Deployment)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="720" width="1400" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="a_gh" value="GitHub Repository&#xa;(main branch)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="a_dl">
+          <mxGeometry x="60" y="60" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_ga" value="GitHub Actions&#xa;(CI/CD Pipeline)&#xa;push to main -&gt; build -&gt; deploy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" vertex="1" parent="a_dl">
+          <mxGeometry x="360" y="50" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_gp" value="GitHub Pages&#xa;(Static Hosting)&#xa;processcheck.github.io" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="a_dl">
+          <mxGeometry x="720" y="60" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_build" value="npm run build&#xa;(next export -&gt; /out)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;" vertex="1" parent="a_dl">
+          <mxGeometry x="1060" y="60" width="160" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Deploy arrows -->
+        <mxCell id="f_gh_ga" value="push" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;" edge="1" source="a_gh" target="a_ga" parent="a_dl">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="f_ga_gp" value="deploy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;" edge="1" source="a_ga" target="a_gp" parent="a_dl">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- DATA FLOW ARROWS between layers -->
+        <mxCell id="df1" value="Firebase SDK" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;strokeWidth=2.5;fontSize=11;fontStyle=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" source="a_cl" target="a_sl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="df2" value="Real-time Sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;strokeWidth=2.5;fontSize=11;fontStyle=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" source="a_sl" target="a_cl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="df3" value="Static Files" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="a_cl" target="a_dl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Auth flow labels -->
+        <mxCell id="a_flow1" value="인증 경로 1: Demo Card&#xa;카드 클릭 -&gt; localStorage -&gt; Dashboard" style="text;html=1;fontSize=10;align=left;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="970" width="280" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_flow2" value="인증 경로 2: Microsoft OAuth&#xa;OAuth -&gt; Firebase Auth -&gt; Firestore 조회/등록 -&gt; Dashboard" style="text;html=1;fontSize=10;align=left;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="400" y="970" width="380" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_flow3" value="인증 경로 3: Customer Portal&#xa;이메일 입력 -&gt; Firestore 검증 -&gt; sessionStorage -&gt; 읽기 전용 뷰" style="text;html=1;fontSize=10;align=left;fillColor=#f5f5f5;strokeColor=#cccccc;rounded=1;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="820" y="970" width="380" height="35" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

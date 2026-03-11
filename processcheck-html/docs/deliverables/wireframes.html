@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProcessCheck - UI Wireframes (All Screens)</title>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
+  }
+}
+</script>
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#e9ecef;color:#333;line-height:1.5;padding-bottom:4rem}
+
+/* ===== FIXED NAV ===== */
+.top-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(26,26,46,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;padding:0 1.5rem;height:52px;display:flex;align-items:center;gap:1rem;box-shadow:0 2px 12px rgba(0,0,0,.25);overflow-x:auto;white-space:nowrap}
+.top-nav a{color:#a8dadc;text-decoration:none;font-size:.8rem;padding:.35rem .7rem;border-radius:6px;transition:all .2s;flex-shrink:0}
+.top-nav a:hover{background:rgba(168,218,220,.15);color:#f1faee}
+.top-nav a.nav-active{background:rgba(74,144,217,.25);color:#fff;font-weight:600}
+.top-nav .nav-title{font-weight:700;font-size:1rem;color:#4A90D9;margin-right:.5rem;flex-shrink:0}
+.top-nav .nav-counter{font-size:.65rem;color:#94a3b8;margin-left:.25rem;flex-shrink:0}
+.top-nav .nav-divider{width:1px;height:24px;background:rgba(255,255,255,.15);flex-shrink:0}
+
+/* ===== LAYOUT ===== */
+.main{max-width:1280px;margin:68px auto 0;padding:0 1.5rem}
+.screen-section{margin-bottom:60px;scroll-margin-top:68px}
+
+/* ===== SCREEN HEADER ===== */
+.screen-header{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem;padding-top:8px}
+.screen-number{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#4A90D9;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0}
+.screen-title{font-size:1.35rem;font-weight:700;color:#1a1a2e}
+.screen-file{font-size:.75rem;color:#6c757d;background:#e9ecef;padding:.15rem .5rem;border-radius:4px;font-family:'SF Mono',Monaco,monospace}
+.access-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;font-weight:600}
+.access-all{background:#d4edda;color:#155724}
+.access-auth{background:#fff3cd;color:#856404}
+.access-role{background:#cce5ff;color:#004085}
+.screen-desc{font-size:.85rem;color:#495057;margin-bottom:1rem;max-width:700px}
+
+/* ===== BROWSER FRAME ===== */
+.browser-frame{max-width:1200px;margin:0 auto 0;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.browser-bar{height:36px;background:#f1f3f4;display:flex;align-items:center;padding:0 12px;gap:6px;border-bottom:1px solid #dee2e6}
+.browser-dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.08)}
+.dot-red{background:#ff5f56}.dot-yellow{background:#ffbd2e}.dot-green{background:#27c93f}
+.browser-url{height:28px;background:#e8eaed;margin:0 12px;border-radius:14px;display:flex;align-items:center;padding:0 14px;font-size:12px;color:#5f6368;flex:1}
+.browser-content{padding:0;background:#fff;min-height:500px;position:relative;overflow:hidden}
+
+/* ===== WIREFRAME COMPONENTS ===== */
+.w-nav{height:48px;background:#0f172a;display:flex;align-items:center;padding:0 16px;gap:12px}
+.w-nav-logo{display:flex;align-items:center;gap:6px}
+.w-nav-logo-icon{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.65rem;font-weight:700}
+.w-nav-logo-text{color:#e2e8f0;font-size:.85rem;font-weight:600}
+.w-nav-logo-text span{color:#06b6d4}
+.w-nav-links{display:flex;gap:2px;margin-left:16px}
+.w-nav-link{color:#94a3b8;font-size:.72rem;padding:6px 10px;border-radius:6px;background:transparent;text-decoration:none;transition:background .15s}
+.w-nav-link.active{color:#06b6d4;background:rgba(6,182,212,.1)}
+.w-nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.w-nav-user{font-size:.7rem;color:#94a3b8}
+.w-nav-bell{width:20px;height:20px;border-radius:50%;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:.55rem;color:#94a3b8;position:relative}
+.w-nav-bell-dot{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:#ef4444}
+.w-theme-btn{width:24px;height:24px;border-radius:6px;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#94a3b8}
+.w-logout{font-size:.6rem;color:#64748b;padding:4px 8px;border:1px solid #334155;border-radius:4px}
+
+/* Content area styling */
+.w-body{padding:20px 24px;background:#f8f9fa;min-height:420px}
+.w-body-dark{background:#0f172a;color:#e2e8f0}
+
+/* Cards */
+.w-card{background:#fff;border:1px solid #dee2e6;border-radius:8px;padding:14px;margin-bottom:10px}
+.w-card-dark{background:#1e293b;border-color:#334155}
+
+/* Stat cards */
+.w-stats{display:grid;gap:10px;margin-bottom:16px}
+.w-stats-5{grid-template-columns:repeat(5,1fr)}
+.w-stats-4{grid-template-columns:repeat(4,1fr)}
+.w-stats-3{grid-template-columns:repeat(3,1fr)}
+.w-stat{background:#fff;border:1px solid #dee2e6;border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:border-color .15s}
+.w-stat:hover{border-color:#4A90D9}
+.w-stat-value{font-size:1.5rem;font-weight:700}
+.w-stat-label{font-size:.65rem;color:#6c757d;margin-top:2px}
+.w-stat-click{font-size:.55rem;color:#4A90D9;margin-top:3px}
+
+/* Badges */
+.w-badge{display:inline-block;font-size:.6rem;padding:2px 7px;border-radius:4px;font-weight:600;line-height:1.4}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-yellow{background:#fef3c7;color:#92400e}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-gray{background:#f1f5f9;color:#475569}
+.badge-purple{background:#ede9fe;color:#5b21b6}
+.badge-cyan{background:#cffafe;color:#155e75}
+
+/* Tables */
+.w-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.w-table th{background:#f1f5f9;padding:8px 10px;text-align:left;font-weight:600;color:#475569;border-bottom:2px solid #dee2e6;white-space:nowrap}
+.w-table td{padding:7px 10px;border-bottom:1px solid #e2e8f0;color:#334155}
+.w-table tr:hover td{background:#f8fafc}
+.w-table .sort-icon{color:#94a3b8;font-size:.55rem;margin-left:3px}
+
+/* Tab bars */
+.w-tabs{display:flex;gap:2px;border-bottom:2px solid #e2e8f0;margin-bottom:14px}
+.w-tab{padding:8px 14px;font-size:.72rem;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;transition:all .15s}
+.w-tab.active{color:#4A90D9;border-bottom-color:#4A90D9;font-weight:600}
+
+/* Progress bar */
+.w-progress{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden}
+.w-progress-fill{height:100%;border-radius:3px}
+.fill-blue{background:#4A90D9}.fill-green{background:#22c55e}.fill-yellow{background:#f59e0b}.fill-red{background:#ef4444}
+
+/* Input/Select */
+.w-input{height:30px;border:1px solid #d1d5db;border-radius:6px;padding:0 8px;font-size:.72rem;background:#fff;color:#374151}
+.w-select{height:30px;border:1px solid #d1d5db;border-radius:6px;padding:0 8px;font-size:.72rem;background:#fff;color:#374151;appearance:auto}
+
+/* Buttons */
+.w-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:6px;font-size:.7rem;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+.w-btn-primary{background:#4A90D9;color:#fff}
+.w-btn-success{background:#22c55e;color:#fff}
+.w-btn-danger{background:#ef4444;color:#fff}
+.w-btn-ghost{background:transparent;color:#64748b;border:1px solid #d1d5db}
+.w-btn:hover{opacity:.85}
+
+/* Phase dots */
+.w-phase-dot{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:.5rem;font-weight:700;border:2px solid}
+.dot-done{border-color:#22c55e;color:#22c55e}
+.dot-current{border-color:#4A90D9;background:#4A90D9;color:#fff}
+.dot-future{border-color:#d1d5db;color:#d1d5db}
+.dot-gate-approved{background:#d1fae5;border-color:#22c55e;color:#22c55e}
+.dot-gate-pending{background:#fef3c7;border-color:#f59e0b;color:#f59e0b}
+.dot-gate-none{background:#f1f5f9;border-color:#d1d5db;color:#94a3b8}
+
+/* Matrix specific */
+.w-matrix{border-collapse:collapse;font-size:.65rem;width:100%}
+.w-matrix th{padding:6px 8px;background:#f1f5f9;font-weight:600;color:#475569;border:1px solid #dee2e6;text-align:center}
+.w-matrix td{padding:4px 6px;border:1px solid #dee2e6;text-align:center;vertical-align:middle}
+.w-matrix-cell{display:flex;align-items:center;justify-content:center;gap:4px}
+
+/* Two column layout (6:4 ratio) */
+.w-2col{display:grid;grid-template-columns:3fr 2fr;gap:16px}
+
+/* Annotations */
+.annotations{margin-top:16px;padding:16px;background:#fff;border:1px solid #dee2e6;border-radius:8px}
+.annotations h4{font-size:.8rem;color:#1a1a2e;margin-bottom:8px;font-weight:700}
+.annotation-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:4px}
+.annotation-item{font-size:.7rem;color:#495057;display:flex;gap:6px}
+.annotation-num{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:50%;background:#4A90D9;color:#fff;font-size:.55rem;font-weight:700;flex-shrink:0}
+
+/* Annotation markers in wireframe */
+.anno{position:relative}
+.anno:not([class*="w-stats"]):not([class*="flex"]):not([class*="w-tabs"]):not([class*="w-nav"]):not([class*="w-2col"]):not([class*="w-grid"]){display:inline-block}
+.anno::after{content:attr(data-num);position:absolute;top:-6px;right:-8px;width:14px;height:14px;border-radius:50%;background:#4A90D9;color:#fff;font-size:.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;z-index:10}
+
+/* Click indicator */
+.clickable{outline:2px dashed transparent;outline-offset:2px;transition:outline-color .15s}
+.clickable:hover{outline-color:#4A90D9}
+
+/* Sidebar */
+.w-sidebar{width:250px;background:#fff;border-right:1px solid #dee2e6;padding:12px;flex-shrink:0;min-height:360px}
+.w-sidebar-item{padding:6px 10px;font-size:.72rem;color:#475569;border-radius:6px;margin-bottom:2px;cursor:pointer;transition:background .15s}
+.w-sidebar-item.active{background:#dbeafe;color:#1d4ed8;font-weight:600}
+.w-sidebar-item:hover{background:#f1f5f9}
+.w-sidebar-child{padding:4px 10px 4px 20px;font-size:.68rem;color:#64748b}
+
+/* Flex helpers */
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap-2{gap:8px}.gap-1{gap:4px}.gap-3{gap:12px}.gap-4{gap:16px}
+.flex-1{flex:1}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}
+.ml-auto{margin-left:auto}.mt-1{margin-top:4px}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}
+
+/* Timeline */
+.w-timeline-item{display:flex;gap:10px;margin-bottom:10px}
+.w-timeline-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.w-timeline-dot.done{background:#22c55e}.w-timeline-dot.active{background:#4A90D9;box-shadow:0 0 0 3px rgba(74,144,217,.2)}.w-timeline-dot.pending{background:#d1d5db}.w-timeline-dot.rejected{background:#ef4444}
+
+/* User card (login) */
+.w-user-card{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1.5px solid #dee2e6;border-radius:12px;background:#fff;cursor:pointer;transition:all .15s;margin-bottom:8px}
+.w-user-card:hover{border-color:#4A90D9;box-shadow:0 2px 8px rgba(74,144,217,.1)}
+.w-user-avatar{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex-shrink:0}
+.avatar-blue{background:#dbeafe;color:#2563eb}
+.avatar-yellow{background:#fef3c7;color:#d97706}
+.avatar-green{background:#d1fae5;color:#059669}
+.w-user-info{flex:1}
+.w-user-role{font-size:.9rem;font-weight:600;color:#1e293b}
+.w-user-name{font-size:.68rem;color:#94a3b8;font-family:monospace;background:#f1f5f9;padding:1px 5px;border-radius:3px;display:inline-block;margin-left:4px}
+.w-user-desc{font-size:.72rem;color:#64748b;margin-top:1px}
+.w-user-dept{font-size:.65rem;color:#94a3b8;font-family:monospace;margin-top:2px}
+.w-user-arrow{color:#cbd5e1;font-size:.8rem}
+
+/* Divider */
+.w-divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:#94a3b8;font-size:.7rem}
+.w-divider::before,.w-divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
+
+/* Login specific */
+.login-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:500px;padding:48px 20px;background:linear-gradient(180deg,#f8fafc,#e2e8f0)}
+.login-box{width:100%;max-width:400px}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo-box{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff;font-weight:700;font-size:1.1rem;margin-bottom:8px}
+.login-title{font-size:1.4rem;font-weight:700;color:#1e293b}
+.login-subtitle{font-size:.75rem;color:#94a3b8;letter-spacing:.05em}
+
+/* MS button */
+.w-ms-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border:1.5px solid #dee2e6;border-radius:12px;background:#fff;cursor:pointer;font-size:.82rem;font-weight:500;color:#334155;transition:border-color .15s}
+.w-ms-btn:hover{border-color:#4A90D9}
+.w-ms-logo{display:grid;grid-template-columns:1fr 1fr;gap:1px;width:16px;height:16px}
+.w-ms-logo div{width:7px;height:7px}
+
+/* Spinner */
+.w-spinner{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px;color:#94a3b8;font-size:.8rem}
+.w-spinner-circle{width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#4A90D9;border-radius:50%}
+
+/* 3-col grid */
+.w-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+
+/* View switcher */
+.w-view-switch{display:flex;gap:2px;background:#e2e8f0;border-radius:8px;padding:3px}
+.w-view-btn{padding:5px 10px;font-size:.68rem;border-radius:6px;color:#64748b;cursor:pointer;font-weight:500;transition:all .15s}
+.w-view-btn.active{background:#fff;color:#4A90D9;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* Card view project card */
+.w-proj-card{background:#fff;border:1px solid #dee2e6;border-radius:8px;padding:14px;cursor:pointer;transition:border-color .15s}
+.w-proj-card:hover{border-color:#4A90D9}
+
+/* Tooltip style annotation */
+.w-note{font-size:.6rem;color:#4A90D9;font-style:italic;margin-top:4px}
+
+/* Filter bar */
+.w-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+
+/* Phase progress bar */
+.w-phase-bar{display:flex;align-items:center;gap:2px}
+.w-phase-chip{padding:3px 8px;border-radius:6px;font-size:.65rem;font-weight:600;white-space:nowrap}
+.phase-done{background:#22c55e;color:#fff}
+.phase-current{background:#4A90D9;color:#fff}
+.phase-future{background:#e2e8f0;color:#94a3b8}
+.phase-arrow{color:#94a3b8;font-size:.6rem}
+
+/* Checklist checkbox */
+.w-checkbox{width:16px;height:16px;border:2px solid #d1d5db;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:.55rem;flex-shrink:0}
+.w-checkbox.checked{background:#22c55e;border-color:#22c55e;color:#fff}
+
+/* Empty state */
+.w-empty{text-align:center;padding:24px;color:#94a3b8;font-size:.8rem}
+
+/* Upload area */
+.w-upload{border:2px dashed #d1d5db;border-radius:10px;padding:20px;text-align:center;color:#94a3b8;font-size:.75rem}
+
+/* Comment */
+.w-comment{display:flex;gap:8px;margin-bottom:10px}
+.w-comment-avatar{width:28px;height:28px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:600;color:#2563eb;flex-shrink:0}
+.w-comment-body{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
+.w-comment-author{font-size:.68rem;font-weight:600;color:#334155}
+.w-comment-time{font-size:.6rem;color:#94a3b8;margin-left:6px}
+.w-comment-text{font-size:.72rem;color:#475569;margin-top:2px}
+
+/* Rejection box */
+.w-rejection{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-top:8px}
+
+/* Ensure min-width for wireframes */
+.browser-frame{min-width:800px}
+.main{overflow-x:auto}
+
+/* Responsive — only annotations outside browser frames */
+@media(max-width:768px){
+  .annotation-list{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== FIXED TOP NAV ===== -->
+<nav class="top-nav" id="topNav">
+  <span class="nav-title">ProcessCheck Wireframes</span>
+  <span class="nav-counter" id="navCounter">1/10</span>
+  <span class="nav-divider"></span>
+  <a href="#screen-1" data-idx="0">1. 로그인</a>
+  <a href="#screen-2" data-idx="1">2. 대시보드</a>
+  <a href="#screen-3" data-idx="2">3. 프로젝트 목록</a>
+  <a href="#screen-4" data-idx="3">4. 프로젝트 상세</a>
+  <a href="#screen-5" data-idx="4">5. 작업 상세</a>
+  <a href="#screen-6" data-idx="5">6. 체크리스트 관리</a>
+  <a href="#screen-7" data-idx="6">7. 고객 관리</a>
+  <a href="#screen-8" data-idx="7">8. 고객 포털</a>
+  <a href="#screen-9" data-idx="8">9. 영업 대시보드</a>
+  <a href="#screen-10" data-idx="9">10. 매뉴얼</a>
+</nav>
+
+<div class="main">
+
+<!-- ================================================================== -->
+<!-- SCREEN 1: LOGIN (index.html)                                       -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-1">
+  <div class="screen-header">
+    <span class="screen-number">1</span>
+    <span class="screen-title">로그인</span>
+    <span class="screen-file">index.html</span>
+    <span class="access-badge access-all">인증 불필요</span>
+  </div>
+  <p class="screen-desc">데모 사용자 카드 3개와 Microsoft OAuth 로그인을 통해 시스템에 접근합니다. DB 시딩 완료 전까지 스피너가 표시됩니다.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span>
+      <span class="browser-dot dot-yellow"></span>
+      <span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/index.html</div>
+    </div>
+    <div class="browser-content">
+      <div class="login-center">
+        <div class="login-box">
+          <!-- Logo -->
+          <div class="login-logo anno" data-num="1">
+            <div class="login-logo-box">PC</div>
+            <div class="login-title">ProcessCheck</div>
+            <div class="login-subtitle">개발 프로세스 관리 시스템</div>
+          </div>
+
+          <p style="text-align:center;font-size:.8rem;color:#64748b;margin-bottom:14px" class="anno" data-num="2">역할을 선택하여 시작하세요</p>
+
+          <!-- User Cards -->
+          <div class="anno" data-num="3">
+            <div class="w-user-card clickable">
+              <div class="w-user-avatar avatar-blue">W</div>
+              <div class="w-user-info">
+                <div><span class="w-user-role">실무자</span><span class="w-user-name">김철수</span></div>
+                <div class="w-user-desc">체크리스트 작업 수행 &middot; 완료 보고</div>
+                <div class="w-user-dept">개발팀</div>
+              </div>
+              <span class="w-user-arrow">&rsaquo;</span>
+            </div>
+          </div>
+
+          <div class="w-user-card clickable">
+            <div class="w-user-avatar avatar-yellow">M</div>
+            <div class="w-user-info">
+              <div><span class="w-user-role">매니저</span><span class="w-user-name">이영희</span></div>
+              <div class="w-user-desc">부서 작업 검토 &middot; 승인/반려</div>
+              <div class="w-user-dept">개발팀</div>
+            </div>
+            <span class="w-user-arrow">&rsaquo;</span>
+          </div>
+
+          <div class="w-user-card clickable">
+            <div class="w-user-avatar avatar-green">O</div>
+            <div class="w-user-info">
+              <div><span class="w-user-role">기획조정실</span><span class="w-user-name">박민수</span></div>
+              <div class="w-user-desc">전체 프로젝트 현황 모니터링 &middot; 옵저버</div>
+              <div class="w-user-dept">경영관리팀</div>
+            </div>
+            <span class="w-user-arrow">&rsaquo;</span>
+          </div>
+
+          <!-- Divider -->
+          <div class="w-divider anno" data-num="4">또는</div>
+
+          <!-- MS Login -->
+          <div class="anno" data-num="5">
+            <div class="w-ms-btn clickable">
+              <div class="w-ms-logo">
+                <div style="background:#f25022"></div>
+                <div style="background:#7fba00"></div>
+                <div style="background:#00a4ef"></div>
+                <div style="background:#ffb900"></div>
+              </div>
+              <span>Microsoft 계정으로 로그인</span>
+            </div>
+          </div>
+
+          <!-- Spinner area note -->
+          <div class="anno" data-num="6" style="margin-top:14px">
+            <div class="w-spinner" style="border:1px dashed #d1d5db;border-radius:8px;padding:12px">
+              <div class="w-spinner-circle"></div>
+              <span style="font-size:.7rem">시스템 초기화 중... (DB 시딩)</span>
+            </div>
+          </div>
+
+          <div style="text-align:center;font-size:.65rem;color:#94a3b8;margin-top:14px;font-family:monospace" class="anno" data-num="7">
+            Firebase Firestore 연동 &middot; 실시간 데이터 동기화
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> PC 로고 아이콘(그라데이션) + "ProcessCheck" 타이틀 + 부제</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 역할 선택 안내 문구 (시딩 완료 후 표시)</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 데모 유저 카드 3개: 아바타(아이콘+색상) + 역할명 + 이름 코드 + 설명 + 부서. 클릭 시 즉시 로그인</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> "또는" 구분선 (CSS ::before/::after 라인)</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> Microsoft OAuth 로그인 버튼 (MS 4색 로고 + 텍스트). 신규 사용자는 역할/부서 선택 모달로 전환</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> DB 시딩 중 스피너 오버레이 (초기 로드 시 표시, 완료 후 숨김)</div>
+      <div class="annotation-item"><span class="annotation-num">7</span> 하단 푸터 정보 텍스트</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 2: DASHBOARD (dashboard.html)                               -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-2">
+  <div class="screen-header">
+    <span class="screen-number">2</span>
+    <span class="screen-title">대시보드</span>
+    <span class="screen-file">dashboard.html</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">로그인 후 메인 화면. 역할별 구독 기반으로 작업/승인/프로젝트/알림을 탭 형태로 표시합니다. 통계 카드 5개는 모두 클릭 가능합니다.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span>
+      <span class="browser-dot dot-yellow"></span>
+      <span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/dashboard.html</div>
+    </div>
+    <div class="browser-content">
+      <!-- Nav -->
+      <div class="w-nav anno" data-num="1">
+        <div class="w-nav-logo">
+          <div class="w-nav-logo-icon">PC</div>
+          <span class="w-nav-logo-text">Process<span>Check</span></span>
+        </div>
+        <div class="w-nav-links">
+          <span class="w-nav-link active">대시보드</span>
+          <span class="w-nav-link">프로젝트</span>
+          <span class="w-nav-link">고객</span>
+          <span class="w-nav-link">영업 준비</span>
+          <span class="w-nav-link">체크리스트</span>
+          <span class="w-nav-link">매뉴얼</span>
+        </div>
+        <div class="w-nav-right">
+          <div class="w-theme-btn">&#9789;</div>
+          <div class="w-nav-bell">&#128276;<span class="w-nav-bell-dot"></span></div>
+          <span class="w-nav-user">김철수 &middot; 실무자</span>
+          <span class="w-logout">로그아웃</span>
+        </div>
+      </div>
+
+      <div class="w-body">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-2 anno" data-num="2">
+          <div class="flex items-center gap-2">
+            <span style="font-size:1.05rem;font-weight:700;color:#1e293b">김철수님</span>
+            <span class="w-badge badge-blue">실무자</span>
+            <span style="font-size:.7rem;color:#94a3b8">개발팀</span>
+          </div>
+          <div style="font-size:.7rem;color:#94a3b8">
+            <span style="color:#ef4444;font-weight:600">2</span> 초과 &middot;
+            오늘 <span style="font-weight:600">3</span> &middot;
+            이번 주 <span style="color:#4A90D9;font-weight:600">8</span>건
+          </div>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="w-stats w-stats-5 anno" data-num="3">
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#4A90D9">12</div>
+            <div class="w-stat-label">작업 대기</div>
+            <div class="w-stat-click">클릭 &rarr; 작업 탭</div>
+          </div>
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#f59e0b">5</div>
+            <div class="w-stat-label">승인 대기</div>
+            <div class="w-stat-click">클릭 &rarr; 승인 탭</div>
+          </div>
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#ef4444">2</div>
+            <div class="w-stat-label">마감 초과</div>
+            <div class="w-stat-click">클릭 &rarr; 작업 탭</div>
+          </div>
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#22c55e">3</div>
+            <div class="w-stat-label">프로젝트</div>
+            <div class="w-stat-click">클릭 &rarr; projects.html</div>
+          </div>
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#ef4444">4</div>
+            <div class="w-stat-label">알림</div>
+            <div class="w-stat-click">클릭 &rarr; 알림 탭</div>
+          </div>
+        </div>
+
+        <!-- Tabbed Card -->
+        <div class="w-card">
+          <!-- Tab Bar -->
+          <div class="w-tabs anno" data-num="4">
+            <span class="w-tab active">내 작업 <span class="w-badge badge-gray">12</span></span>
+            <span class="w-tab">승인 대기 <span class="w-badge badge-yellow">5</span></span>
+            <span class="w-tab">프로젝트 <span class="w-badge badge-gray">3</span></span>
+            <span class="w-tab">알림 <span class="w-badge badge-red">4</span></span>
+          </div>
+
+          <!-- Phase mini bar -->
+          <div class="flex items-center gap-1 mb-2 anno" data-num="5" style="padding:6px 8px;background:#f8fafc;border-radius:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span><span style="font-size:.62rem;color:#6c757d">발의</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span><span style="font-size:.62rem;color:#6c757d">기획</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span><span style="font-size:.62rem;color:#6c757d">WM</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:#94a3b8"></span><span style="font-size:.62rem;color:#6c757d">Tx</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:#d1d5db"></span><span style="font-size:.62rem;color:#6c757d">MSG</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:#d1d5db"></span><span style="font-size:.62rem;color:#6c757d">양산/이관</span>
+          </div>
+
+          <!-- Task rows -->
+          <div class="anno" data-num="6">
+            <div class="flex items-center justify-between clickable" style="padding:8px;border-bottom:1px solid #f1f5f9">
+              <div class="flex items-center gap-2">
+                <span style="width:6px;height:6px;border-radius:50%;background:#ef4444"></span>
+                <span style="font-size:.78rem;font-weight:500;color:#1e293b">회로 설계 검증 완료</span>
+                <span class="w-badge badge-blue">진행 중</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="font-size:.68rem;color:#94a3b8">개발팀</span>
+                <span style="font-size:.72rem;font-weight:600;color:#ef4444;font-family:monospace">D+2</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between clickable" style="padding:8px;border-bottom:1px solid #f1f5f9">
+              <div class="flex items-center gap-2">
+                <span style="width:6px;height:6px;border-radius:50%;background:#f59e0b"></span>
+                <span style="font-size:.78rem;font-weight:500;color:#1e293b">EMC 시험 결과 확인</span>
+                <span class="w-badge badge-gray">대기 중</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="font-size:.68rem;color:#94a3b8">품질팀</span>
+                <span style="font-size:.72rem;font-weight:600;color:#f59e0b;font-family:monospace">D-Day</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between clickable" style="padding:8px;border-bottom:1px solid #f1f5f9">
+              <div class="flex items-center gap-2">
+                <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8"></span>
+                <span style="font-size:.78rem;font-weight:500;color:#1e293b">BOM 등록 및 검증</span>
+                <span class="w-badge badge-blue">진행 중</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="font-size:.68rem;color:#94a3b8">구매팀</span>
+                <span style="font-size:.72rem;font-weight:600;color:#4A90D9;font-family:monospace">D-3</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:8px;text-align:center;font-size:.72rem;color:#4A90D9;cursor:pointer" class="anno" data-num="7">나머지 9건 더 보기</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 글로벌 네비게이션 바: PC 로고, 6개 메뉴(대시보드/프로젝트/고객/영업준비/체크리스트/매뉴얼), 다크모드 토글, 알림 벨(미읽음 빨간 점), 사용자 이름+역할, 로그아웃</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 인사 헤더: "이름님" + 역할 배지 + 부서명. 우측에 마감 초과/오늘/이번주 카운트</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 통계 카드 5개 (모두 클릭 가능): 작업대기, 승인대기, 마감초과, 프로젝트(외부 이동), 알림. 각각 해당 탭으로 전환</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 4개 탭: 내 작업(카운트) / 승인 대기(카운트) / 프로젝트(카운트) / 알림(미읽음 카운트)</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> Phase 미니 진행 바: 6개 Phase 도트(완료=초록, 진행=노랑, 대기=회색) + Phase 이름</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> 작업 행: 마감 상태 도트(빨강=초과/노랑=임박/회색=여유) + 작업명 + 상태 배지 + 부서 + D-day. 클릭 시 task.html 이동</div>
+      <div class="annotation-item"><span class="annotation-num">7</span> "더 보기" 버튼 (10건 단위 페이징)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 3: PROJECTS LIST (projects.html)                            -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-3">
+  <div class="screen-header">
+    <span class="screen-number">3</span>
+    <span class="screen-title">프로젝트 목록</span>
+    <span class="screen-file">projects.html</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">신규개발/설계변경 탭 + 7가지 뷰 모드(테이블/매트릭스/카드/간트/칸반/타임라인/캘린더). 테이블 뷰가 기본입니다.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/projects.html</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav">
+        <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
+        <div class="w-nav-links">
+          <span class="w-nav-link">대시보드</span><span class="w-nav-link active">프로젝트</span><span class="w-nav-link">고객</span><span class="w-nav-link">영업 준비</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">매뉴얼</span>
+        </div>
+        <div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
+      </div>
+
+      <div class="w-body">
+        <div class="flex items-center justify-between mb-3">
+          <div><span style="font-size:1.1rem;font-weight:700;color:#1e293b">프로젝트</span><span style="font-size:.75rem;color:#94a3b8;margin-left:8px">총 8개</span></div>
+        </div>
+
+        <!-- Type Tabs -->
+        <div class="w-tabs anno" data-num="1">
+          <span class="w-tab active">신규개발</span>
+          <span class="w-tab">설계변경</span>
+        </div>
+
+        <!-- Controls -->
+        <div class="w-filter-bar anno" data-num="2">
+          <input class="w-input" placeholder="프로젝트 검색..." style="flex:1;min-width:160px;max-width:260px">
+          <select class="w-select"><option>전체 상태</option><option>활성</option><option>완료</option><option>보류</option></select>
+          <div class="w-view-switch anno" data-num="3">
+            <span class="w-view-btn active">테이블</span>
+            <span class="w-view-btn">매트릭스</span>
+            <span class="w-view-btn">카드</span>
+            <span class="w-view-btn">간트</span>
+            <span class="w-view-btn">칸반</span>
+            <span class="w-view-btn">타임라인</span>
+            <span class="w-view-btn">캘린더</span>
+          </div>
+        </div>
+
+        <!-- TABLE VIEW -->
+        <div class="w-card anno" data-num="4" style="padding:0;overflow:hidden">
+          <table class="w-table">
+            <thead>
+              <tr>
+                <th style="width:30%">프로젝트명 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:15%">상태 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:15%">PM <span class="sort-icon">&udarr;</span></th>
+                <th style="width:20%">진행률 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:20%">시작일 <span class="sort-icon">&udarr;</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="clickable">
+                <td><strong>차세대 혈압계 개발</strong><br><span style="font-size:.6rem;color:#94a3b8">혈압계 &middot; 신규개발</span></td>
+                <td><span class="w-badge badge-blue">활성</span></td>
+                <td>이영희</td>
+                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-blue" style="width:65%"></div></div><span style="font-size:.62rem;color:#4A90D9;margin-left:4px">65%</span></td>
+                <td>2025.09.01</td>
+              </tr>
+              <tr class="clickable">
+                <td><strong>스마트 체온계 v2</strong><br><span style="font-size:.6rem;color:#94a3b8">체온계 &middot; 신규개발</span></td>
+                <td><span class="w-badge badge-blue">활성</span></td>
+                <td>김철수</td>
+                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-green" style="width:85%"></div></div><span style="font-size:.62rem;color:#22c55e;margin-left:4px">85%</span></td>
+                <td>2025.06.15</td>
+              </tr>
+              <tr class="clickable">
+                <td><strong>무선 산소포화도 측정기</strong><br><span style="font-size:.6rem;color:#94a3b8">산소포화도 &middot; 신규개발</span></td>
+                <td><span class="w-badge badge-blue">활성</span></td>
+                <td>박민수</td>
+                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-yellow" style="width:30%"></div></div><span style="font-size:.62rem;color:#f59e0b;margin-left:4px">30%</span></td>
+                <td>2026.01.10</td>
+              </tr>
+              <tr class="clickable">
+                <td><strong>혈당 모니터링 시스템</strong><br><span style="font-size:.6rem;color:#94a3b8">혈당계 &middot; 신규개발</span></td>
+                <td><span class="w-badge badge-green">완료</span></td>
+                <td>이영희</td>
+                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-green" style="width:100%"></div></div><span style="font-size:.62rem;color:#22c55e;margin-left:4px">100%</span></td>
+                <td>2024.11.01</td>
+              </tr>
+              <tr class="clickable">
+                <td><strong>디지털 청진기 프로</strong><br><span style="font-size:.6rem;color:#94a3b8">청진기 &middot; 신규개발</span></td>
+                <td><span class="w-badge badge-yellow">보류</span></td>
+                <td>김철수</td>
+                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-yellow" style="width:15%"></div></div><span style="font-size:.62rem;color:#f59e0b;margin-left:4px">15%</span></td>
+                <td>2026.02.01</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- MATRIX VIEW (preview) -->
+        <div style="margin-top:20px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">매트릭스 뷰 (미리보기)</div>
+          <div class="w-card anno" data-num="5" style="padding:8px;overflow-x:auto">
+            <table class="w-matrix">
+              <thead>
+                <tr>
+                  <th style="text-align:left;min-width:120px">프로젝트</th>
+                  <th>발의</th><th>기획</th><th>WM</th><th>Tx</th><th>MSG</th><th>양산/이관</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="text-align:left;font-weight:500;font-size:.7rem">차세대 혈압계</td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">5/5</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">4/4</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-current" style="width:16px;height:16px;font-size:.45rem">3/6</span><span class="w-phase-dot dot-gate-pending" style="width:16px;height:16px;font-size:.5rem">&#9203;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left;font-weight:500;font-size:.7rem">스마트 체온계</td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">3/3</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">5/5</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">4/4</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">6/6</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-current" style="width:16px;height:16px;font-size:.45rem">2/5</span><span class="w-phase-dot dot-gate-pending" style="width:16px;height:16px;font-size:.5rem">&#9203;</span></div></td>
+                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="display:flex;gap:12px;margin-top:8px;font-size:.6rem;color:#6c757d;align-items:center">
+              <span>범례:</span>
+              <span class="flex items-center gap-1"><span class="w-phase-dot dot-done" style="width:12px;height:12px;font-size:0"></span> 작업완료</span>
+              <span class="flex items-center gap-1"><span class="w-phase-dot dot-current" style="width:12px;height:12px;font-size:0"></span> 진행중</span>
+              <span class="flex items-center gap-1"><span class="w-phase-dot dot-future" style="width:12px;height:12px;font-size:0"></span> 미진행</span>
+              <span class="flex items-center gap-1"><span class="w-phase-dot dot-gate-approved" style="width:12px;height:12px;font-size:.45rem">&check;</span> 승인</span>
+              <span class="flex items-center gap-1"><span class="w-phase-dot dot-gate-pending" style="width:12px;height:12px;font-size:.45rem">&#9203;</span> 대기</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD VIEW (preview) -->
+        <div style="margin-top:20px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">카드 뷰 (미리보기)</div>
+          <div class="w-grid-3 anno" data-num="6">
+            <div class="w-proj-card clickable">
+              <div class="flex items-center justify-between mb-2">
+                <span style="font-size:.82rem;font-weight:600;color:#1e293b">차세대 혈압계 개발</span>
+                <span style="font-size:.95rem;font-weight:700;color:#4A90D9">65%</span>
+              </div>
+              <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
+                <span>혈압계</span><span>PM: 이영희</span>
+                <span class="w-badge badge-yellow">중요</span>
+              </div>
+              <div class="w-progress mb-2"><div class="w-progress-fill fill-blue" style="width:65%"></div></div>
+              <div class="flex items-center gap-1">
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#4A90D9"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+              </div>
+            </div>
+            <div class="w-proj-card clickable">
+              <div class="flex items-center justify-between mb-2">
+                <span style="font-size:.82rem;font-weight:600;color:#1e293b">스마트 체온계 v2</span>
+                <span style="font-size:.95rem;font-weight:700;color:#22c55e">85%</span>
+              </div>
+              <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
+                <span>체온계</span><span>PM: 김철수</span>
+                <span class="w-badge badge-green">보통</span>
+              </div>
+              <div class="w-progress mb-2"><div class="w-progress-fill fill-green" style="width:85%"></div></div>
+              <div class="flex items-center gap-1">
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#4A90D9"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+              </div>
+            </div>
+            <div class="w-proj-card clickable">
+              <div class="flex items-center justify-between mb-2">
+                <span style="font-size:.82rem;font-weight:600;color:#1e293b">무선 산소포화도</span>
+                <span style="font-size:.95rem;font-weight:700;color:#f59e0b">30%</span>
+              </div>
+              <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
+                <span>산소포화도</span><span>PM: 박민수</span>
+                <span class="w-badge badge-red">긴급</span>
+              </div>
+              <div class="w-progress mb-2"><div class="w-progress-fill fill-yellow" style="width:30%"></div></div>
+              <div class="flex items-center gap-1">
+                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#f59e0b"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+                <span style="width:6px;height:6px;border-radius:50%;background:#d1d5db"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 프로젝트 유형 탭: 신규개발(연 5-6건, 장기) / 설계변경(월 ~50건, 짧은 사이클). 설계변경 탭은 테이블/칸반 2개 뷰만 제공</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 컨트롤 바: 검색 입력 + 상태 필터(전체/활성/완료/보류) + 뷰 전환</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 뷰 모드 스위처: 테이블(기본) > 매트릭스 > 카드 > 간트 > 칸반 > 타임라인 > 캘린더</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 테이블 뷰: 정렬 가능한 5개 컬럼(프로젝트명, 상태, PM, 진행률 바+%, 시작일). 행 클릭 시 project.html로 이동</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 매트릭스 뷰: 프로젝트 행 x 6 Phase 열. 각 셀에 동그라미 2개 (좌=작업 완료/전체, 우=승인 상태 기호). 하단 색상 범례</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> 카드 뷰: 3열 그리드. 각 카드에 프로젝트명, PM, 중요도 배지, 진행률 바+%, 6개 Phase 도트</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 4: PROJECT DETAIL (project.html)                            -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-4">
+  <div class="screen-header">
+    <span class="screen-number">4</span>
+    <span class="screen-title">프로젝트 상세</span>
+    <span class="screen-file">project.html?id=...</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">개요/체크리스트/파일/설계변경 4개 탭. 개요 탭에 5개 stat 카드(클릭 가능) + 프로젝트 요약 카드 + 최근 활동.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/project.html?id=proj-001</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link active">프로젝트</span><span class="w-nav-link">고객</span><span class="w-nav-link">영업 준비</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">매뉴얼</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">이영희</span><span class="w-logout">로그아웃</span></div></div>
+
+      <div class="w-body">
+        <!-- Project Header -->
+        <div class="w-card anno" data-num="1">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div style="flex:1">
+              <div class="flex items-center gap-2 mb-2">
+                <span style="font-size:1.2rem;font-weight:700;color:#1e293b">차세대 혈압계 개발</span>
+                <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b" title="중요"></span>
+              </div>
+              <div class="flex items-center gap-3" style="font-size:.75rem;color:#6c757d">
+                <span>제품: <strong style="color:#334155">혈압계</strong></span>
+                <span>PM: <strong style="color:#334155">이영희</strong></span>
+                <span>2025.09.01 ~ 2026.06.30</span>
+              </div>
+              <div style="margin-top:8px;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px">
+                <span style="font-size:.75rem;font-weight:600;color:#0891b2">&#9889; 현재 단계: WM</span>
+              </div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:2.2rem;font-weight:700;color:#4A90D9">65%</div>
+              <div style="font-size:.65rem;color:#94a3b8">전체 진행률</div>
+              <div class="w-progress mt-1" style="width:100px"><div class="w-progress-fill fill-blue" style="width:65%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="w-tabs anno" data-num="2" style="margin-top:14px">
+          <span class="w-tab active">개요</span>
+          <span class="w-tab">체크리스트</span>
+          <span class="w-tab">파일</span>
+          <span class="w-tab">설계 변경</span>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="w-stats w-stats-5 anno" data-num="3">
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#334155">142</div><div class="w-stat-label">전체 작업</div><div class="w-stat-click">클릭 &rarr; 체크리스트 탭</div></div>
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#4A90D9">18</div><div class="w-stat-label">진행 중</div><div class="w-stat-click">클릭 &rarr; 필터 적용</div></div>
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#ef4444">3</div><div class="w-stat-label">지연</div><div class="w-stat-click">클릭 &rarr; 지연 필터</div></div>
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#f59e0b">5</div><div class="w-stat-label">매니저 승인 대기</div><div class="w-stat-click">클릭 &rarr; 필터</div></div>
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#f59e0b">2</div><div class="w-stat-label">위원회 승인 대기</div><div class="w-stat-click">클릭 &rarr; 필터</div></div>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="w-card anno" data-num="4">
+          <div style="font-size:.85rem;font-weight:600;color:#334155;margin-bottom:10px">프로젝트 상태 요약</div>
+          <div class="flex items-center gap-1 mb-2" style="font-size:.72rem;color:#0891b2;font-weight:600">&#9889; WM (작업 진행 중)</div>
+          <div class="w-phase-bar mb-3">
+            <span class="w-phase-chip phase-done">&#10004; 발의</span><span class="phase-arrow">&rarr;</span>
+            <span class="w-phase-chip phase-done">&#10004; 기획</span><span class="phase-arrow">&rarr;</span>
+            <span class="w-phase-chip phase-current">&#9654; WM</span><span class="phase-arrow">&rarr;</span>
+            <span class="w-phase-chip phase-future">Tx</span><span class="phase-arrow">&rarr;</span>
+            <span class="w-phase-chip phase-future">MSG</span><span class="phase-arrow">&rarr;</span>
+            <span class="w-phase-chip phase-future">양산/이관</span>
+          </div>
+          <div class="flex gap-4 mb-2" style="font-size:.75rem">
+            <div><div style="color:#94a3b8;font-size:.65rem">마감일</div><div style="color:#334155;font-weight:600">2026.06.30</div><div style="color:#4A90D9;font-size:.7rem;font-family:monospace">D-111</div></div>
+            <div><div style="color:#94a3b8;font-size:.65rem">계획 대비</div><div style="color:#22c55e;font-weight:600">정상</div><div style="color:#94a3b8;font-size:.65rem">현재 WM (3/6 phase)</div></div>
+          </div>
+          <div style="padding:8px 10px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:.72rem">
+            <span style="color:#d97706;font-weight:600">병목:</span>
+            <span style="color:#78716c">품질팀 2건 대기 / 인증팀 1건 진행중</span>
+          </div>
+        </div>
+
+        <!-- Checklist Tab preview -->
+        <div style="margin-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">체크리스트 탭 (미리보기)</div>
+          <div class="w-card anno" data-num="5" style="padding:8px;overflow-x:auto">
+            <div style="font-size:.75rem;font-weight:600;color:#475569;margin-bottom:6px">부서 x 페이즈 매트릭스</div>
+            <table class="w-matrix" style="font-size:.6rem">
+              <thead><tr><th style="text-align:left">부서</th><th>발의</th><th>기획</th><th>WM</th><th>Tx</th><th>MSG</th><th>양산/이관</th></tr></thead>
+              <tbody>
+                <tr><td style="text-align:left">개발팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">3/3</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">1/3</span><span class="w-phase-dot dot-gate-none" style="width:14px;height:14px;font-size:.4rem">&mdash;</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
+                <tr><td style="text-align:left">품질팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">1/1</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">0/2</span><span class="w-phase-dot dot-gate-pending" style="width:14px;height:14px;font-size:.4rem">&#9203;</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
+              </tbody>
+            </table>
+            <div class="w-filter-bar mt-2">
+              <select class="w-select" style="font-size:.65rem"><option>전체 단계</option></select>
+              <select class="w-select" style="font-size:.65rem"><option>전체 부서</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Changes Tab preview -->
+        <div style="margin-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">설계변경 탭 (미리보기)</div>
+          <div class="w-card anno" data-num="6">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-badge badge-yellow">중간</span>
+              <span class="w-badge badge-yellow">검토 중</span>
+            </div>
+            <div style="font-size:.82rem;font-weight:600;color:#1e293b">센서 모듈 교체 요청</div>
+            <div style="font-size:.7rem;color:#64748b;margin-top:4px">요청부서: 구매팀 &middot; 2026.02.15</div>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="w-badge badge-green">개발팀 &#10004;</span>
+              <span class="w-badge badge-gray">품질팀 &#9675;</span>
+              <span class="w-badge badge-gray">인증팀 &#9675;</span>
+            </div>
+            <div class="flex gap-2 mt-2">
+              <span class="w-btn w-btn-primary" style="font-size:.62rem">승인</span>
+              <span class="w-btn w-btn-danger" style="font-size:.62rem">반려</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 프로젝트 헤더: 이름 + 중요도 도트(보통/중요/긴급) + 제품유형 + PM + 기간 + 현재 Phase 태그 + 우측 큰 진행률%</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 4개 탭: 개요 / 체크리스트 / 파일 / 설계 변경</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> Stat 카드 5개(클릭 가능): 전체/진행중/지연/매니저승인대기/위원회승인대기. 클릭 시 체크리스트 탭+필터 적용</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 요약 카드: 현재 Phase + Phase 진행바(&#10004;완료/&#9654;현재/미래) + 마감 D-day + 계획대비 상태 + 병목 부서</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 체크리스트 탭: 부서x페이즈 매트릭스(동그라미 쌍) + 단계/부서 필터 + 부서별 그룹 작업 리스트 + "작업 추가" 버튼</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> 설계변경 탭: 변경요청 카드 (규모 배지+상태 배지+제목+영향부서 읽음 표시+승인/반려 버튼)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 5: TASK DETAIL (task.html)                                  -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-5">
+  <div class="screen-header">
+    <span class="screen-number">5</span>
+    <span class="screen-title">작업 상세</span>
+    <span class="screen-file">task.html?projectId=...&amp;taskId=...</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">2컬럼 레이아웃: 좌측에 작업 정보+체크리스트+첨부+코멘트, 우측에 작업 관리(액션 버튼)+히스토리 타임라인.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/task.html?projectId=proj-001&amp;taskId=task-042</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link active">프로젝트</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
+
+      <div class="w-body">
+        <!-- Breadcrumb -->
+        <div style="font-size:.72rem;color:#94a3b8;margin-bottom:12px" class="anno" data-num="1">
+          프로젝트 &rsaquo; <span style="color:#64748b">차세대 혈압계 개발</span> &rsaquo; <span style="color:#334155">작업 상세</span>
+        </div>
+
+        <!-- Task Header -->
+        <div class="w-card anno" data-num="2">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-badge badge-blue">진행 중</span>
+            <span class="w-badge badge-yellow">승인 대기</span>
+            <span class="w-badge badge-gray">WM 제작</span>
+          </div>
+          <div style="font-size:1.1rem;font-weight:700;color:#1e293b;margin-bottom:4px">회로 설계 검증 완료</div>
+          <div style="font-size:.75rem;color:#64748b;line-height:1.6">전자 회로 설계의 최종 검증을 수행하고, 시뮬레이션 결과와 실측 데이터를 비교합니다.</div>
+          <hr style="margin:10px 0;border:none;border-top:1px solid #e2e8f0">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:.72rem">
+            <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">부서</div><div style="color:#334155">개발팀</div></div>
+            <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">담당자</div><div style="color:#334155">김철수</div></div>
+            <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">검토자</div><div style="color:#334155">이영희</div></div>
+            <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">마감일</div><div style="color:#334155">2026.03.15</div></div>
+          </div>
+        </div>
+
+        <!-- 2 column -->
+        <div class="w-2col" style="margin-top:14px">
+          <!-- Left -->
+          <div>
+            <!-- Checklist -->
+            <div class="w-card anno" data-num="3">
+              <div class="flex items-center justify-between mb-2">
+                <span style="font-size:.82rem;font-weight:600;color:#334155">체크리스트</span>
+                <span style="font-size:.75rem;color:#94a3b8;font-family:monospace">3/5</span>
+              </div>
+              <div class="w-progress mb-3"><div class="w-progress-fill fill-blue" style="width:60%"></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div class="flex items-center gap-2"><span class="w-checkbox checked">&#10003;</span><span style="font-size:.75rem;color:#94a3b8;text-decoration:line-through">요구사항 문서 검토 완료</span><span style="font-size:.6rem;color:#ef4444;font-weight:500">필수</span></div>
+                <div class="flex items-center gap-2"><span class="w-checkbox checked">&#10003;</span><span style="font-size:.75rem;color:#94a3b8;text-decoration:line-through">기술 스펙 확인 완료</span><span style="font-size:.6rem;color:#ef4444;font-weight:500">필수</span></div>
+                <div class="flex items-center gap-2"><span class="w-checkbox checked">&#10003;</span><span style="font-size:.75rem;color:#94a3b8;text-decoration:line-through">관련 부서 협의 완료</span><span style="font-size:.6rem;color:#ef4444;font-weight:500">필수</span></div>
+                <div class="flex items-center gap-2"><span class="w-checkbox"></span><span style="font-size:.75rem;color:#334155">테스트 결과 확인</span><span style="font-size:.6rem;color:#94a3b8">선택</span></div>
+                <div class="flex items-center gap-2"><span class="w-checkbox"></span><span style="font-size:.75rem;color:#334155">최종 검토 및 서명</span><span style="font-size:.6rem;color:#ef4444;font-weight:500">필수</span></div>
+              </div>
+              <div style="margin-top:8px;padding:8px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:.65rem;color:#d97706">&#9888; 모든 필수 항목을 완료해야 작업을 완료할 수 있습니다.</div>
+            </div>
+
+            <!-- Attachments -->
+            <div class="w-card anno" data-num="4">
+              <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:8px">첨부 파일</div>
+              <div class="w-upload">파일을 드래그하거나 클릭하여 업로드<br><span style="font-size:.65rem">PDF, DOC, XLS, 이미지 등 (최대 10MB)</span></div>
+            </div>
+
+            <!-- Comments -->
+            <div class="w-card anno" data-num="5">
+              <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:8px">코멘트</div>
+              <div style="margin-bottom:10px">
+                <div style="border:1px solid #d1d5db;border-radius:8px;padding:8px;font-size:.72rem;color:#94a3b8;min-height:50px">코멘트를 입력하세요...</div>
+                <div style="text-align:right;margin-top:4px"><span class="w-btn w-btn-primary" style="font-size:.65rem">코멘트 추가</span></div>
+              </div>
+              <div class="w-comment">
+                <div class="w-comment-avatar">이</div>
+                <div class="w-comment-body">
+                  <span class="w-comment-author">이영희</span><span class="w-comment-time">2시간 전</span>
+                  <div class="w-comment-text">시뮬레이션 결과 첨부 부탁드립니다.</div>
+                </div>
+              </div>
+              <div class="w-comment">
+                <div class="w-comment-avatar">김</div>
+                <div class="w-comment-body">
+                  <span class="w-comment-author">김철수</span><span class="w-comment-time">1시간 전</span>
+                  <div class="w-comment-text">확인했습니다. 오후에 업로드하겠습니다.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Sidebar -->
+          <div>
+            <div class="w-card anno" data-num="6" style="position:sticky;top:60px">
+              <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:10px">작업 관리</div>
+              <!-- Action buttons -->
+              <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+                <div style="font-size:.68rem;color:#64748b;text-align:center;margin-bottom:4px">역할별 액션 버튼:</div>
+                <span class="w-btn w-btn-primary" style="justify-content:center;width:100%">&#9745; 작업 완료 (실무자)</span>
+                <span class="w-btn w-btn-success" style="justify-content:center;width:100%">&#10004; 승인 (매니저/기획조정실)</span>
+                <div style="border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:.68rem;color:#94a3b8">반려 사유를 입력하세요...</div>
+                <span class="w-btn w-btn-danger" style="justify-content:center;width:100%">&#10006; 반려 (매니저/기획조정실)</span>
+                <span class="w-btn w-btn-ghost" style="justify-content:center;width:100%">&#8635; 재작업 시작 (반려 후 실무자)</span>
+              </div>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin-bottom:10px">
+              <!-- Timeline -->
+              <div style="font-size:.78rem;font-weight:600;color:#475569;margin-bottom:8px" class="anno" data-num="7">작업 히스토리</div>
+              <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">작업 배정됨</div><div style="font-size:.62rem;color:#94a3b8">2026.02.28</div></div></div>
+              <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">작업 시작됨</div><div style="font-size:.62rem;color:#94a3b8">2026.03.05</div></div></div>
+              <div class="w-timeline-item"><span class="w-timeline-dot active"></span><div><div style="font-size:.72rem;color:#334155">작업 완료됨</div><div style="font-size:.62rem;color:#94a3b8">2026.03.10</div></div></div>
+              <div class="w-timeline-item"><span class="w-timeline-dot pending"></span><div><div style="font-size:.72rem;color:#d1d5db">승인 완료</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 브레드크럼: 프로젝트 > 프로젝트명(링크) > 작업 상세</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 작업 헤더 카드: 상태 배지(pending/in_progress/completed/rejected) + 승인 상태 + 단계명 + 제목 + 설명 + 4열 정보(부서/담당자/검토자/마감일). 반려 시 빨간 반려사유 박스 표시</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 체크리스트: 진행률 바 + 각 항목(체크박스+내용+필수/선택 라벨). 실무자만 토글 가능. 필수 미완료 시 경고 표시</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 첨부 파일: 드래그&드롭 업로드 영역 + 업로드된 파일 목록</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 코멘트: 입력란 + "코멘트 추가" 버튼 + 아바타+이름+시간+내용 리스트</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> 우측 작업 관리: 역할별 액션 버튼 - 실무자:"작업 완료"/"재작업 시작", 매니저:"승인"/"반려(사유입력)", 기획조정실:"승인"/"반려"</div>
+      <div class="annotation-item"><span class="annotation-num">7</span> 히스토리 타임라인: 배정/시작/완료/승인/반려 이벤트별 날짜+행위자 표시. 도트 색상으로 상태 구분</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 6: ADMIN CHECKLISTS (admin-checklists.html)                 -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-6">
+  <div class="screen-header">
+    <span class="screen-number">6</span>
+    <span class="screen-title">체크리스트 관리자</span>
+    <span class="screen-file">admin-checklists.html</span>
+    <span class="access-badge access-role">매니저/기획조정실</span>
+  </div>
+  <p class="screen-desc">템플릿 체크리스트 관리. 매트릭스/트리/리스트 3가지 뷰. 193개 템플릿 항목을 6 Phase x 10 부서로 관리합니다.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/admin-checklists.html</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link">프로젝트</span><span class="w-nav-link">고객</span><span class="w-nav-link">영업 준비</span><span class="w-nav-link active">체크리스트</span><span class="w-nav-link">매뉴얼</span></div><div class="w-nav-right"><span class="w-nav-user">박민수 &middot; 기획조정실</span><span class="w-logout">로그아웃</span></div></div>
+
+      <div class="w-body">
+        <div class="flex items-center justify-between mb-3">
+          <div><span style="font-size:1.1rem;font-weight:700;color:#1e293b">체크리스트 템플릿</span><span style="font-size:.7rem;color:#94a3b8;margin-left:8px">193개 항목</span></div>
+          <span class="w-btn w-btn-primary">+ 항목 추가</span>
+        </div>
+
+        <!-- View switch -->
+        <div class="w-filter-bar anno" data-num="1">
+          <div class="w-view-switch">
+            <span class="w-view-btn active">매트릭스</span>
+            <span class="w-view-btn">트리</span>
+            <span class="w-view-btn">리스트</span>
+          </div>
+        </div>
+
+        <!-- MATRIX VIEW -->
+        <div class="w-card anno" data-num="2" style="padding:8px;overflow-x:auto">
+          <table class="w-matrix" style="font-size:.6rem">
+            <thead>
+              <tr>
+                <th style="text-align:left;min-width:80px">단계 \ 부서</th>
+                <th>개발팀</th><th>품질팀</th><th>영업팀</th><th>제조팀</th><th>구매팀</th><th>CS팀</th><th>경영관리</th><th>글로벌임상</th><th>디자인연구소</th><th>인증팀</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="text-align:left;font-weight:600">발의</td><td>5 / <span style="color:#ef4444">3</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>1 / <span style="color:#ef4444">1</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td></tr>
+              <tr><td style="text-align:left;font-weight:600">기획</td><td>6 / <span style="color:#ef4444">4</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>4 / <span style="color:#ef4444">3</span></td></tr>
+              <tr><td style="text-align:left;font-weight:600">WM</td><td>5 / <span style="color:#ef4444">4</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>5 / <span style="color:#ef4444">4</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>1 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">3</span></td></tr>
+              <tr><td style="text-align:left;font-weight:600">Tx</td><td>4 / <span style="color:#ef4444">3</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>5 / <span style="color:#ef4444">4</span></td></tr>
+              <tr><td style="text-align:left;font-weight:600">MSG</td><td>3 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td></tr>
+              <tr><td style="text-align:left;font-weight:600">양산/이관</td><td>4 / <span style="color:#ef4444">3</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">3</span></td><td>4 / <span style="color:#ef4444">3</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">2</span></td><td>3 / <span style="color:#ef4444">2</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>2 / <span style="color:#ef4444">1</span></td><td>3 / <span style="color:#ef4444">2</span></td></tr>
+            </tbody>
+          </table>
+          <div style="font-size:.6rem;color:#94a3b8;margin-top:6px">N개 항목 / <span style="color:#ef4444">M필수</span> &mdash; 셀 클릭 시 트리 뷰로 전환</div>
+        </div>
+
+        <!-- TREE VIEW preview -->
+        <div style="margin-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">트리 뷰 (미리보기)</div>
+          <div class="anno" data-num="3" style="display:flex;border:1px solid #dee2e6;border-radius:8px;overflow:hidden;background:#fff">
+            <!-- Sidebar -->
+            <div class="w-sidebar">
+              <div style="font-size:.7rem;font-weight:600;color:#475569;margin-bottom:6px">단계 (Phase)</div>
+              <div class="w-sidebar-item active">&#9654; 발의</div>
+              <div class="w-sidebar-item">기획</div>
+              <div class="w-sidebar-item">WM</div>
+              <div class="w-sidebar-item">Tx</div>
+              <div class="w-sidebar-item">MSG</div>
+              <div class="w-sidebar-item">양산/이관</div>
+            </div>
+            <!-- Content -->
+            <div style="flex:1;padding:12px">
+              <div class="w-tabs" style="font-size:.7rem">
+                <span class="w-tab active">개발팀</span><span class="w-tab">품질팀</span><span class="w-tab">영업팀</span><span class="w-tab">제조팀</span><span class="w-tab">구매팀</span><span class="w-tab" style="color:#94a3b8">...</span>
+              </div>
+              <div class="w-card" style="padding:8px;margin-bottom:4px;cursor:grab">
+                <div class="flex items-center gap-2">
+                  <span style="color:#d1d5db">&#9776;</span>
+                  <span style="font-size:.75rem;font-weight:500;color:#334155">요구사항 문서 작성</span>
+                  <span class="w-badge badge-red" style="font-size:.55rem">필수</span>
+                  <span class="ml-auto w-btn w-btn-ghost" style="font-size:.55rem;padding:2px 6px">편집</span>
+                </div>
+              </div>
+              <div class="w-card" style="padding:8px;margin-bottom:4px;cursor:grab">
+                <div class="flex items-center gap-2">
+                  <span style="color:#d1d5db">&#9776;</span>
+                  <span style="font-size:.75rem;font-weight:500;color:#334155">기술 스펙 초안 작성</span>
+                  <span class="w-badge badge-red" style="font-size:.55rem">필수</span>
+                  <span class="ml-auto w-btn w-btn-ghost" style="font-size:.55rem;padding:2px 6px">편집</span>
+                </div>
+              </div>
+              <div class="w-card" style="padding:8px;margin-bottom:4px;cursor:grab">
+                <div class="flex items-center gap-2">
+                  <span style="color:#d1d5db">&#9776;</span>
+                  <span style="font-size:.75rem;font-weight:500;color:#334155">회로 시뮬레이션</span>
+                  <span class="w-badge badge-gray" style="font-size:.55rem">선택</span>
+                  <span class="ml-auto w-btn w-btn-ghost" style="font-size:.55rem;padding:2px 6px">편집</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIST VIEW preview -->
+        <div style="margin-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">리스트 뷰 (미리보기)</div>
+          <div class="w-card anno" data-num="4" style="padding:0;overflow:hidden">
+            <div class="w-filter-bar" style="padding:8px">
+              <input class="w-input" placeholder="검색..." style="flex:1;max-width:200px">
+              <select class="w-select"><option>전체 Phase</option></select>
+              <select class="w-select"><option>전체 부서</option></select>
+            </div>
+            <table class="w-table" style="font-size:.65rem">
+              <thead><tr><th>항목명</th><th>Phase</th><th>부서</th><th>필수</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>요구사항 문서 작성</td><td>발의</td><td>개발팀</td><td><span class="w-badge badge-red">필수</span></td><td><span style="cursor:pointer;color:#4A90D9">&#9998;</span></td></tr>
+                <tr><td>시장 조사 보고서</td><td>발의</td><td>영업팀</td><td><span class="w-badge badge-red">필수</span></td><td><span style="cursor:pointer;color:#4A90D9">&#9998;</span></td></tr>
+                <tr><td>원가 분석표</td><td>기획</td><td>구매팀</td><td><span class="w-badge badge-gray">선택</span></td><td><span style="cursor:pointer;color:#4A90D9">&#9998;</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 뷰 전환: 매트릭스(기본) / 트리 / 리스트</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 매트릭스 뷰: 6행(Phase) x 10열(부서) 테이블. 각 셀에 "N개 항목 / M필수" 표시. 셀 클릭 시 트리 뷰 해당 위치로 전환</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 트리 뷰: 좌측 Phase 사이드바(6개) + 상단 부서 탭(10개) + 아이템 카드 목록(드래그 핸들로 순서변경 가능, 편집 버튼)</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 리스트 뷰: 검색바 + Phase 필터 + 부서 필터 + 전체 아이템 flat 테이블(편집 아이콘 클릭 시 트리 뷰 해당 위치로 전환)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 7: CUSTOMERS (customers.html)                               -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-7">
+  <div class="screen-header">
+    <span class="screen-number">7</span>
+    <span class="screen-title">고객 관리</span>
+    <span class="screen-file">customers.html</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">대리점/법인/병원/온라인 거래처 관리. 검색+필터+테이블+등록/편집 모달.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/customers.html</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link">프로젝트</span><span class="w-nav-link active">고객</span><span class="w-nav-link">영업 준비</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">매뉴얼</span></div><div class="w-nav-right"><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
+
+      <div class="w-body">
+        <div class="flex items-center justify-between mb-3 anno" data-num="1">
+          <div><span style="font-size:1.1rem;font-weight:700;color:#1e293b">고객 관리</span><br><span style="font-size:.72rem;color:#94a3b8">대리점, 해외 법인, 병원 등 거래처 관리</span></div>
+          <span class="w-btn w-btn-primary">+ 고객 등록</span>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="w-stats w-stats-4 mb-3 anno" data-num="2">
+          <div class="w-stat"><div class="w-stat-value">24</div><div class="w-stat-label">전체 고객</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#22c55e">18</div><div class="w-stat-label">활성 거래처</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#f59e0b">4</div><div class="w-stat-label">협상 중</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#4A90D9">12</div><div class="w-stat-label">포털 활성</div></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="w-card mb-3 anno" data-num="3" style="padding:10px">
+          <div class="w-filter-bar">
+            <input class="w-input" placeholder="검색 (거래처명, 담당자, 지역, 영업 담당)" style="flex:1;min-width:200px">
+            <select class="w-select"><option>전체 유형</option><option>대리점</option><option>해외 법인</option><option>병원</option><option>온라인</option></select>
+            <select class="w-select"><option>전체 상태</option><option>활성</option><option>협상중</option><option>비활성</option></select>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="w-card anno" data-num="4" style="padding:0;overflow:hidden">
+          <table class="w-table">
+            <thead>
+              <tr><th>거래처명</th><th>유형</th><th>지역</th><th>담당자</th><th>영업 담당</th><th>상태</th><th>포털</th><th>취급 제품</th></tr>
+            </thead>
+            <tbody>
+              <tr class="clickable"><td><strong>서울메디칼</strong></td><td><span class="w-badge badge-blue">대리점</span></td><td>서울/경기</td><td>박지훈</td><td>김영수</td><td><span class="w-badge badge-green">활성</span></td><td><span class="w-badge badge-blue">ON</span></td><td>3개</td></tr>
+              <tr class="clickable"><td><strong>Tokyo Medical Co.</strong></td><td><span class="w-badge badge-blue">해외 법인</span></td><td>일본</td><td>Tanaka</td><td>이지현</td><td><span class="w-badge badge-green">활성</span></td><td><span class="w-badge badge-blue">ON</span></td><td>5개</td></tr>
+              <tr class="clickable"><td><strong>부산대학교병원</strong></td><td><span class="w-badge badge-purple">병원</span></td><td>부산</td><td>최원석</td><td>김영수</td><td><span class="w-badge badge-yellow">협상중</span></td><td><span class="w-badge badge-gray">OFF</span></td><td>1개</td></tr>
+              <tr class="clickable"><td><strong>건강마켓 온라인</strong></td><td><span class="w-badge badge-cyan">온라인</span></td><td>전국</td><td>한승민</td><td>박서연</td><td><span class="w-badge badge-green">활성</span></td><td><span class="w-badge badge-gray">OFF</span></td><td>2개</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Modal preview -->
+        <div style="margin-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">고객 등록/편집 모달 (미리보기)</div>
+          <div class="w-card anno" data-num="5" style="max-width:480px">
+            <div style="font-size:.9rem;font-weight:600;color:#1e293b;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0">고객 등록</div>
+            <div style="display:grid;gap:8px;font-size:.72rem">
+              <div><span style="color:#64748b;font-size:.65rem;font-weight:500">거래처명 *</span><div class="w-input" style="width:100%;margin-top:2px;display:flex;align-items:center;color:#94a3b8">입력</div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div><span style="color:#64748b;font-size:.65rem;font-weight:500">유형 *</span><select class="w-select" style="width:100%;margin-top:2px"><option>대리점</option></select></div>
+                <div><span style="color:#64748b;font-size:.65rem;font-weight:500">지역 *</span><div class="w-input" style="width:100%;margin-top:2px;display:flex;align-items:center;color:#94a3b8">예: 서울/경기</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div><span style="color:#64748b;font-size:.65rem;font-weight:500">담당자명 *</span><div class="w-input" style="width:100%;margin-top:2px"></div></div>
+                <div><span style="color:#64748b;font-size:.65rem;font-weight:500">포털 활성화</span><select class="w-select" style="width:100%;margin-top:2px"><option>OFF</option><option>ON</option></select></div>
+              </div>
+              <div><span style="color:#64748b;font-size:.65rem;font-weight:500">포털 로그인 이메일</span><div class="w-input" style="width:100%;margin-top:2px;display:flex;align-items:center;color:#94a3b8">포털 접속용 이메일</div></div>
+            </div>
+            <div class="flex gap-2 mt-3" style="justify-content:flex-end">
+              <span class="w-btn w-btn-ghost">취소</span>
+              <span class="w-btn w-btn-primary">저장</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 헤더: 페이지 제목 + 설명 + "고객 등록" 버튼</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 통계 카드 4개: 전체 고객, 활성 거래처, 협상 중, 포털 활성</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 필터: 통합 검색 + 유형 드롭다운(대리점/해외법인/병원/온라인) + 상태 드롭다운(활성/협상중/비활성)</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 고객 테이블: 거래처명, 유형 배지, 지역, 담당자, 영업 담당, 상태 배지, 포털 ON/OFF, 취급 제품 수. 행 클릭 시 편집 모달</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 등록/편집 모달: 거래처명*, 유형*, 지역*, 담당자명*, 이메일, 전화, 영업담당, 계약상태, 포털ON/OFF, 포털 이메일, 비고</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 8: CUSTOMER PORTAL (customer-portal.html)                   -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-8">
+  <div class="screen-header">
+    <span class="screen-number">8</span>
+    <span class="screen-title">고객 포털</span>
+    <span class="screen-file">customer-portal.html</span>
+    <span class="access-badge access-role">고객 이메일 인증</span>
+  </div>
+  <p class="screen-desc">거래처/법인이 자사 관련 프로젝트 진행 상황을 확인하는 읽기 전용 뷰. 이메일 인증으로 접근합니다.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/customer-portal.html</div>
+    </div>
+    <div class="browser-content" style="background:#f8f9fa;min-height:500px">
+      <div style="max-width:520px;margin:0 auto;padding:48px 20px">
+        <!-- Auth Screen -->
+        <div class="anno" data-num="1">
+          <div style="text-align:center;margin-bottom:24px">
+            <div class="login-logo-box" style="display:inline-flex;margin-bottom:8px">PC</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#1e293b">고객 포털</div>
+            <div style="font-size:.75rem;color:#94a3b8">프로젝트 진행 현황을 확인하세요</div>
+          </div>
+          <div class="w-card">
+            <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:8px">이메일 인증</div>
+            <div class="flex gap-2">
+              <input class="w-input" placeholder="등록된 이메일 주소 입력" style="flex:1">
+              <span class="w-btn w-btn-primary">인증</span>
+            </div>
+            <div style="font-size:.65rem;color:#94a3b8;margin-top:6px">거래처 등록 시 설정된 포털 로그인 이메일을 입력하세요</div>
+          </div>
+        </div>
+
+        <!-- After auth -->
+        <div style="margin-top:24px;border-top:2px dashed #dee2e6;padding-top:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:8px">인증 후 화면</div>
+
+          <!-- Portal header -->
+          <div class="w-card anno" data-num="2">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <div style="font-size:.9rem;font-weight:700;color:#1e293b">서울메디칼</div>
+                <div style="font-size:.7rem;color:#94a3b8">대리점 &middot; 서울/경기</div>
+              </div>
+              <span class="w-btn w-btn-ghost" style="font-size:.6rem">로그아웃</span>
+            </div>
+          </div>
+
+          <!-- Project progress -->
+          <div class="w-card anno" data-num="3">
+            <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:8px">프로젝트 진행 현황</div>
+            <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px">
+              <div class="flex items-center justify-between mb-2">
+                <span style="font-size:.78rem;font-weight:600;color:#1e293b">차세대 혈압계 개발</span>
+                <span style="font-size:.75rem;font-weight:700;color:#4A90D9">65%</span>
+              </div>
+              <div class="w-progress mb-2"><div class="w-progress-fill fill-blue" style="width:65%"></div></div>
+              <div class="flex items-center gap-2" style="font-size:.65rem;color:#94a3b8">
+                <span>현재: WM 단계</span><span>&middot;</span><span>마감: 2026.06.30</span>
+              </div>
+            </div>
+            <div style="font-size:.68rem;color:#94a3b8;font-style:italic">읽기 전용 뷰 &mdash; 수정 불가</div>
+          </div>
+
+          <!-- Portal notifications -->
+          <div class="w-card anno" data-num="4">
+            <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:8px">포털 알림</div>
+            <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:.72rem">
+              <span class="w-badge badge-green" style="font-size:.55rem">승인</span>
+              <span style="color:#334155;margin-left:4px">WM 승인회 완료 - 차세대 혈압계 개발</span>
+              <div style="font-size:.62rem;color:#94a3b8;margin-top:2px">2일 전</div>
+            </div>
+            <div style="padding:6px 0;font-size:.72rem">
+              <span class="w-badge badge-blue" style="font-size:.55rem">진행</span>
+              <span style="color:#334155;margin-left:4px">Tx 단계 시작 예정</span>
+              <div style="font-size:.62rem;color:#94a3b8;margin-top:2px">5일 전</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 이메일 인증: 이메일 입력 + "인증" 버튼. portalLoginEmail 일치 + portalEnabled 체크 후 sessionStorage 저장</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 인증 후 헤더: 거래처명 + 유형 + 지역 + 로그아웃 버튼</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 프로젝트 진행 현황: 해당 거래처와 연결된 프로젝트의 이름, 진행률 바, 현재 단계, 마감일 (읽기 전용)</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 포털 알림: gate 승인, 변경요청 승인/반려 등 자동 생성된 알림 목록 (portalNotifications 컬렉션)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 9: SALES DASHBOARD (sales.html)                             -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-9">
+  <div class="screen-header">
+    <span class="screen-number">9</span>
+    <span class="screen-title">영업 대시보드</span>
+    <span class="screen-file">sales.html</span>
+    <span class="access-badge access-auth">로그인 필요</span>
+  </div>
+  <p class="screen-desc">출시 준비 대시보드. 6가지 뷰(제품별/카테고리/D-Day/거래처/테이블/준비현황) + 오늘의 브리핑 + 담당자별 워크로드.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/sales.html</div>
+    </div>
+    <div class="browser-content">
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link">프로젝트</span><span class="w-nav-link">고객</span><span class="w-nav-link active">영업 준비</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">매뉴얼</span></div><div class="w-nav-right"><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
+
+      <div class="w-body">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span style="font-size:1.1rem;font-weight:700;color:#1e293b">출시 준비 대시보드</span>
+            <div style="font-size:.72rem;color:#94a3b8;margin-top:2px">영업팀 기준 출시 체크리스트 현황</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label style="font-size:.65rem;color:#64748b"><input type="checkbox"> 전체 카테고리 보기</label>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="w-stats w-stats-4 mb-3 anno" data-num="1">
+          <div class="w-stat"><div class="w-stat-value">42</div><div class="w-stat-label">전체 항목</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#22c55e">28</div><div class="w-stat-label">완료</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#f59e0b">8</div><div class="w-stat-label">진행중</div></div>
+          <div class="w-stat"><div class="w-stat-value" style="color:#ef4444">6</div><div class="w-stat-label">대기</div></div>
+        </div>
+
+        <!-- View switch -->
+        <div class="w-filter-bar anno" data-num="2">
+          <div class="w-view-switch">
+            <span class="w-view-btn active">제품별</span>
+            <span class="w-view-btn">카테고리</span>
+            <span class="w-view-btn">D-Day</span>
+            <span class="w-view-btn">거래처</span>
+            <span class="w-view-btn">테이블</span>
+            <span class="w-view-btn">준비현황</span>
+          </div>
+          <select class="w-select"><option>전체 프로젝트</option></select>
+          <select class="w-select"><option>전체 카테고리</option></select>
+          <input class="w-input" placeholder="검색..." style="width:140px">
+        </div>
+
+        <!-- Product Card View -->
+        <div class="w-grid-3 anno" data-num="3">
+          <div class="w-proj-card">
+            <div class="flex items-center justify-between mb-2">
+              <span style="font-size:.82rem;font-weight:600;color:#1e293b">차세대 혈압계 개발</span>
+              <span class="w-badge badge-red">D-14</span>
+            </div>
+            <div class="w-progress mb-2"><div class="w-progress-fill fill-blue" style="width:67%"></div></div>
+            <div class="flex items-center justify-between" style="font-size:.65rem;color:#94a3b8">
+              <span>8/12 완료</span>
+              <span style="color:#4A90D9;font-weight:600">67%</span>
+            </div>
+            <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:6px">
+              <div style="font-size:.62rem;color:#64748b;margin-bottom:4px">카테고리별:</div>
+              <div class="flex items-center gap-1 flex-wrap">
+                <span class="w-badge badge-green" style="font-size:.5rem">가격 &#10004;</span>
+                <span class="w-badge badge-yellow" style="font-size:.5rem">교육 2/3</span>
+                <span class="w-badge badge-gray" style="font-size:.5rem">거래처 1/4</span>
+              </div>
+            </div>
+          </div>
+          <div class="w-proj-card">
+            <div class="flex items-center justify-between mb-2">
+              <span style="font-size:.82rem;font-weight:600;color:#1e293b">스마트 체온계 v2</span>
+              <span class="w-badge badge-yellow">D-30</span>
+            </div>
+            <div class="w-progress mb-2"><div class="w-progress-fill fill-green" style="width:90%"></div></div>
+            <div class="flex items-center justify-between" style="font-size:.65rem;color:#94a3b8">
+              <span>9/10 완료</span>
+              <span style="color:#22c55e;font-weight:600">90%</span>
+            </div>
+          </div>
+          <div class="w-proj-card">
+            <div class="flex items-center justify-between mb-2">
+              <span style="font-size:.82rem;font-weight:600;color:#1e293b">무선 산소포화도</span>
+              <span class="w-badge badge-red">D-7</span>
+            </div>
+            <div class="w-progress mb-2"><div class="w-progress-fill fill-yellow" style="width:40%"></div></div>
+            <div class="flex items-center justify-between" style="font-size:.65rem;color:#94a3b8">
+              <span>4/10 완료</span>
+              <span style="color:#f59e0b;font-weight:600">40%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Briefing card -->
+        <div class="w-card mt-3 anno" data-num="4">
+          <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:6px">오늘의 브리핑</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:.7rem">
+            <div style="background:#fef2f2;border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:#ef4444">3</div><div style="font-size:.6rem;color:#991b1b">지연 항목</div></div>
+            <div style="background:#ecfdf5;border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:#22c55e">5</div><div style="font-size:.6rem;color:#065f46">오늘 완료</div></div>
+            <div style="background:#fefce8;border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:#f59e0b">2</div><div style="font-size:.6rem;color:#92400e">이번 주 마감</div></div>
+          </div>
+        </div>
+
+        <!-- Customer readiness (mini table) -->
+        <div class="w-card mt-3 anno" data-num="5">
+          <div style="font-size:.82rem;font-weight:600;color:#334155;margin-bottom:6px">거래처별 준비 상황</div>
+          <table class="w-table" style="font-size:.65rem">
+            <thead><tr><th>거래처</th><th>프로젝트</th><th>D-Day</th><th>진행률</th><th>확인</th></tr></thead>
+            <tbody>
+              <tr><td>서울메디칼</td><td>혈압계</td><td><span class="w-badge badge-red">D-14</span></td><td><div class="w-progress" style="width:60px"><div class="w-progress-fill fill-blue" style="width:50%"></div></div></td><td><span class="w-badge badge-green" style="font-size:.5rem">&#10004; 박지훈</span></td></tr>
+              <tr><td>Tokyo Medical</td><td>체온계</td><td><span class="w-badge badge-yellow">D-30</span></td><td><div class="w-progress" style="width:60px"><div class="w-progress-fill fill-green" style="width:80%"></div></div></td><td><span class="w-btn w-btn-ghost" style="font-size:.5rem;padding:1px 5px">확인</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 통계 카드 4개: 전체/완료/진행중/대기 항목 수. "전체 카테고리 보기" 토글로 영업 핵심 vs 전체 전환</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 6가지 뷰 전환: 제품별(기본)/카테고리 매트릭스/D-Day 타임라인/거래처 현황/테이블/준비현황 + 프로젝트/카테고리/상태/담당자 필터</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 제품별 카드 뷰: 프로젝트별 카드에 D-Day 배지, 진행률 바, 완료 카운트, 카테고리별 미니 진행 표시</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 오늘의 브리핑: 지연 항목/오늘 완료/이번 주 마감 카운트를 색상 카드로 요약</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 거래처별 준비 상황 테이블: 거래처명, 프로젝트, D-Day, 진행률 바, 거래처 확인 상태(확인자+날짜 또는 "확인" 버튼)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SCREEN 10: MANUAL (manual.html)                                    -->
+<!-- ================================================================== -->
+<section class="screen-section" id="screen-10">
+  <div class="screen-header">
+    <span class="screen-number">10</span>
+    <span class="screen-title">매뉴얼</span>
+    <span class="screen-file">manual.html</span>
+    <span class="access-badge access-all">인증 불필요</span>
+  </div>
+  <p class="screen-desc">좌측 사이드바 TOC + 우측 콘텐츠. ScrollSpy, 실시간 검색, 모바일 플로팅 TOC. 10개 섹션 + 용어집.</p>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <span class="browser-dot dot-red"></span><span class="browser-dot dot-yellow"></span><span class="browser-dot dot-green"></span>
+      <div class="browser-url">processcheck.example.com/manual.html</div>
+    </div>
+    <div class="browser-content">
+      <!-- Nav (logged in or minimal) -->
+      <div class="w-nav">
+        <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
+        <div class="w-nav-links"><span class="w-nav-link">대시보드</span><span class="w-nav-link">프로젝트</span><span class="w-nav-link">고객</span><span class="w-nav-link">영업 준비</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link active">매뉴얼</span></div>
+        <div class="w-nav-right"><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
+      </div>
+
+      <div style="display:flex;min-height:460px">
+        <!-- Sidebar TOC -->
+        <div class="w-sidebar anno" data-num="1" style="width:250px;background:#fff;border-right:1px solid #dee2e6;padding:14px;overflow-y:auto">
+          <div style="margin-bottom:10px" class="anno" data-num="2">
+            <input class="w-input" placeholder="섹션 검색..." style="width:100%">
+          </div>
+          <div class="w-sidebar-item active">1. 시작하기</div>
+          <div class="w-sidebar-child">1.1 로그인</div>
+          <div class="w-sidebar-child">1.2 역할 소개</div>
+          <div class="w-sidebar-child">1.3 대시보드 둘러보기</div>
+          <div class="w-sidebar-item">2. 프로젝트 관리</div>
+          <div class="w-sidebar-child">2.1 프로젝트 목록</div>
+          <div class="w-sidebar-child">2.2 프로젝트 상세</div>
+          <div class="w-sidebar-child">2.3 프로젝트 단계 (6 Phase)</div>
+          <div class="w-sidebar-child">2.4 체크리스트 매트릭스</div>
+          <div class="w-sidebar-item">3. 작업 관리</div>
+          <div class="w-sidebar-item">4. 승인 워크플로우</div>
+          <div class="w-sidebar-item">5. 설계 변경 관리</div>
+          <div class="w-sidebar-item">6. 출시 준비 관리</div>
+          <div class="w-sidebar-item">7. 고객 관리</div>
+          <div class="w-sidebar-item">8. 체크리스트 관리</div>
+          <div class="w-sidebar-item">9. 역할별 가이드</div>
+          <div class="w-sidebar-item">10. FAQ</div>
+          <div class="w-sidebar-item">용어집</div>
+        </div>
+
+        <!-- Content -->
+        <div style="flex:1;padding:20px;overflow-y:auto;background:#f8f9fa" class="anno" data-num="3">
+          <div style="max-width:700px">
+            <h2 style="font-size:1.2rem;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #4A90D9">1. 시작하기</h2>
+
+            <h3 style="font-size:.95rem;font-weight:600;color:#334155;margin-bottom:8px">1.1 로그인</h3>
+            <p style="font-size:.78rem;color:#475569;line-height:1.7;margin-bottom:12px">
+              ProcessCheck에 접속하면 로그인 페이지가 표시됩니다. 3가지 데모 사용자 카드 중 하나를 클릭하거나, Microsoft 계정으로 로그인할 수 있습니다.
+            </p>
+
+            <!-- Screenshot placeholder -->
+            <div class="anno" data-num="4" style="background:#e2e8f0;border:1px solid #cbd5e1;border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;color:#64748b;font-size:.75rem">
+              <div style="font-size:2rem;margin-bottom:4px">&#128247;</div>
+              스크린샷: 로그인 화면<br>
+              <span style="font-size:.62rem;color:#94a3b8">img/login.png (14개 스크린샷 중 1)</span>
+            </div>
+
+            <h3 style="font-size:.95rem;font-weight:600;color:#334155;margin-bottom:8px">1.2 역할 소개</h3>
+            <p style="font-size:.78rem;color:#475569;line-height:1.7;margin-bottom:8px">
+              ProcessCheck에는 3가지 역할이 있습니다:
+            </p>
+            <ul style="font-size:.75rem;color:#475569;padding-left:18px;margin-bottom:12px;line-height:1.8">
+              <li><strong>실무자 (Worker)</strong> &mdash; 체크리스트 작업 수행, 완료 보고</li>
+              <li><strong>매니저 (Manager)</strong> &mdash; 부서별 작업 검토, 승인/반려</li>
+              <li><strong>기획조정실 (Observer)</strong> &mdash; 전체 현황 모니터링, 게이트 승인</li>
+            </ul>
+
+            <h3 style="font-size:.95rem;font-weight:600;color:#334155;margin-bottom:8px">1.3 대시보드 둘러보기</h3>
+            <p style="font-size:.78rem;color:#475569;line-height:1.7;margin-bottom:12px">
+              로그인 후 첫 화면은 대시보드입니다. 통계 카드, 작업 목록, 알림을 한눈에 확인할 수 있습니다.
+            </p>
+
+            <div style="background:#e2e8f0;border:1px solid #cbd5e1;border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;color:#64748b;font-size:.75rem">
+              <div style="font-size:2rem;margin-bottom:4px">&#128247;</div>
+              스크린샷: 대시보드 화면
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile TOC button indicator -->
+      <div style="position:absolute;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;background:#4A90D9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2)" class="anno" data-num="5" title="모바일 플로팅 TOC 버튼">
+        &#9776;
+      </div>
+    </div>
+  </div>
+
+  <div class="annotations">
+    <h4>어노테이션</h4>
+    <div class="annotation-list">
+      <div class="annotation-item"><span class="annotation-num">1</span> 좌측 사이드바 TOC: 10개 섹션(시작하기~FAQ) + 용어집. IntersectionObserver로 현재 섹션 자동 하이라이트 (ScrollSpy)</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> 사이드바 상단 검색: 실시간 필터링으로 섹션 제목 기준 검색</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> 우측 콘텐츠 영역: 섹션 제목 + 본문 + 스크린샷(img/ 폴더 14개 PNG). Notion Help/GitBook 스타일 레이아웃</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> 스크린샷 Placeholder: Puppeteer로 캡처한 14개 실제 스크린샷이 삽입되는 위치</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> 모바일 플로팅 TOC 버튼: 768px 이하에서 사이드바 대신 표시, 클릭 시 모달 TOC 오픈</div>
+    </div>
+  </div>
+</section>
+
+</div><!-- end .main -->
+
+<!-- Smooth scroll + ScrollSpy with counter -->
+<script>
+(function(){
+  var navLinks=document.querySelectorAll('.top-nav a[href^="#"]');
+  var sections=document.querySelectorAll('.screen-section');
+  var counter=document.getElementById('navCounter');
+  var total=sections.length;
+
+  // Smooth scroll
+  navLinks.forEach(function(a){
+    a.addEventListener('click',function(e){
+      e.preventDefault();
+      var target=document.querySelector(this.getAttribute('href'));
+      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+
+  // ScrollSpy with IntersectionObserver
+  var currentIdx=0;
+  function updateNav(idx){
+    if(idx===currentIdx&&navLinks[idx]&&navLinks[idx].classList.contains('nav-active'))return;
+    currentIdx=idx;
+    navLinks.forEach(function(l){l.classList.remove('nav-active')});
+    if(navLinks[idx]){
+      navLinks[idx].classList.add('nav-active');
+      navLinks[idx].scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+    if(counter)counter.textContent=(idx+1)+'/'+total;
+  }
+
+  var observer=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        var id=entry.target.id;
+        var num=parseInt(id.replace('screen-',''),10)-1;
+        if(!isNaN(num))updateNav(num);
+      }
+    });
+  },{rootMargin:'-80px 0px -60% 0px',threshold:0});
+
+  sections.forEach(function(sec){observer.observe(sec)});
+  updateNav(0);
+})();
+</script>
+<script src="js/review-bootstrap.js"></script>
+<script src="js/deliverable-nav.js"></script>
+
+</body>
+</html>
