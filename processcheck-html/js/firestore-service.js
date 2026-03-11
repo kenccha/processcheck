@@ -66,6 +66,7 @@ function docToUser(id, data) {
   return { ...data, id };
 }
 
+// ─── Demo Data Filtering ────────────────────────────────────────────────────
 // ─── Mock Data (inline for seeding) ─────────────────────────────────────────
 
 function getMockData() {
@@ -139,13 +140,15 @@ function getMockData() {
 export async function seedDatabaseIfEmpty() {
   try {
     const usersSnap = await getDocs(collection(db, "users"));
-    if (!usersSnap.empty) return false;
+    if (!usersSnap.empty) {
+      return false;
+    }
 
     const { mockUsers, mockProjects, mockChangeRequests, mockNotifications, mockCustomers } = getMockData();
     const batch = writeBatch(db);
 
     for (const user of mockUsers) {
-      batch.set(doc(db, "users", user.id), user);
+      batch.set(doc(db, "users", user.id), { ...user });
     }
 
     for (const project of mockProjects) {
@@ -476,11 +479,65 @@ export async function seedDatabaseIfEmpty() {
     await batch.commit();
     console.log("✅ 기본 데이터 시드 완료, 템플릿 기반 체크리스트 생성 시작...");
 
-    // 템플릿 기반 체크리스트 생성 (프로젝트별)
+    // ── 최적화: 로컬 데이터로 체크리스트 일괄 생성 (Firestore 재읽기 없음) ──
+    const MINOR_PHASES = ["phase0", "phase3", "phase5"];
+    const stageMap = {};
+    for (const s of stages) stageMap[s.id] = s;
+    const deptMap = {};
+    for (const d of depts) deptMap[d.id] = d;
+    const today = new Date();
+
+    // 모든 프로젝트의 체크리스트를 한꺼번에 생성
+    const allChecklistItems = [];
     for (const proj of mockProjects) {
-      const count = await applyTemplateToProject(proj.id, proj.projectType, proj.changeScale);
-      console.log(`  → ${proj.name}: ${count}개 체크리스트`);
+      let filtered;
+      if (proj.projectType === "설계변경") {
+        if (proj.changeScale === "minor") {
+          filtered = tItems.filter(ti => ti.isRequired && MINOR_PHASES.includes(ti.stageId));
+        } else if (proj.changeScale === "medium") {
+          filtered = tItems.filter(ti => ti.isRequired);
+        } else {
+          filtered = tItems;
+        }
+      } else {
+        filtered = tItems;
+      }
+
+      for (const ti of filtered) {
+        const stage = stageMap[ti.stageId];
+        const dept = deptMap[ti.departmentId];
+        if (!stage || !dept) continue;
+        allChecklistItems.push({
+          projectId: proj.id,
+          stage: stage.workStageName,
+          department: dept.name,
+          title: ti.content,
+          description: "",
+          assignee: "",
+          reviewer: "",
+          status: "pending",
+          dueDate: Timestamp.fromDate(new Date(today.getTime() + 30 * 86400000)),
+          completedDate: null,
+          files: [],
+          comments: [],
+          dependencies: [],
+          isRequired: ti.isRequired,
+          templateItemId: ti.id,
+        });
+      }
+      console.log(`  → ${proj.name}: ${filtered.length}개`);
     }
+
+    // 450개씩 배치 쓰기
+    const BATCH_LIMIT = 450;
+    for (let i = 0; i < allChecklistItems.length; i += BATCH_LIMIT) {
+      const b = writeBatch(db);
+      allChecklistItems.slice(i, i + BATCH_LIMIT).forEach(item => {
+        b.set(doc(collection(db, "checklistItems")), item);
+      });
+      await b.commit();
+    }
+    console.log(`✅ 체크리스트 ${allChecklistItems.length}개 일괄 생성 완료`);
 
     // 프로젝트 상태에 맞게 일부 체크리스트 상태 업데이트
     await _seedUpdateChecklistStatuses(mockProjects);
@@ -491,12 +548,11 @@ export async function seedDatabaseIfEmpty() {
     for (const proj of mockProjects) {
       if (proj.projectType === "신규개발" && proj.status === "active") {
         const lCount = await applyLaunchChecklistToProject(
-          proj.id, proj.projectType, null, proj.endDate, customerObjs.slice(0, 3) // 상위 3개 고객
+          proj.id, proj.projectType, null, proj.endDate, customerObjs.slice(0, 3)
         );
         console.log(`  → ${proj.name}: ${lCount}개 출시 준비 체크리스트`);
       }
     }
-    // 설계변경 major에도 K카테고리 출시 체크리스트
     for (const proj of mockProjects) {
       if (proj.projectType === "설계변경" && proj.changeScale === "major" && proj.status === "active") {
         const lCount = await applyLaunchChecklistToProject(
@@ -506,22 +562,22 @@ export async function seedDatabaseIfEmpty() {
       }
     }
 
-    // 출시 준비 체크리스트 상태 시드: proj2(Tx단계, 65%)의 일부 항목을 완료+확인 처리
+    // 출시 준비 체크리스트 상태 시드
     await _seedLaunchChecklistStatuses();
 
-    // 포털 알림 시드
+    // 포털 알림 시드 (배치로 일괄 처리)
+    const pnBatch = writeBatch(db);
     const portalNotifs = [
       { customerId: "cust1", projectId: "proj1", type: "phase_completed", title: "기획 단계 완료", message: "신규 체성분 분석기의 기획 단계가 완료되었습니다." },
       { customerId: "cust1", projectId: "proj2", type: "phase_completed", title: "WM 단계 완료", message: "가정용 혈압계 업그레이드의 WM 단계가 완료되었습니다." },
       { customerId: "cust3", projectId: "proj1", type: "request_resolved", title: "변경 요청 승인", message: "요청하신 '배터리 용량 증대' 건이 승인되었습니다." },
     ];
     for (const pn of portalNotifs) {
-      await addDoc(collection(db, "portalNotifications"), {
-        ...pn,
-        read: false,
-        createdAt: Timestamp.now(),
+      pnBatch.set(doc(collection(db, "portalNotifications")), {
+        ...pn, read: false, createdAt: Timestamp.now(),
       });
     }
+    await pnBatch.commit();
 
     console.log("✅ Firestore 초기 데이터 시드 완료");
     return true;
@@ -539,62 +595,75 @@ export async function seedDatabaseIfEmpty() {
 async function _seedUpdateChecklistStatuses(projects) {
   const stageOrder = ["발의검토", "발의승인", "기획검토", "기획승인", "WM제작", "WM승인회", "Tx단계", "Tx승인회", "MasterGatePilot", "MSG승인회", "양산", "영업이관"];
 
+  // 전체 checklistItems를 한 번만 읽기 (프로젝트별 쿼리 10회 → 1회)
+  const allSnap = await getDocs(collection(db, "checklistItems"));
+  if (allSnap.empty) return;
+
+  // projectId별로 그룹화
+  const byProject = {};
+  for (const d of allSnap.docs) {
+    const pid = d.data().projectId;
+    if (!byProject[pid]) byProject[pid] = [];
+    byProject[pid].push(d);
+  }
+
+  // 프로젝트별 lookup
+  const projMap = {};
+  for (const p of projects) projMap[p.id] = p;
+
+  // 모든 업데이트를 한 번에 수집 후 배치 쓰기
+  const updates = []; // [{ref, data}]
   for (const proj of projects) {
-    const q = query(collection(db, "checklistItems"), where("projectId", "==", proj.id));
-    const snap = await getDocs(q);
-    if (snap.empty) continue;
+    const docs = byProject[proj.id];
+    if (!docs || docs.length === 0) continue;
 
     const currentIdx = stageOrder.indexOf(proj.currentStage);
     if (currentIdx < 0) continue;
 
-    // 완료된 프로젝트: 전부 completed
     if (proj.status === "completed") {
-      for (let i = 0; i < snap.docs.length; i += 450) {
-        const b = writeBatch(db);
-        snap.docs.slice(i, i + 450).forEach(d => {
-          b.update(d.ref, {
-            status: "completed",
-            completedDate: Timestamp.fromDate(new Date(proj.endDate.getTime() - Math.random() * 30 * 86400000)),
-            approvalStatus: "approved",
-          });
-        });
-        await b.commit();
+      for (const d of docs) {
+        updates.push({ ref: d.ref, data: {
+          status: "completed",
+          completedDate: Timestamp.fromDate(new Date(proj.endDate.getTime() - Math.random() * 30 * 86400000)),
+          approvalStatus: "approved",
+        }});
       }
       continue;
     }
 
-    // 진행 중: currentStage 이전 phase는 completed, 현재는 혼합
     const completedStages = new Set(stageOrder.slice(0, currentIdx));
     const currentStage = proj.currentStage;
 
-    for (let i = 0; i < snap.docs.length; i += 450) {
-      const b = writeBatch(db);
-      snap.docs.slice(i, i + 450).forEach(d => {
-        const data = d.data();
-        if (completedStages.has(data.stage)) {
-          b.update(d.ref, {
+    for (const d of docs) {
+      const data = d.data();
+      if (completedStages.has(data.stage)) {
+        updates.push({ ref: d.ref, data: {
+          status: "completed",
+          completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 60 * 86400000)),
+          approvalStatus: "approved",
+        }});
+      } else if (data.stage === currentStage) {
+        const rand = Math.random();
+        if (rand < 0.3) {
+          updates.push({ ref: d.ref, data: {
             status: "completed",
-            completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 60 * 86400000)),
-            approvalStatus: "approved",
-          });
-        } else if (data.stage === currentStage) {
-          // 현재 stage: 30% completed, 20% in_progress, 50% pending
-          const rand = Math.random();
-          if (rand < 0.3) {
-            b.update(d.ref, {
-              status: "completed",
-              completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 7 * 86400000)),
-              approvalStatus: "pending",
-            });
-          } else if (rand < 0.5) {
-            b.update(d.ref, { status: "in_progress" });
-          }
-          // else: stay pending
+            completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 7 * 86400000)),
+            approvalStatus: "pending",
+          }});
+        } else if (rand < 0.5) {
+          updates.push({ ref: d.ref, data: { status: "in_progress" } });
         }
-      });
-      await b.commit();
+      }
     }
   }
+
+  // 배치 쓰기
+  for (let i = 0; i < updates.length; i += 450) {
+    const b = writeBatch(db);
+    updates.slice(i, i + 450).forEach(u => b.update(u.ref, u.data));
+    await b.commit();
+  }
+  console.log(`✅ 체크리스트 상태 업데이트 ${updates.length}건 완료`);
 }
 
 /**
@@ -1134,6 +1203,34 @@ export async function markAllNotificationsRead(userId) {
   const batch = writeBatch(db);
   snap.docs.forEach(d => batch.update(d.ref, { read: true }));
   await batch.commit();
+}
+
+// ─── Fallback getDocs loaders (for when onSnapshot fails) ─────────────────
+
+export async function fallbackLoadProjects() {
+  const snap = await getDocs(collection(db, "projects"));
+  const projects = snap.docs.map(d => docToProject(d.id, d.data()));
+  projects.sort((a, b) => a.id.localeCompare(b.id));
+  return projects;
+}
+
+export async function fallbackLoadAllChecklistItems() {
+  const snap = await getDocs(collection(db, "checklistItems"));
+  return snap.docs.map(d => docToChecklistItem(d.id, d.data()));
+}
+
+export async function fallbackLoadChecklistItemsByAssignee(assigneeName) {
+  const q = query(collection(db, "checklistItems"), where("assignee", "==", assigneeName));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => docToChecklistItem(d.id, d.data()));
+}
+
+export async function fallbackLoadNotifications(userId) {
+  const q = query(collection(db, "notifications"), where("userId", "==", userId));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map(d => docToNotification(d.id, d.data()))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function createNotification(data) {

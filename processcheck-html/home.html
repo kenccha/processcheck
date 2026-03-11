@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>홈 - ProcessCheck</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js"
+    }
+  }
+  </script>
+  <style>
+    .hub-wrap { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 64px); padding: 24px; }
+    .hub-container { max-width: 800px; width: 100%; text-align: center; }
+    .hub-header { margin-bottom: 40px; }
+    .hub-header h1 { font-size: 1.75rem; font-weight: 700; color: var(--slate-800); margin-bottom: 8px; }
+    .hub-header p { color: var(--slate-500); font-size: 0.95rem; }
+    .hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .hub-card {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 48px 32px; border-radius: 16px; text-decoration: none;
+      border: 2px solid var(--surface-2); background: var(--surface-1);
+      transition: all 0.2s ease; cursor: pointer; position: relative; overflow: hidden;
+    }
+    .hub-card:hover { border-color: var(--primary-400); box-shadow: 0 8px 32px rgba(6,182,212,0.12); transform: translateY(-2px); }
+    .hub-card-icon {
+      width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 32px;
+    }
+    .hub-card-icon--primary { background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(6,182,212,0.05)); color: var(--primary-500); }
+    .hub-card-icon--sales { background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05)); color: #f59e0b; }
+    .hub-card h2 { font-size: 1.25rem; font-weight: 700; color: var(--slate-800); margin-bottom: 8px; }
+    .hub-card p { color: var(--slate-500); font-size: 0.875rem; line-height: 1.5; }
+    .hub-card-arrow {
+      position: absolute; top: 16px; right: 20px; color: var(--slate-400); font-size: 1.25rem;
+      transition: transform 0.2s; opacity: 0.5;
+    }
+    .hub-card:hover .hub-card-arrow { transform: translateX(4px); opacity: 1; color: var(--primary-500); }
+
+    @media (max-width: 640px) {
+      .hub-grid { grid-template-columns: 1fr; }
+      .hub-card { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper bg-grid" style="background-color: var(--surface-0)">
+    <div id="nav-root"></div>
+    <main class="hub-wrap">
+      <div class="hub-container">
+        <div class="hub-header">
+          <h1>서비스를 선택하세요</h1>
+          <p>사용할 서비스를 선택해 이동합니다</p>
+        </div>
+        <div class="hub-grid">
+          <a href="dashboard.html" class="hub-card" id="card-pc">
+            <span class="hub-card-arrow">→</span>
+            <div class="hub-card-icon hub-card-icon--primary">
+              <svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+            </div>
+            <h2>ProcessCheck</h2>
+            <p>출시위원회 · 설계변경<br>프로세스 관리</p>
+          </a>
+          <a href="sales.html" class="hub-card" id="card-sales">
+            <span class="hub-card-arrow">→</span>
+            <div class="hub-card-icon hub-card-icon--sales">
+              <svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+              </svg>
+            </div>
+            <h2>영업 출시 준비</h2>
+            <p>제품 출시 체크리스트<br>D-Day 관리</p>
+          </a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/pages/home.js"></script>
+</body>
+</html>

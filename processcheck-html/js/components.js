@@ -5,19 +5,20 @@
 import { getUser, logout } from "./auth.js";
 import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
 import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
+import { ReviewPanel } from "./review-system.js";
 
 // ─── Theme Management ────────────────────────────────────────────────────────
 
-function getTheme() {
+export function getTheme() {
   return localStorage.getItem("pc-theme") || "light";
 }
 
-function setTheme(theme) {
+export function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   localStorage.setItem("pc-theme", theme);
 }
 
-function toggleTheme() {
+export function toggleTheme() {
   const current = getTheme();
   const next = current === "dark" ? "light" : "dark";
   setTheme(next);
@@ -26,7 +27,7 @@ function toggleTheme() {
   if (btn) btn.innerHTML = getThemeIcon();
 }
 
-function getThemeIcon() {
+export function getThemeIcon() {
   const isDark = getTheme() === "dark";
   if (isDark) {
     // Sun icon — click to switch to light
@@ -52,24 +53,14 @@ export function initTheme() {
 
 const BASE_NAV_LINKS = [
   {
-    href: "dashboard.html",
-    label: "대시보드",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1v-5zM4 14a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1v-5z"/></svg>`,
+    href: "projects.html?type=신규개발",
+    label: "출시위원회",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`,
   },
   {
-    href: "projects.html",
-    label: "프로젝트",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`,
-  },
-  {
-    href: "customers.html",
-    label: "고객",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg>`,
-  },
-  {
-    href: "sales.html",
-    label: "영업 준비",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+    href: "projects.html?type=설계변경",
+    label: "설계변경",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`,
   },
   {
     href: "reports.html",
@@ -87,9 +78,26 @@ const BASE_NAV_LINKS = [
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
   },
   {
-    href: "manual.html",
-    label: "매뉴얼",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>`,
+    href: "docs/deliverables/wireframes.html",
+    label: "리뷰",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>`,
+    children: [
+      { href: "docs/deliverables/wireframes.html", label: "전체 화면 설계" },
+      { href: "docs/deliverables/user-flows.html", label: "업무 흐름" },
+      { href: "docs/deliverables/diagram-viewer.html", label: "시스템 구조" },
+      { href: "docs/deliverables/feedback.html", label: "피드백 모아보기" },
+      { href: "manual.html", label: "매뉴얼" },
+    ],
+  },
+  {
+    href: "#",
+    label: "관련 서비스",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
+    isSeparated: true,
+    children: [
+      { href: "sales.html", label: "영업 출시 준비", external: true },
+      { href: "customers.html", label: "고객 관리", external: true },
+    ],
   },
 ];
 
@@ -112,21 +120,48 @@ export function renderNav(container) {
   const user = getUser();
   if (!user) return;
 
-  const currentPage = window.location.pathname.split("/").pop() || "index.html";
+  const currentPath = window.location.pathname;
+  const currentPage = currentPath.split("/").pop() || "index.html";
   const NAV_LINKS = getNavLinks(user.role);
+
+  const currentSearch = window.location.search;
+
+  function isLinkActive(link) {
+    if (link.children) {
+      return link.children.some(c => currentPath.endsWith(c.href));
+    }
+    // Handle links with query params (e.g., "projects.html?type=신규개발")
+    if (link.href && link.href.includes("?")) {
+      const [linkFile, linkQuery] = link.href.split("?");
+      return currentPage === linkFile && currentSearch.includes(linkQuery);
+    }
+    return currentPage === link.href;
+  }
 
   container.innerHTML = `
     <nav class="nav">
       <div class="nav-inner">
         <div class="flex items-center gap-8">
-          <button class="nav-logo" data-nav="dashboard.html">
+          <button class="nav-logo" data-nav="home.html">
             <div class="nav-logo-icon"><span>PC</span></div>
             <span class="nav-logo-text">Process<span class="accent">Check</span></span>
           </button>
           <div class="nav-links">
             ${NAV_LINKS.map(link => {
-              const isActive = currentPage === link.href;
-              return `<button class="nav-link${isActive ? " active" : ""}" data-nav="${link.href}">
+              const isActive = isLinkActive(link);
+              const sep = link.isSeparated ? '<span class="nav-separator"></span>' : '';
+              if (link.children) {
+                return `${sep}<div class="nav-dropdown">
+                  <button class="nav-link${isActive ? " active" : ""}${link.isSeparated ? " nav-link-secondary" : ""}" data-nav="${link.href}">
+                    ${link.icon}${link.label}
+                    <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:2px;opacity:.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                  <div class="nav-dropdown-menu">
+                    ${link.children.map(child => `<button class="nav-dropdown-item${currentPath.endsWith(child.href) ? " active" : ""}" data-nav="${child.href}"${child.external ? ' data-external="true"' : ''}>${child.label}${child.external ? ' <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:4px;opacity:.4;vertical-align:middle"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : ''}</button>`).join("")}
+                  </div>
+                </div>`;
+              }
+              return `${sep}<button class="nav-link${isActive ? " active" : ""}" data-nav="${link.href}">
                 ${link.icon}${link.label}
               </button>`;
             }).join("")}
@@ -135,6 +170,12 @@ export function renderNav(container) {
         <div class="nav-right">
           <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
             ${getThemeIcon()}
+          </button>
+          <button class="nav-review-btn" id="nav-review-btn" title="리뷰">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+            </svg>
+            <span class="nav-review-dot hidden" id="nav-review-dot"></span>
           </button>
           <button class="nav-bell" id="nav-bell-btn">
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,21 +202,36 @@ export function renderNav(container) {
         </div>
       </div>
       <div class="nav-mobile-menu" id="nav-mobile-menu">
-        ${NAV_LINKS.map(link => {
+        ${NAV_LINKS.flatMap(link => {
+          if (link.children) {
+            return link.children.map(child => {
+              const isActive = currentPage === child.href;
+              return `<button class="nav-mobile-link${isActive ? " active" : ""}" data-nav="${child.href}"${child.external ? ' data-external="true"' : ''}>
+                ${link.icon}${child.label}${child.external ? ' ↗' : ''}
+              </button>`;
+            });
+          }
           const isActive = currentPage === link.href;
-          return `<button class="nav-mobile-link${isActive ? " active" : ""}" data-nav="${link.href}">
+          return [`<button class="nav-mobile-link${isActive ? " active" : ""}" data-nav="${link.href}">
             ${link.icon}${link.label}
-          </button>`;
+          </button>`];
         }).join("")}
       </div>
     </nav>
     <div id="notif-panel-root"></div>
+    <div id="review-panel-root"></div>
   `;
 
   // Bind navigation
   container.querySelectorAll("[data-nav]").forEach(btn => {
     btn.addEventListener("click", () => {
-      window.location.href = btn.dataset.nav;
+      const href = btn.dataset.nav;
+      if (href === "#") return; // dropdown parent, no action
+      if (btn.dataset.external === "true") {
+        window.open(href, "_blank");
+      } else {
+        window.location.href = href;
+      }
     });
   });
 
@@ -260,8 +316,93 @@ export function renderNav(container) {
     }
   });
 
+  // ─── Review Panel ──────────────────────────────────────────────────────────
+  const reviewBtn = container.querySelector("#nav-review-btn");
+  const reviewRoot = container.querySelector("#review-panel-root");
+  const reviewDot = container.querySelector("#nav-review-dot");
+  const reviewPanel = new ReviewPanel(reviewRoot);
+  reviewPanel.init();
+
+  // Show dot when there are open reviews
+  const reviewUnsub = reviewPanel.unsubscribe;
+  // The panel auto-updates via its internal subscription; update the dot badge
+  const origRender = reviewPanel.render.bind(reviewPanel);
+  const origPanelInit = reviewPanel.init.bind(reviewPanel);
+  // Patch: track open count for dot
+  const _origSub = reviewPanel.unsubscribe;
+  reviewPanel.destroy();
+  reviewPanel.unsubscribe = null;
+  // Re-init with dot callback
+  import("./review-system.js").then(({ subscribeReviews }) => {
+    const pageId = (window.location.pathname.split("/").pop() || "index.html").replace(".html", "");
+    reviewPanel.unsubscribe = subscribeReviews(pageId, (reviews) => {
+      reviewPanel.reviews = reviews;
+      const openCount = reviews.filter(r => r.status === "open").length;
+      reviewDot.classList.toggle("hidden", openCount === 0);
+      if (reviewPanel.isOpen) reviewPanel.render();
+    });
+  });
+
+  reviewBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close notif panel if open
+    if (notifPanelOpen) {
+      notifPanelOpen = false;
+      renderNotifPanel();
+    }
+    reviewPanel.toggle();
+  });
+
+  // ─── Global Feedback Widget ─────────────────────────────────────────────────
+  import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
+
   // Return unsubscribe for cleanup
-  return unsub;
+  return () => {
+    unsub();
+    reviewPanel.destroy();
+  };
+}
+
+// ─── Home Nav (minimal — logo + user + logout only) ─────────────────────────
+
+export function renderHomeNav(container) {
+  const user = getUser();
+  if (!user) return;
+
+  container.innerHTML = `
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="flex items-center gap-8">
+          <div class="nav-logo">
+            <div class="nav-logo-icon"><span>PC</span></div>
+            <span class="nav-logo-text">Process<span class="accent">Check</span></span>
+          </div>
+        </div>
+        <div class="nav-right">
+          <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
+            ${getThemeIcon()}
+          </button>
+          <div class="nav-user">
+            <div class="nav-user-info">
+              <div class="nav-user-name">${escapeHtml(user.name)}</div>
+              <div class="nav-user-role">${getRoleName(user.role)}</div>
+            </div>
+            <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  `;
+
+  container.querySelector("#nav-logout-btn").addEventListener("click", logout);
+  container.querySelector("#nav-theme-btn").addEventListener("click", toggleTheme);
+
+  // Global Feedback Widget
+  import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
 }
 
 // ─── Spinner ──────────────────────────────────────────────────────────────────

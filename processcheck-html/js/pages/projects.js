@@ -2,10 +2,10 @@
 // Projects Page -- 7 view modes (cards, table, gantt, kanban, timeline, calendar, matrix)
 // =============================================================================
 
-import { guardPage } from "../auth.js";
+import { guardPage, getUser } from "../auth.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
-import { subscribeProjects, subscribeAllChecklistItems, updateProject } from "../firestore-service.js";
+import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject } from "../firestore-service.js";
 import {
   departments,
   projectStages,
@@ -33,10 +33,14 @@ const navRoot = document.getElementById("nav-root");
 // -- Render nav --
 const unsubNav = renderNav(navRoot);
 
+// -- Read query params --
+const urlParams = new URLSearchParams(window.location.search);
+const forcedType = urlParams.get("type"); // "신규개발" | "설계변경" | null
+
 // -- State --
 let projects = [];
 let allTasks = [];
-let projectTypeTab = "신규개발"; // "신규개발" | "설계변경"
+let projectTypeTab = forcedType || "신규개발"; // "신규개발" | "설계변경"
 let viewMode = "table"; // table | matrix | cards | gantt | kanban | timeline | calendar
 let changeViewMode = "table"; // table | kanban (설계변경 전용)
 let searchQuery = "";
@@ -241,24 +245,32 @@ function render() {
   const currentViewModes = isChangeTab ? CHANGE_VIEW_MODES : VIEW_MODES;
   const currentView = isChangeTab ? changeViewMode : viewMode;
 
+  const pageTitle = forcedType === "설계변경" ? "설계변경" : forcedType === "신규개발" ? "출시위원회" : "프로젝트";
+
   app.innerHTML = `
     <div class="container">
       <!-- Header -->
       <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">프로젝트</h1>
+          <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">${pageTitle}</h1>
           <p class="text-sm text-soft mt-1">총 ${filtered.length}개 프로젝트</p>
         </div>
-        <button class="btn-ghost btn-sm" id="export-projects-csv" style="font-size:0.75rem">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV 내보내기
-        </button>
+        <div class="flex items-center gap-2">
+          <button class="btn-ghost btn-sm" id="export-projects-csv" style="font-size:0.75rem">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV 내보내기
+          </button>
+          <button class="btn btn-primary" id="btn-create-project" style="gap:6px">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            ${isChangeTab ? "설계변경 등록" : "프로젝트 등록"}
+          </button>
+        </div>
       </div>
 
-      <!-- Project Type Tabs (신규개발 / 설계변경) -->
-      <div class="tab-bar mb-4">
+      <!-- Project Type Tabs (신규개발 / 설계변경) — hidden when forced via URL -->
+      ${!forcedType ? `<div class="tab-bar mb-4">
         <button class="tab-btn${projectTypeTab === "신규개발" ? " active" : ""}" data-type-tab="신규개발">신규개발</button>
         <button class="tab-btn${projectTypeTab === "설계변경" ? " active" : ""}" data-type-tab="설계변경">설계변경</button>
-      </div>
+      </div>` : ""}
 
       <!-- Controls -->
       <div class="flex items-center gap-4 mb-6 flex-wrap">
@@ -287,6 +299,57 @@ function render() {
       <!-- Content -->
       <div id="view-content">
         ${isChangeTab ? renderChangeViewContent(filtered) : renderViewContent(filtered)}
+      </div>
+    </div>
+
+    <!-- Create Project Modal -->
+    <div class="modal-backdrop" id="create-modal" style="display:none">
+      <div class="modal" style="max-width:520px">
+        <div class="modal-header">
+          <h3 class="modal-title">${isChangeTab ? "설계변경 등록" : "신규개발 프로젝트 등록"}</h3>
+          <button class="modal-close" id="create-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex flex-col gap-4">
+            <div>
+              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">프로젝트명 <span style="color:var(--danger-400)">*</span></label>
+              <input type="text" class="input-field" id="cp-name" placeholder="${isChangeTab ? "예: 센서 교체 (혈압계)" : "예: 신규 체성분 분석기 개발"}" />
+            </div>
+            <div>
+              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">제품 유형 <span style="color:var(--danger-400)">*</span></label>
+              <input type="text" class="input-field" id="cp-product" placeholder="예: 체성분 분석기, 혈압계, FRA" />
+            </div>
+            ${isChangeTab ? `
+            <div>
+              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">변경 규모 <span style="color:var(--danger-400)">*</span></label>
+              <select class="input-field" id="cp-scale">
+                <option value="">선택하세요</option>
+                <option value="minor">경미 (minor) — 접수→승인</option>
+                <option value="medium">중간 (medium) — 접수→검토→승인→적용</option>
+                <option value="major">대규모 (major) — 전체 6 Phase</option>
+              </select>
+            </div>
+            ` : ""}
+            <div class="flex gap-4">
+              <div style="flex:1">
+                <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">시작일 <span style="color:var(--danger-400)">*</span></label>
+                <input type="date" class="input-field" id="cp-start" value="${new Date().toISOString().split("T")[0]}" />
+              </div>
+              <div style="flex:1">
+                <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">종료 예정일 <span style="color:var(--danger-400)">*</span></label>
+                <input type="date" class="input-field" id="cp-end" />
+              </div>
+            </div>
+            <div>
+              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">PM (프로젝트 매니저)</label>
+              <input type="text" class="input-field" id="cp-pm" value="${escapeHtml(user.name || "")}" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="create-modal-cancel">취소</button>
+          <button class="btn btn-primary" id="btn-submit-project">등록</button>
+        </div>
       </div>
     </div>
   `;
@@ -1149,6 +1212,81 @@ function bindControls() {
         formatStageName(p.currentStage),
       ]);
       exportToCSV(data, headers, "프로젝트_목록.csv");
+    });
+  }
+
+  // ── Create Project Modal ──
+  const createBtn = document.getElementById("btn-create-project");
+  const modal = document.getElementById("create-modal");
+  const closeModal = () => { if (modal) modal.style.display = "none"; };
+  const openModal = () => { if (modal) modal.style.display = ""; };
+
+  if (createBtn) createBtn.addEventListener("click", openModal);
+  const closeBtn = document.getElementById("create-modal-close");
+  const cancelBtn = document.getElementById("create-modal-cancel");
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  const submitBtn = document.getElementById("btn-submit-project");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", async () => {
+      const name = document.getElementById("cp-name")?.value.trim();
+      const productType = document.getElementById("cp-product")?.value.trim();
+      const startStr = document.getElementById("cp-start")?.value;
+      const endStr = document.getElementById("cp-end")?.value;
+      const pm = document.getElementById("cp-pm")?.value.trim() || "";
+      const scaleEl = document.getElementById("cp-scale");
+      const changeScale = scaleEl ? scaleEl.value : null;
+      const isChange = projectTypeTab === "설계변경";
+
+      // Validation
+      if (!name || !productType || !startStr || !endStr) {
+        alert("필수 항목을 모두 입력하세요.");
+        return;
+      }
+      if (isChange && !changeScale) {
+        alert("변경 규모를 선택하세요.");
+        return;
+      }
+      if (new Date(endStr) <= new Date(startStr)) {
+        alert("종료일은 시작일보다 이후여야 합니다.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "등록 중...";
+
+      try {
+        const projData = {
+          name,
+          productType,
+          projectType: isChange ? "설계변경" : "신규개발",
+          status: "active",
+          progress: 0,
+          startDate: new Date(startStr),
+          endDate: new Date(endStr),
+          pm,
+          riskLevel: "green",
+          currentStage: "발의검토",
+        };
+        if (isChange) projData.changeScale = changeScale;
+
+        const newId = await createProject(projData);
+        closeModal();
+
+        // Navigate to the new project detail page
+        window.location.href = `project.html?id=${newId}`;
+      } catch (err) {
+        console.error("프로젝트 등록 오류:", err);
+        alert("프로젝트 등록 중 오류가 발생했습니다.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "등록";
+      }
     });
   }
 }

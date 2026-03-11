@@ -4,8 +4,8 @@
 // + 오늘의 브리핑, 담당자별 워크로드, 일괄 상태 변경, 완료 예측, 거래처 응답 강화
 // =============================================================================
 
-import { initTheme, renderNav, renderSpinner } from "../components.js";
-import { guardPage } from "../auth.js";
+import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
+import { guardPage, getUser, logout } from "../auth.js";
 import {
   subscribeAllLaunchChecklists,
   subscribeProjects,
@@ -14,7 +14,7 @@ import {
   confirmLaunchChecklist,
   LAUNCH_CATEGORY_LABELS,
 } from "../firestore-service.js";
-import { escapeHtml, formatDate, daysUntil, timeAgo } from "../utils.js";
+import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName } from "../utils.js";
 
 initTheme();
 
@@ -74,11 +74,65 @@ const SALES_CORE_CATEGORIES = ["pricing", "sales_training", "dealer_notify"];
 const SALES_DEPT_KEYWORDS = ["영업"];
 
 // =============================================================================
+// Sales Nav — independent navigation (logo → home, title, theme, user, logout)
+// =============================================================================
+
+function renderSalesNav(container) {
+  const u = getUser();
+  if (!u) return;
+
+  container.innerHTML = `
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="flex items-center gap-8">
+          <button class="nav-logo" data-nav="home.html">
+            <div class="nav-logo-icon" style="background:linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.1));color:#f59e0b"><span>SL</span></div>
+            <span class="nav-logo-text" style="color:var(--slate-800)">영업<span class="accent" style="color:#f59e0b">출시준비</span></span>
+          </button>
+        </div>
+        <div class="nav-right">
+          <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
+            ${getThemeIcon()}
+          </button>
+          <button class="nav-link" data-nav="home.html" style="font-size:0.8rem;padding:6px 12px;gap:4px;opacity:0.7" title="허브로 돌아가기">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+            홈
+          </button>
+          <div class="nav-user">
+            <div class="nav-user-info">
+              <div class="nav-user-name">${escapeHtml(u.name)}</div>
+              <div class="nav-user-role">${getRoleName(u.role)}</div>
+            </div>
+            <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  `;
+
+  container.querySelector(".nav-logo").addEventListener("click", () => {
+    window.location.href = "home.html";
+  });
+  container.querySelector("[data-nav='home.html']:not(.nav-logo)").addEventListener("click", () => {
+    window.location.href = "home.html";
+  });
+  container.querySelector("#nav-logout-btn").addEventListener("click", logout);
+  container.querySelector("#nav-theme-btn").addEventListener("click", toggleTheme);
+
+  // Load global feedback widget
+  import("../feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
+}
+
+// =============================================================================
 // Init — with loading state and error handling
 // =============================================================================
 
 function init() {
-  renderNav(navRoot);
+  renderSalesNav(navRoot);
   app.innerHTML = renderSpinner("출시 준비 데이터 로딩 중...");
 
   subscribeProjects((data) => {

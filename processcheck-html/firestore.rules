@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isStoredUser() {
+      // Allow access for users who logged in via demo cards (no Firebase Auth)
+      // or via MS OAuth (Firebase Auth present)
+      return true; // Client-side auth check via localStorage
+    }
+
+    // ─── Users ──────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true; // Demo users need write too
+    }
+
+    // ─── Projects ───────────────────────────────────────────────────────────
+    match /projects/{projectId} {
+      allow read: if true;
+      allow write: if true; // TODO: restrict to authenticated users
+    }
+
+    // ─── Checklist Items ────────────────────────────────────────────────────
+    match /checklistItems/{itemId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Template Stages ────────────────────────────────────────────────────
+    match /templateStages/{stageId} {
+      allow read: if true;
+      allow write: if true; // Observer role only (enforced client-side)
+    }
+
+    // ─── Template Departments ───────────────────────────────────────────────
+    match /templateDepartments/{deptId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Template Items ─────────────────────────────────────────────────────
+    match /templateItems/{itemId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Notifications ──────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Change Requests ────────────────────────────────────────────────────
+    match /changeRequests/{requestId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Customers ──────────────────────────────────────────────────────────
+    match /customers/{customerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Launch Checklists ──────────────────────────────────────────────────
+    match /launchChecklists/{checklistId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Portal Notifications ───────────────────────────────────────────────
+    match /portalNotifications/{notifId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Reviews (NEW) ──────────────────────────────────────────────────────
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if isAuthenticated(); // Only MS OAuth authenticated users
+    }
+  }
+}

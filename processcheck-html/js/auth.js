@@ -7,6 +7,7 @@ import { auth } from "./firebase-init.js";
 import { getUserByName, getUserByEmail, createUser } from "./firestore-service.js";
 
 const STORAGE_KEY = "pc_user";
+const ALLOWED_DOMAIN = "inbody.com"; // Only @inbody.com emails allowed
 
 // Get current user from localStorage
 export function getUser() {
@@ -41,18 +42,28 @@ export async function login(name, role) {
 // Microsoft OAuth login — popup based
 export async function loginWithMicrosoft() {
   const provider = new OAuthProvider("microsoft.com");
+  provider.setCustomParameters({
+    tenant: "547afe76-db4a-45d9-9af8-c970051a4c7d", // InBody Azure AD tenant
+  });
   const result = await signInWithPopup(auth, provider);
 
   const firebaseUser = result.user;
   const email = firebaseUser.email;
   const displayName = firebaseUser.displayName || email.split("@")[0];
 
+  // Restrict to @inbody.com only
+  if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    await signOut(auth);
+    throw new Error(`@${ALLOWED_DOMAIN} 이메일만 사용할 수 있습니다.`);
+  }
+
   // Check if user already exists in Firestore
   const existingUser = await getUserByEmail(email);
 
   if (existingUser) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingUser));
-    return { user: existingUser, isNewUser: false };
+    const msUser = { ...existingUser, authProvider: "microsoft" };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
+    return { user: msUser, isNewUser: false };
   }
 
   // New user: return auth info so login page can show role selection
@@ -72,8 +83,9 @@ export async function completeRegistration(authInfo, role, department) {
     department,
     authProvider: "microsoft",
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-  return newUser;
+  const msUser = { ...newUser, authProvider: "microsoft" };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
+  return msUser;
 }
 
 // Logout — clear session and redirect

@@ -7,13 +7,13 @@ import { seedDatabaseIfEmpty } from "../firestore-service.js";
 
 // If already logged in, redirect immediately
 if (getUser()) {
-  window.location.href = "dashboard.html";
+  window.location.href = "home.html";
 }
 
 // DOM refs
 const seedingView = document.getElementById("login-seeding");
 const contentView = document.getElementById("login-content");
-const userCards = document.querySelectorAll(".user-card");
+const userCards = document.querySelectorAll(".demo-btn");
 const msLoginBtn = document.getElementById("ms-login-btn");
 const msLoginWrap = document.getElementById("ms-login-wrap");
 const loginDivider = document.getElementById("login-divider");
@@ -31,14 +31,23 @@ let pendingAuthInfo = null;
 // MS button original HTML (for reset)
 const MS_BTN_HTML = msLoginBtn.innerHTML;
 
-// Seed database first, then show cards
+// Seed database — show content immediately, seed in background
+// Show login content after max 3 seconds even if seeding is still running
+let seedDone = false;
+const showContent = () => {
+  if (seedDone) return;
+  seedDone = true;
+  seedingView.style.display = "none";
+  contentView.style.display = "";
+  window.__seedComplete = true;
+};
+
+// Safety timeout: show login content after 3 seconds regardless
+setTimeout(showContent, 3000);
+
 seedDatabaseIfEmpty()
   .catch((e) => console.warn("시드 오류 (무시 가능):", e))
-  .finally(() => {
-    seedingView.style.display = "none";
-    contentView.style.display = "";
-    window.__seedComplete = true;
-  });
+  .finally(showContent);
 
 // ── Demo card click → login → redirect ──
 userCards.forEach((card) => {
@@ -47,27 +56,19 @@ userCards.forEach((card) => {
     const userName = card.dataset.user;
 
     // Disable all cards while loading
-    userCards.forEach((c) => c.setAttribute("disabled", ""));
-
-    // Show loading state on clicked card
+    userCards.forEach((c) => (c.disabled = true));
     card.classList.add("loading");
-    const iconEl = card.querySelector(".user-card-icon svg");
-    const savedIcon = iconEl ? iconEl.outerHTML : "";
-    if (iconEl) {
-      iconEl.outerHTML =
-        '<div class="spinner" style="width:24px;height:24px;border-width:2px"></div>';
-    }
+    const savedHTML = card.innerHTML;
+    card.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px"></div>';
 
     try {
       await login(userName, role);
-      window.location.href = "dashboard.html";
+      window.location.href = "home.html";
     } catch (e) {
       console.error("로그인 오류:", e);
-      // Restore state on error
       card.classList.remove("loading");
-      const spinnerEl = card.querySelector(".user-card-icon .spinner");
-      if (spinnerEl) spinnerEl.outerHTML = savedIcon;
-      userCards.forEach((c) => c.removeAttribute("disabled"));
+      card.innerHTML = savedHTML;
+      userCards.forEach((c) => (c.disabled = false));
     }
   });
 });
@@ -86,7 +87,7 @@ msLoginBtn.addEventListener("click", async () => {
 
     if (!result.isNewUser) {
       // Existing user — go to dashboard
-      window.location.href = "dashboard.html";
+      window.location.href = "home.html";
     } else {
       // New user — show role selection
       pendingAuthInfo = result.authInfo;
@@ -94,14 +95,15 @@ msLoginBtn.addEventListener("click", async () => {
     }
   } catch (e) {
     console.error("Microsoft 로그인 오류:", e);
-    showError("로그인 중 오류가 발생했습니다.");
+    showError(e.message || "로그인 중 오류가 발생했습니다.");
     resetMsButton();
   }
 });
 
 // ── Role Selection Logic ──
 function showRoleSelection(authInfo) {
-  document.getElementById("user-cards").style.display = "none";
+  const demoRow = document.getElementById("user-cards");
+  if (demoRow) demoRow.style.display = "none";
   loginDivider.style.display = "none";
   msLoginWrap.style.display = "none";
   loginPrompt.style.display = "none";
@@ -115,7 +117,8 @@ function showRoleSelection(authInfo) {
 
 function hideRoleSelection() {
   roleSelection.style.display = "none";
-  document.getElementById("user-cards").style.display = "";
+  const demoRow = document.getElementById("user-cards");
+  if (demoRow) demoRow.style.display = "";
   loginDivider.style.display = "";
   msLoginWrap.style.display = "";
   loginPrompt.style.display = "";
@@ -138,7 +141,7 @@ completeBtn.addEventListener("click", async () => {
 
   try {
     await completeRegistration(pendingAuthInfo, roleSelect.value, deptSelect.value);
-    window.location.href = "dashboard.html";
+    window.location.href = "home.html";
   } catch (e) {
     console.error("등록 오류:", e);
     showError("등록 중 오류가 발생했습니다.");

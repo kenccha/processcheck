@@ -12,6 +12,10 @@ import {
   subscribeNotifications,
   markNotificationRead,
   approveTask,
+  fallbackLoadProjects,
+  fallbackLoadAllChecklistItems,
+  fallbackLoadChecklistItemsByAssignee,
+  fallbackLoadNotifications,
 } from "../firestore-service.js";
 import {
   getStatusLabel,
@@ -57,46 +61,71 @@ let approvalLimit = 10;
 const app = document.getElementById("app");
 const unsubscribers = [];
 
-// ─── Subscriptions ──────────────────────────────────────────────────────────
-
-unsubscribers.push(
-  subscribeProjects((projects) => {
-    allProjects = projects;
-    computeDerived();
-    render();
-  })
-);
-
-if (user.role === "observer" || user.role === "manager") {
-  unsubscribers.push(
-    subscribeAllChecklistItems((tasks) => {
-      if (user.role === "manager") {
-        allTasks = tasks.filter((t) => t.department === user.department);
-      } else {
-        allTasks = tasks;
-      }
-      computeDerived();
-      render();
-    })
-  );
-} else {
-  unsubscribers.push(
-    subscribeChecklistItemsByAssignee(user.name, (tasks) => {
-      allTasks = tasks;
-      computeDerived();
-      render();
-    })
-  );
-}
-
-unsubscribers.push(
-  subscribeNotifications(user.id, (notifs) => {
-    notifications = notifs.slice(0, 20);
-    render();
-  })
-);
+// ─── Initial Load (getDocs for fast first paint) then Subscriptions ────────
 
 if (navUnsub) unsubscribers.push(navUnsub);
+
+(async () => {
+  // 1) Fast initial load via getDocs
+  try {
+    const [projects, tasks, notifs] = await Promise.all([
+      fallbackLoadProjects(),
+      user.role === "observer" || user.role === "manager"
+        ? fallbackLoadAllChecklistItems()
+        : fallbackLoadChecklistItemsByAssignee(user.name),
+      fallbackLoadNotifications(user.id),
+    ]);
+    allProjects = projects;
+    if (user.role === "manager") {
+      allTasks = tasks.filter((t) => t.department === user.department);
+    } else {
+      allTasks = tasks;
+    }
+    notifications = notifs.slice(0, 20);
+    computeDerived();
+    render();
+  } catch (e) {
+    console.error("초기 로딩 오류:", e);
+  }
+
+  // 2) Then subscribe for real-time updates
+  unsubscribers.push(
+    subscribeProjects((projects) => {
+      allProjects = projects;
+      computeDerived();
+      render();
+    })
+  );
+
+  if (user.role === "observer" || user.role === "manager") {
+    unsubscribers.push(
+      subscribeAllChecklistItems((tasks) => {
+        if (user.role === "manager") {
+          allTasks = tasks.filter((t) => t.department === user.department);
+        } else {
+          allTasks = tasks;
+        }
+        computeDerived();
+        render();
+      })
+    );
+  } else {
+    unsubscribers.push(
+      subscribeChecklistItemsByAssignee(user.name, (tasks) => {
+        allTasks = tasks;
+        computeDerived();
+        render();
+      })
+    );
+  }
+
+  unsubscribers.push(
+    subscribeNotifications(user.id, (notifs) => {
+      notifications = notifs.slice(0, 20);
+      render();
+    })
+  );
+})();
 
 // ─── Derived State Computation ──────────────────────────────────────────────
 
@@ -545,7 +574,7 @@ function bindClickHandlers() {
       const stat = card.dataset.stat;
       if (stat === "tasks" || stat === "overdue") activeTab = "tasks";
       else if (stat === "approvals") activeTab = "approvals";
-      else if (stat === "projects") { window.location.href = "projects.html"; return; }
+      else if (stat === "projects") { window.location.href = "projects.html?type=신규개발"; return; }
       else if (stat === "notifications") activeTab = "notifications";
       taskLimit = 10;
       approvalLimit = 10;
@@ -592,7 +621,7 @@ function bindClickHandlers() {
   if (viewAllBtn) {
     viewAllBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      window.location.href = "projects.html";
+      window.location.href = "projects.html?type=신규개발";
     });
   }
 

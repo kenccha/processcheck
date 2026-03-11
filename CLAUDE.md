@@ -10,7 +10,7 @@ ProcessCheck (개발 프로세스 관리 시스템) — an electronic product de
 - **Framework:** Next.js 15 (React 18), TypeScript 5, static export mode
 - **Styling:** Tailwind CSS 3.4 with custom theme colors (primary, success, warning, danger)
 - **Backend:** Firebase (Firestore, Authentication, Storage) — SDK v12.9
-- **Deployment:** GitHub Pages via GitHub Actions (push to `main`)
+- **Deployment:** Firebase Hosting via GitHub Actions (push to `main`)
 
 ### HTML Port (`processcheck-html/`)
 - **No framework** — plain HTML + CSS + vanilla JavaScript ES modules
@@ -18,6 +18,7 @@ ProcessCheck (개발 프로세스 관리 시스템) — an electronic product de
 - **Authentication:** Firebase Auth (Microsoft OAuth) + localStorage 기반 세션
 - **Styling:** Single `css/styles.css` with CSS custom properties, 라이트모드(기본)+다크모드 토글
 - **Dev server:** `cd processcheck-html && python3 -m http.server 8080`
+- **Deployment:** Firebase Hosting (`firebase.json` + `.firebaserc` in processcheck-html/)
 - **Purpose:** Simpler deployment without build step, same Firebase Firestore backend
 
 ## Commands
@@ -65,8 +66,23 @@ processcheck-html/        # Plain HTML port (no build step)
   js/firestore-service.js # All Firestore CRUD + subscriptions
   js/auth.js              # localStorage auth + page guard
   js/utils.js             # Helper functions
-  js/components.js        # Shared nav, spinner, badges
+  js/components.js        # Shared nav, spinner, badges, review button
+  js/review-system.js     # Review/feedback system (Firestore reviews collection)
   js/pages/*.js           # Page-specific controllers
+  firebase.json           # Firebase Hosting config
+  .firebaserc             # Firebase project link
+  firestore.rules         # Firestore security rules
+  docs/deliverables/      # Design deliverables (wireframes, flows, diagrams)
+    wireframes.html
+    checklist-wireframe.html
+    user-flows.html
+    flow-annotations.html
+    diagram-viewer.html
+    feedback.html
+    js/review-bootstrap.js  # Standalone review system for deliverables
+    js/checklist-live.js    # Live Firestore data for checklist wireframe
+    js/deliverable-nav.js   # Top nav + sidebar + screenshot capture for deliverables
+    js/feedback-system.js   # Firestore feedback CRUD (feedbacks collection)
 docs/
   manual.md               # User manual content (Korean, source of truth)
 ```
@@ -297,6 +313,50 @@ docs/
 - ~~영업 대시보드 없음~~ → sales.html + js/pages/sales.js 신규 생성 (전체 프로젝트 출시 준비 대시보드)
 - ~~매뉴얼 스크린샷 없음~~ → Puppeteer로 14개 실제 스크린샷 캡처, manual.js에 이미지 렌더링
 - ~~실제 인증 없음~~ → Firebase Auth Microsoft OAuth 연동 (HTML 포트), 데모 카드와 공존, 신규 사용자 역할/부서 선택
+- ~~GitHub Pages 배포~~ → Firebase Hosting으로 전환 (보안 강화), deploy.yml 업데이트
+- ~~산출물 리뷰 기능 없음~~ → review-system.js + review-bootstrap.js 구현, 전체 리뷰 워크플로우 (코멘트/이슈/승인, 투표, 답글, 상태관리)
+- ~~체크리스트 와이어프레임 정적 데이터~~ → checklist-live.js로 Firestore templateStages/templateItems 실시간 연동
+- ~~네비 구조 불필요한 항목~~ → 대시보드 탭 제거 (로고 클릭으로 이동), 매뉴얼을 리뷰 드롭다운에 통합
+- ~~데모/실사용 데이터 미분리~~ → `isDemo: true` 플래그 + `filterDemo()` + 마이그레이션 함수로 완전 분리
+- ~~피드백 스크린샷 전체페이지~~ → 뷰포트 캡처로 변경 + 다중 스크린샷 축적 지원
+
+### Navigation Design (확정)
+- **로고 클릭 → 대시보드**: "대시보드" 탭 불필요, ProcessCheck 로고 클릭으로 이동
+- **네비 탭 순서**: 출시위원회 → 설계변경 → 체크리스트 → 리뷰(드롭다운) → | → 관련 서비스(드롭다운)
+- **리뷰 드롭다운**: 전체 화면 설계, 업무 흐름, 시스템 구조, 피드백 모아보기, **매뉴얼** (리뷰/문서 통합)
+- **관련 서비스 드롭다운**: 영업 출시 준비(외부↗), 고객 관리(외부↗) — 구분선(|)으로 시각적 분리, 새 탭에서 열림
+- **영업 출시 준비는 별도 사이트**: 같은 Firebase DB를 공유하지만 별도 홈페이지/페이지 구조로 분리 예정
+- `components.js`의 `NAV_LINKS`와 `deliverable-nav.js`의 `MAIN_NAV` 동기화 필수
+
+### Demo/Real Data Separation Design (확정)
+- **2가지 사용자 타입**: 데모 카드 사용자 (`isDemo: true`) vs MS OAuth 사용자 (`isDemo: false`)
+- **데이터 분리**: 모든 시드 데이터에 `isDemo: true` 플래그 → `filterDemo()` 함수로 MS OAuth 사용자에게 필터링
+- **MS OAuth 사용자는 빈 DB에서 시작**: 체크리스트, 프로젝트, 출시위원회 등 모든 데이터를 직접 입력
+- **마이그레이션**: `migrateDemoFlags()` — 기존 시드 데이터에 `isDemo: true` 일괄 추가 (v2 localStorage 키로 1회 실행)
+- **대상 컬렉션**: users, projects, checklistItems, changeRequests, notifications, customers, launchChecklists, portalNotifications
+- **templateStages, templateDepartments, templateItems는 공유**: 데모 플래그 미적용 (모든 사용자 공통)
+- **`filterDemo(items)` 로직**: `_isRealUser()` → localStorage `pc_user.isDemo === false` 확인 → `item.isDemo !== true` 필터
+
+### Feedback/Screenshot System Design (확정)
+- **뷰포트 캡처**: html2canvas로 현재 보이는 영역만 캡처 (전체 페이지 X)
+- **다중 스크린샷**: "저장 & 더 캡처" 버튼 → 페이지로 복귀 → 스크롤/이동 → 추가 캡처 → "피드백 작성"
+- **플로팅 바**: 캡처 중 하단에 썸네일 + "추가 캡처" / "피드백 작성" / "취소" 버튼
+- **Firestore `feedbacks` 컬렉션**: `screenshots` 배열 필드 (레거시 `screenshot` 문자열과 하위 호환)
+- **파일**: `docs/deliverables/js/deliverable-nav.js` (섹션 7: 캡처 오버레이), `docs/deliverables/js/feedback-system.js`
+
+### Review System Design (확정)
+- **메인 앱 페이지**: 네비게이션 바에 💬 리뷰 버튼 (알림 벨 옆), 클릭 시 슬라이드인 패널
+- **산출물 페이지**: FAB(Floating Action Button) 💬 버튼, 클릭 시 리뷰 패널
+- **Firestore `reviews` 컬렉션**: pageId, type(comment/issue/approval), status(open/resolved/wontfix), votes, replies, history
+- **권한**: MS OAuth 인증 사용자만 리뷰 작성 가능, 데모 카드 사용자는 읽기만
+- **파일**: `js/review-system.js` (메인 앱 ES module), `docs/deliverables/js/review-bootstrap.js` (산출물 standalone)
+- **실시간**: `onSnapshot` 구독으로 리뷰 실시간 동기화
+
+### Deployment Design (확정)
+- **Firebase Hosting**: `processcheck-html/firebase.json` + `.firebaserc`
+- **CI/CD**: GitHub Actions → `FirebaseExtended/action-hosting-deploy@v0`
+- **시크릿**: `FIREBASE_SERVICE_ACCOUNT` (GitHub repo secret 필요)
+- **Firestore Rules**: `processcheck-html/firestore.rules` — reviews 컬렉션은 Firebase Auth 인증 필요
 
 ## Claude Code Automations
 
