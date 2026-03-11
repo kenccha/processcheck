@@ -5,221 +5,199 @@
 ## Naming Patterns
 
 **Files:**
-- Page entry points: `[name].html` (e.g., `index.html`, `dashboard.html`, `project-detail.html`)
-- Page controllers: `js/pages/[name].js` (e.g., `js/pages/dashboard.js`, `js/pages/project-detail.js`)
-- Core modules: `js/[name].js` (lowercase, dash-separated: `firestore-service.js`, `firebase-init.js`, `review-system.js`)
-- CSS: Single file `css/styles.css` with CSS custom properties and component classes
+- HTML pages: kebab-case, one page per file (`project-detail.js`, `admin-checklists.js`, `customer-portal.js`)
+- JS modules: kebab-case (`firestore-service.js`, `firebase-init.js`, `review-system.js`)
+- CSS: single file `css/styles.css` for all styles
 
 **Functions:**
-- camelCase for all functions: `subscribeProjects()`, `completeTask()`, `validateInput()`
-- Prefixes for function families:
-  - `subscribe*` for Firestore real-time subscriptions: `subscribeProjects()`, `subscribeChecklistItems()`
-  - `get*` for sync reads: `getUser()`, `getFilteredProjects()`
-  - `load*` for async fallback reads: `fallbackLoadProjects()`
-  - `create*` for Firestore creation: `createUser()`, `createChecklistItem()`
-  - `update*` for Firestore updates: `updateTask()`, `updateProject()`
-  - `delete*` for deletion: `deleteChecklistItem()`
-  - `format*` for string formatting: `formatDate()`, `formatStageName()`
-  - `get*Class` or `get*Label` for UI helpers: `getStatusBadgeClass()`, `getRiskLabel()`
-  - `render*` for DOM rendering: `renderNav()`, `renderSpinner()`
+- camelCase for all exported and internal functions: `formatStageName`, `getRiskClass`, `daysUntil`, `guardPage`
+- Async functions prefixed semantically: `completeTask`, `approveTask`, `rejectTask`, `restartTask`
+- Subscribe functions prefixed with `subscribe`: `subscribeProjects`, `subscribeChecklistItems`, `subscribeNotifications`
+- Get/fetch functions prefixed with `get`: `getUser`, `getProject`, `getUsers`
+- Seed/init functions prefixed with `seed`: `seedTemplatesIfEmpty`, `seedDatabaseIfEmpty`
+- Private helpers prefixed with `_`: `_getTemplateItems`, `_seedUpdateChecklistStatuses`
+- Fallback fetch functions prefixed with `fallback`: `fallbackLoadProjects`, `fallbackLoadChecklistItemsByAssignee`
 
 **Variables:**
-- camelCase throughout: `activeTab`, `checklistItems`, `selectedStageId`
-- Prefixes for state management:
-  - `show*` for boolean toggles: `showLaterTasks`
-  - `selected*` for current selection: `selectedStage`, `selectedTaskIds`
-  - `all*` for full collections: `allProjects`, `allTasks`, `allUsers`
-  - `unsub*` for Firestore unsubscribe functions: `unsubProject`, `unsubChecklist`, `unsubNav`
-  - `*Limit`, `*TTL` for numeric configurations: `approvalLimit`, `CACHE_TTL`
-- HTML classes: kebab-case: `badge-success`, `empty-state`, `inline-code`, `mention-tag`
-- CSS variables: lowercase with dashes: `--primary-500`, `--surface-1`, `--foreground`
+- camelCase for all mutable state: `allProjects`, `activeTab`, `viewMode`, `pendingConfirmId`
+- SCREAMING_SNAKE_CASE for module-level constants and config: `PHASE_GROUPS`, `GATE_STAGES`, `CACHE_KEY`, `CACHE_TTL`, `SESSION_TTL`, `ALLOWED_DOMAIN`
+- Short names for loop counters and transients: `b` (batch), `d` (doc), `p` (project), `t` (task)
 
-**Types/Objects:**
-- Korean domain terminology preserved: `stageId`, `departmentId`, `projectType` (not translated)
-- Constants: UPPERCASE_SNAKE_CASE: `STORAGE_KEY`, `ALLOWED_DOMAIN`, `MAX_FILE_SIZE`, `CACHE_TTL`, `FILE_ICONS`
-- Collections/arrays: plural: `projects`, `departments`, `checklistItems`, `notifications`
-- Database field names: exact Firestore schema: `projectId`, `stage`, `approvalStatus`, `completedDate`
+**DOM references:**
+- Suffixed with conventional abbreviations: `navRoot`, `app`, `bellBtn`, `bellDot`, `mobileMenu`
+- Always assigned at module top level from `getElementById` or `querySelector`
+
+**CSS Classes:**
+- BEM-like with component prefix: `nav-link`, `nav-dropdown`, `nav-logo-text`, `badge-primary`, `notif-item`
+- Utility classes for layout: `flex`, `items-center`, `gap-8`, `text-soft`, `p-6`, `mt-4`
+- State modifiers with `open`, `active`, `hidden`, `unread`, `loading` appended
 
 ## Code Style
 
 **Formatting:**
-- No explicit formatter configured (no Prettier, no ESLint rules enforced at build time)
-- Conventions observed in codebase:
-  - 2-space indentation
-  - Semicolons used consistently
-  - Single quotes for strings (some files use double quotes, mixed standard)
-  - Inline comments use `//` with leading space
-  - Block comments use `/* */` style
+- No linting config present (no `.eslintrc`, no `.prettierrc`, no `package.json`)
+- 2-space indentation throughout
+- Single quotes for strings in JS (`"use strict"` not present)
+- Semicolons present
+- Arrow functions for callbacks: `(data) => { ... }`, `(e) => { ... }`
+- Template literals for HTML generation extensively
 
-**Module structure:**
-- ES modules (`import`/`export`)
-- Firebase imports at top: `import { specific, exports } from "firebase/..."`
-- Internal imports organized: services first (`./firestore-service.js`), then utils (`./utils.js`)
-- Page files import all needed dependencies at top before any code execution
-
-**File organization pattern:**
-```javascript
-// ═══════════════════════════════════════════════════════════════════════════════
-// [Module name] — [brief description]
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Section comments use full-width divider lines
-// ─── Subsection ────────────────────────────────────────────────────────────
-
-// Then code follows
-```
+**Header Comments:**
+- Every module opens with a box-art comment block using `═` characters:
+  ```js
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Module Name — description
+  // ═══════════════════════════════════════════════════════════════════════════════
+  ```
+- Section dividers use `─` characters:
+  ```js
+  // ─── Section Name ──────────────────────────────────────────────────────────────
+  ```
+- Some pages use `=` characters (inconsistently):
+  ```js
+  // =============================================================================
+  // Page Title
+  // =============================================================================
+  ```
 
 ## Import Organization
 
-**Order:**
-1. Firebase/external SDKs (`firebase/app`, `firebase/firestore`, etc.)
-2. Local service modules (`./firestore-service.js`, `./firebase-init.js`)
-3. Utility modules (`./utils.js`, `./auth.js`, `./components.js`)
-4. Page-specific modules (`./pages/*.js`)
+**Order (consistent across page modules):**
+1. Auth module: `import { guardPage, getUser } from "../auth.js"`
+2. Components module: `import { renderNav, renderSpinner, initTheme } from "../components.js"`
+3. `initTheme()` called immediately after components import (before other imports, to prevent flash)
+4. Firestore service: `import { subscribeX, getX, updateX } from "../firestore-service.js"`
+5. Utils: `import { formatDate, escapeHtml, ... } from "../utils.js"`
+6. Firebase SDK (only when needed): `import { ref, uploadBytesResumable } from "firebase/storage"`
 
-**Path aliases:**
-- No aliases — all imports use relative paths: `./auth.js`, `../utils.js`, `../firestore-service.js`
-- Structure is flat enough that relative imports are clear
-
-**Example from `js/pages/project-detail.js`:**
-```javascript
-import { guardPage } from "../auth.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
-import {
-  subscribeProjects,
-  subscribeChecklistItems,
-  // ... more imports
-} from "../firestore-service.js";
-import {
-  departments,
-  PHASE_GROUPS,
-  formatDate,
-  // ... more imports
-} from "../utils.js";
-```
+**Path conventions:**
+- Page modules use relative `../` prefix to reach `js/` root: `"../auth.js"`, `"../utils.js"`
+- Firebase SDK imported via importmap aliases: `"firebase/firestore"`, `"firebase/auth"`, `"firebase/storage"`
+- No path aliases or bundler — bare module specifiers via `<script type="importmap">` in each HTML file
 
 ## Error Handling
 
 **Patterns:**
-- Authentication guard at page entry: `const user = guardPage(); if (!user) throw new Error("Not authenticated");`
-- Try-catch blocks wrap Firestore operations and data parsing
-- Firestore operations wrapped: `try { localStorage.setItem(...) } catch { localStorage.removeItem(...) }`
-- Silent failures with fallback in cache loading: `catch { return null; }`
-- Error feedback to user via modal alerts: `alert("작업 생성 실패: " + err.message)`
-- Error logs to console for debugging: `console.error("Init error:", err)`
-
-**Timeout/retry:**
-- No explicit retry logic observed
-- `setTimeout()` used for UI delays (e.g., print window focus): `setTimeout(() => { printWindow.print(); }, 500)`
-- SessionStorage cache has TTL: `CACHE_TTL = 120_000` (2 minutes)
-
-**Validation:**
-- Input validation: `validateInput(str, maxLength = 500)` returns trimmed/limited string
-- File validation: `validateFile(file)` returns `{ valid: boolean, error: string }`
-- ID validation: `validateId(id)` checks regex `^[a-zA-Z0-9_-]+$`
-
-**Custom errors:**
-- Thrown as `throw new Error("message")` with Korean text for user-facing errors
-- Examples: `"Not authenticated"`, `"@inbody.com 이메일만 사용할 수 있습니다."`, `"파일 크기가 10MB를 초과합니다"`
+- Auth guard at top of every page module:
+  ```js
+  const user = guardPage();
+  if (!user) throw new Error("Not authenticated");
+  ```
+- Async operations use `try/catch` with `console.error` for logging:
+  ```js
+  try {
+    await login(userName, role);
+    window.location.href = "home.html";
+  } catch (e) {
+    console.error("로그인 오류:", e);
+    // restore UI state
+  }
+  ```
+- Fire-and-forget side effects (notifications, activity logs) wrap in silent try/catch:
+  ```js
+  try { await addActivityLog(...); } catch(e) {}
+  try { await recalculateProjectStats(...); } catch(e) { console.error("...", e); }
+  ```
+- Missing URL params trigger immediate redirect + throw:
+  ```js
+  if (!projectId) {
+    window.location.href = "projects.html?type=신규개발";
+    throw new Error("No project ID");
+  }
+  ```
+- User-facing feedback via in-page `showFeedback(type, text)` helper with 4-second auto-dismiss
+- Error messages shown via `showError(msg)` / `removeError()` pattern that inserts/removes DOM elements
 
 ## Logging
 
-**Framework:** Native `console` object (no logger library)
+**Framework:** `console.log` / `console.error` (no logging library)
 
 **Patterns:**
-- `console.error()` for initialization failures and exception logging: `console.error("Init error:", err)`
-- Minimal logging elsewhere — mostly for development debugging
-- Log entries often paired with user-facing error modal/toast
-- No info/warn/debug logs observed; only error logs on exception path
+- Emoji prefix used for success/info logs in seed/init functions: `"✅ 체크리스트 상태 업데이트"`, `"📦 템플릿 데이터 자동 생성 완료"`
+- Korean error messages in catch blocks: `"로그인 오류:"`, `"알림 생성 실패:"`
+- Silent catch `catch(e) {}` used for non-critical side effects (activity logs)
+- Page-level debug logs are not stripped in production
 
-**Locations:**
-- `js/pages/admin-checklists.js:69` — init error logging
-- `js/pages/dashboard.js:155` — cache load error (silent)
-- `js/pages/task-detail.js:762` — file delete error with user feedback
-- All Firestore error handling paths include `console.error()` where critical
+## HTML Generation
 
-## Comments
+**Pattern:** All dynamic UI is rendered by writing `innerHTML` with template literal strings:
+```js
+app.innerHTML = `
+  <div class="container">
+    <h1>${escapeHtml(title)}</h1>
+  </div>
+`;
+```
 
-**When to Comment:**
-- Section headers with full-width divider: `// ─── Auth guard ─────────────────────────────────────────────────────────`
-- State initialization blocks: `// --- State ---`
-- Complex filter/calculation logic: `// Derived state`, `// Phase 0: Instant render from cache`
-- Intentional silent failures: `// Ignore — user might not have used Firebase Auth`
-- HTML comment sections: `<!-- Login Page -->`, `<!-- Tabs -->`, `<!-- Modal -->`
+**XSS prevention:** `escapeHtml()` from `utils.js` must be called on any user-supplied string:
+```js
+export function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+```
+- `escapeHtml` is NOT called on trusted constants, badge classes, or internal enum values
+- `data-*` attributes use `escapeHtml` for user-sourced values: `data-notif-id="${escapeHtml(n.id)}"`
 
-**JSDoc/TSDoc:**
-- Not used — plain JavaScript, no TypeScript
-- Function signatures documented via inline comments above when non-obvious
-- Example from `js/utils.js:206-209`:
-  ```javascript
-  export function exportToCSV(data, headers, filename = "export.csv") {
-    // Support both formats:
-    // 1) headers = ["col1", "col2"], data = [["val1", "val2"], ...]  (simple arrays)
-    // 2) headers = [{label, key}, ...], data = [{field: val}, ...]   (object format)
+## State Management
+
+**Pattern:** Module-level `let` variables as reactive state store:
+```js
+let allProjects = [];
+let activeTab = "projects";
+let viewMode = "table";
+```
+- All subscriptions update state variables then call `render()`
+- `render()` is a full re-render of `app.innerHTML` (no diffing/virtual DOM)
+- UI state (tab, filter, expanded sets) persists in module variables across re-renders
+- `Set` used for multi-select state: `let selectedTaskIds = new Set()`
+
+**Subscriptions lifecycle:**
+- All `onSnapshot` subscriptions return unsubscribe functions stored in `unsubscribers[]`
+- Cleanup on `window.beforeunload`:
+  ```js
+  window.addEventListener("beforeunload", () => {
+    unsubscribers.forEach((u) => u && u());
+  });
   ```
 
-**Parameter documentation:**
-- Inline comments explain special behaviors
-- Default parameters in function signature: `formatDate(date)`, `validateInput(str, maxLength = 500)`
+## Firestore Data Mapping
 
-## Function Design
-
-**Size:**
-- Small utility functions: 5-20 lines (e.g., `getTheme()`, `formatDate()`)
-- Mid-size helpers: 30-100 lines (e.g., `loadFromCache()`, `getFilteredProjects()`)
-- Large complex functions: 200+ lines for page render loops (e.g., `render()` in `project-detail.js`)
-- No explicit line count limits observed, but functions aim for single responsibility
-
-**Parameters:**
-- Positional parameters first, then options: `updateTask(taskId, newStatus, assignee)`
-- Optional parameters with defaults: `validateInput(str, maxLength = 500)`, `exportToCSV(data, headers, filename = "export.csv")`
-- Callbacks passed for Firestore subscriptions: `subscribeProjects((projects) => { ... })`
-
-**Return Values:**
-- Firestore read functions return promises: `getUsers()`, `getTemplateDepartments()`
-- Subscription functions return unsubscribe function: `unsub = subscribeProjects((data) => {}); ... unsub();`
-- Helper functions return computed values: `formatDate()`, `getRiskClass()`, `getStatusLabel()`
-- Validation functions return object with status: `validateFile()` → `{ valid: boolean, error: string }`
-- Async operations return promises; sync operations return synchronously
+**Pattern:** Each collection has a dedicated `docToX(id, data)` converter in `firestore-service.js`:
+```js
+function docToProject(id, data) {
+  return { ...data, id, startDate: toDate(data.startDate), endDate: toDate(data.endDate) };
+}
+```
+- Timestamps always converted to JS `Date` via `toDate(val)` helper
+- Optional dates use conditional: `data.completedDate ? toDate(data.completedDate) : undefined`
 
 ## Module Design
 
 **Exports:**
-- `firestore-service.js`: Functions only (no class exports), all async Firestore CRUD operations + subscriptions
-- `utils.js`: Utility functions (format, validate, helpers), constant arrays (departments, projectStages, PHASE_GROUPS)
-- `auth.js`: Auth functions (login, logout, guardPage), localStorage session management
-- `components.js`: Shared UI components (renderNav, renderSpinner), theme management
-- `firebase-init.js`: Singleton Firebase app/db/auth/storage exports
+- `js/utils.js`: named exports only, pure helper functions and constants
+- `js/auth.js`: named exports (`getUser`, `login`, `loginWithMicrosoft`, `logout`, `guardPage`, `startSessionWatcher`)
+- `js/firebase-init.js`: named exports `db`, `auth`, `storage` + default app
+- `js/firestore-service.js`: named exports for all CRUD, subscribe, and seed operations (~60+ exports)
+- `js/components.js`: named exports (`renderNav`, `renderHomeNav`, `renderSpinner`, `renderBadge`, `navigate`, `initTheme`, `toggleTheme`, `getTheme`, `setTheme`)
+- Page modules (`js/pages/*.js`): no exports (side-effect modules, loaded as `<script type="module">`)
 
-**Barrel Files:**
-- No barrel files (no `index.js` re-exports)
-- Each page imports directly: `import { renderNav } from "../components.js"`
+**No barrel files:** imports always reference specific module files directly.
 
-**Naming conventions for exports:**
-- All exports are named (no default exports)
-- Single export per concept: one function = one export
+## CSS Architecture
 
-**Example from `js/auth.js`:**
-```javascript
-export function getUser() { ... }
-export async function login(name, role) { ... }
-export async function loginWithMicrosoft() { ... }
-export function guardPage() { ... }
-export async function logout() { ... }
+**Design Tokens:**
+- All colors, spacing, and shadows defined as CSS custom properties in `:root` (light mode)
+- Dark mode overrides in `[data-theme="dark"]` selector
+- Token naming: `--surface-0` through `--surface-4`, `--primary-500`, `--success-600`, `--danger-700`
+
+**Theme flash prevention:** Inline `<script>` in every HTML `<head>`:
+```html
+<script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
 ```
 
-## HTML Structure
-
-**Data attributes:**
-- `data-theme="dark"` for theme mode
-- `data-view="matrix"` for view mode selection (admin-checklists)
-- `id` and `class` for selectors (no data-* for internal selectors)
-
-**CSS Custom Properties:**
-- Light mode is default (`:root`), dark mode uses `[data-theme="dark"]`
-- Color tokens: `--primary-*`, `--success-*`, `--warning-*`, `--danger-*`, `--slate-*`
-- Surface tokens: `--surface-0` (bg) through `--surface-4` (borders)
-- Semantic tokens: `--foreground`, `--background`, `--shadow-glow`, `--radius-lg`
+**Page-specific CSS:** Placed in `<style>` block inside the HTML file (not in `styles.css`)
 
 ---
 

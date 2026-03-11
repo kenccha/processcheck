@@ -6,293 +6,199 @@
 
 ```
 processcheck-html/
-├── index.html                    # Login page (Microsoft OAuth + demo cards)
-├── home.html                     # Hub/home page (navigation to dashboard/projects/etc)
-├── landing.html                  # Marketing landing page (no auth required)
-├── manual.html                   # User manual (no auth required)
-├── dashboard.html                # Project-centric dashboard (4 tabs: projects/tasks/approvals/notifications)
-├── projects.html                 # Project list & 7 view modes (table/matrix/cards/gantt/kanban/timeline/calendar)
-├── project.html                  # Project detail (3 tabs: overview+tasks/schedule/bottleneck)
-├── task.html                     # Task detail (timeline, comments, file uploads, approvals)
-├── admin-checklists.html         # Template item management (3 modes: matrix/tree/list) — observer only
-├── admin-users.html              # User management (role/dept assignment) — observer only
-├── customers.html                # Customer management (dealers, subsidiaries, hospitals)
-├── customer-portal.html          # Customer-facing read-only project view (email auth)
-├── sales.html                    # Sales launch preparation dashboard
-├── activity.html                 # Activity/event log
-├── notifications.html            # Notifications page (timeline view)
-├── reports.html                  # Reports & analytics (placeholder)
-│
+├── index.html              # Login page (entry point)
+├── home.html               # Hub — links to dashboard or sales
+├── dashboard.html          # Role-based dashboard shell
+├── projects.html           # Project list (7 views) shell
+├── project.html            # Project detail (3 tabs) shell
+├── task.html               # Task detail shell
+├── sales.html              # Sales launch dashboard shell
+├── admin-checklists.html   # Template admin shell
+├── admin-users.html        # User management shell
+├── customers.html          # Customer management shell
+├── customer-portal.html    # Customer portal (email auth) shell
+├── notifications.html      # Notifications shell
+├── activity.html           # Activity log shell
+├── reports.html            # Reports shell
+├── manual.html             # User manual (no auth required) shell
+├── landing.html            # Marketing/landing page (self-contained)
 ├── css/
-│   └── styles.css                # Single design system file (light/dark themes, tokens, components)
-│
+│   └── styles.css          # All design tokens, components, utilities (3733 lines)
 ├── js/
-│   ├── firebase-init.js          # Firebase SDK initialization (app, auth, db, storage)
-│   ├── auth.js                   # Authentication (login, MS OAuth, logout, session mgmt)
-│   ├── firestore-service.js      # All Firestore CRUD + subscriptions (380+ lines)
-│   ├── components.js             # Shared UI components (nav, spinner, badges, theme)
-│   ├── utils.js                  # Utility functions (date, role, formatting, helpers)
-│   ├── review-system.js          # Review/feedback system (comments, issues, approvals)
-│   ├── feedback-widget.js        # Feedback prompt widget (inline on pages)
-│   │
+│   ├── firebase-init.js    # Firebase app + db/auth/storage singletons
+│   ├── auth.js             # Session management, login flows, page guard
+│   ├── firestore-service.js# All Firestore CRUD + subscriptions (132 KB)
+│   ├── components.js       # Nav, theme, spinner, shared UI components
+│   ├── utils.js            # Pure helpers, domain constants (PHASE_GROUPS, etc.)
+│   ├── review-system.js    # Review/feedback panel (Firestore reviews collection)
+│   ├── feedback-widget.js  # Feedback widget (older, separate from review-system)
 │   └── pages/
-│       ├── login.js              # Login page controller (demo cards, MS OAuth flow)
-│       ├── home.js               # Home hub page controller
-│       ├── landing.js            # Landing page controller (no auth)
-│       ├── manual.js             # Manual page controller (search, scroll spy, no auth)
-│       ├── dashboard.js          # Dashboard page controller (role-based subscriptions)
-│       ├── projects.js           # Projects page controller (7 view modes, filtering, sorting)
-│       ├── project-detail.js     # Project detail page controller (3 tabs, checklist CRUD)
-│       ├── task-detail.js        # Task detail page controller (timeline, approvals)
-│       ├── admin-checklists.js   # Template admin page controller (matrix/tree/list views)
-│       ├── admin-users.js        # User admin page controller (role/dept editing)
-│       ├── customers.js          # Customer management page controller
-│       ├── customer-portal.js    # Customer portal page controller (email auth)
-│       ├── sales.js              # Sales launch dashboard page controller
-│       ├── activity.js           # Activity log page controller
-│       ├── notifications.js      # Notifications page controller
-│       └── reports.js            # Reports page controller
-│
+│       ├── login.js        # Login page controller
+│       ├── home.js         # Hub page controller
+│       ├── dashboard.js    # Dashboard controller (34 KB)
+│       ├── projects.js     # Project list controller (54 KB)
+│       ├── project-detail.js# Project detail controller (62 KB)
+│       ├── task-detail.js  # Task detail controller (36 KB)
+│       ├── sales.js        # Sales dashboard controller (75 KB)
+│       ├── admin-checklists.js # Template admin controller (53 KB)
+│       ├── admin-users.js  # User management controller (10 KB)
+│       ├── customers.js    # Customer management controller (15 KB)
+│       ├── customer-portal.js # Portal controller (19 KB)
+│       ├── notifications.js# Notifications controller (15 KB)
+│       ├── activity.js     # Activity log controller (15 KB)
+│       ├── reports.js      # Reports controller (33 KB)
+│       ├── manual.js       # Manual page controller (47 KB, embeds CSS)
+│       └── landing.js      # Landing page controller (minimal)
+├── img/                    # Manual screenshots (14 PNG files)
 ├── docs/
-│   ├── manual.md                 # User manual content (Korean, source of truth)
-│   └── deliverables/
-│       ├── wireframes.html       # Design wireframes (interactive deliverable)
-│       ├── checklist-wireframe.html  # Checklist template wireframe (live Firestore data)
-│       ├── user-flows.html       # User flow diagrams
-│       ├── flow-annotations.html # Flow diagrams with annotations
-│       ├── diagram-viewer.html   # System architecture diagrams (DrawIO)
-│       ├── feedback.html         # Feedback aggregation view (all page feedbacks)
-│       │
+│   └── deliverables/       # Design review documents (read-only UI)
+│       ├── wireframes.html
+│       ├── checklist-wireframe.html
+│       ├── user-flows.html
+│       ├── flow-annotations.html
+│       ├── diagram-viewer.html
+│       ├── feedback.html
 │       └── js/
-│           ├── deliverable-nav.js    # Top nav + sidebar for deliverable pages
-│           ├── review-bootstrap.js   # Standalone review system for deliverables
-│           ├── checklist-live.js     # Live Firestore sync for checklist wireframe
-│           └── feedback-system.js    # Feedback collection & UI (screenshot + comments)
-│
-├── img/
-│   ├── [14 PNG files]            # Manual page screenshots (captured via Puppeteer)
-│
-├── firebase.json                 # Firebase Hosting deployment config
-├── .firebaserc                   # Firebase project ID binding
-└── firestore.rules               # Firestore security rules (reviews collection auth)
+│           ├── deliverable-nav.js  # IIFE top nav + sidebar + screenshot capture
+│           ├── review-bootstrap.js # Standalone review system for deliverables
+│           ├── checklist-live.js   # Firestore live data for checklist wireframe
+│           └── feedback-system.js  # Firestore feedback CRUD
+├── firebase.json           # Firebase Hosting config + Firestore rules pointer
+├── firestore.rules         # Firestore security rules
+├── storage.rules           # Firebase Storage security rules
+├── .firebaserc             # Firebase project link (processsss-appp)
+├── capture-screenshots.mjs # Puppeteer screenshot utility (dev tool, not deployed)
+└── .planning/              # GSD planning documents (not deployed)
+    ├── codebase/           # Codebase analysis documents
+    ├── phases/             # Phase implementation plans
+    └── research/           # Research notes
 ```
 
 ## Directory Purposes
 
-**Root HTML Files:**
-- Purpose: Entry points for different user flows and roles
-- Contains: Minimal HTML shell + inline `<script type="importmap">` for Firebase CDN + page-specific style blocks + div#app/nav-root/other containers
-- Key files: `index.html` (login), `home.html` (hub), `dashboard.html`, `projects.html`, `project.html`, `task.html`, `admin-checklists.html`, `admin-users.html`, `manual.html`
+**`css/`:**
+- Purpose: Single global stylesheet — no component-scoped styles
+- Contains: CSS custom properties (design tokens), light mode (`:root`) and dark mode (`[data-theme="dark"]`), layout utilities, component classes (`.nav`, `.card`, `.btn`, `.badge`, `.spinner`, `.modal`, etc.)
+- Key files: `css/styles.css` (the only CSS file; 3733 lines)
+- Note: Page-specific CSS is sometimes embedded as `<style>` in the HTML shell (e.g., `index.html`) or inside the page controller JS (e.g., `manual.js` injects a `<style>` tag)
 
-**`css/styles.css`:**
-- Purpose: Single design system file with all tokens, components, and layouts
-- Contains: CSS custom properties (light/dark mode), animations, resets, base styles, component classes (.nav-*, .card-*, .btn-*, .badge-*, etc)
-- Key features: Light mode (default, `:root`), dark mode (`[data-theme="dark"]`), Pretendard + JetBrains Mono fonts, cyan primary color, scrollbar customization
+**`js/` (shared modules):**
+- Purpose: Infrastructure and shared utilities imported by all page controllers
+- Contains: `firebase-init.js`, `auth.js`, `firestore-service.js`, `components.js`, `utils.js`, `review-system.js`
+- All files are ES modules (`import`/`export`)
 
-**`js/firebase-init.js`:**
-- Purpose: Firebase SDK initialization (singleton pattern)
-- Contains: Firebase config, `initializeApp()`, `getFirestore()`, `getAuth()`, `getStorage()` exports
-- Used by: All modules that need `db`, `auth`, or `storage` references
+**`js/pages/`:**
+- Purpose: One controller per page — handles the full lifecycle of one HTML page
+- Contains: Page-specific state, render functions, event handlers
+- Each file is an ES module loaded by its corresponding HTML shell via `<script type="module" src="js/pages/[page].js">`
 
-**`js/auth.js`:**
-- Purpose: Authentication and session management
-- Contains: `login(name, role)` (demo cards), `loginWithMicrosoft()` (OAuth popup), `completeRegistration()`, `logout()`, `getUser()` (localStorage check), page guard `guardPage()`
-- Session storage: localStorage key `pc_user` stores `{id, name, email, role, department, authProvider}`
-
-**`js/firestore-service.js`:**
-- Purpose: All data operations — subscriptions, CRUD, transformations, seeding
-- Contains:
-  - Timestamp converters: `toDate()`, `docToProject()`, `docToChecklistItem()`, `docToChangeRequest()`, `docToUser()`, etc.
-  - Subscriptions: `subscribeProjects()`, `subscribeChecklistItems()`, `subscribeAllChecklistItems()`, `subscribeNotifications()`, `subscribeTemplateItems()`, etc.
-  - CRUD: `createProject()`, `updateProject()`, `createChecklistItem()`, `completeTask()`, `approveTask()`, `rejectTask()`, `updateChangeRequest()`, etc.
-  - Utils: `getUsers()`, `getUserByName()`, `getUserByEmail()`, `createUser()`, `getUsersInDepartment()`
-  - Seeding: `seedTemplatesIfEmpty()`, `applyTemplateToProject()`, `seedDatabaseIfEmpty()` (legacy, disabled)
-  - Notifications: `createNotification()` (auto-called on task changes), `markNotificationRead()`
-  - Stats: `recalculateProjectStats()` (auto-called on task complete/approve/reject/restart)
-- Size: ~2000 lines (large monolithic file)
-
-**`js/components.js`:**
-- Purpose: Shared UI components (reused across pages)
-- Contains:
-  - Theme: `getTheme()`, `setTheme()`, `toggleTheme()`, `getThemeIcon()`, `initTheme()`
-  - Navigation: `renderNav()` (renders top nav bar with links + role-based menu), `BASE_NAV_LINKS` array, `getNavLinks(userRole)`
-  - Spinner: `renderSpinner()` (loading indicator HTML)
-  - Review panel: `ReviewPanel` class (FAB + sidebar for feedback)
-  - Badges: Helper functions for status/role/risk badges
-
-**`js/utils.js`:**
-- Purpose: Utility functions and constants
-- Contains:
-  - Constants: `departments` (10 departments), `projectStages` (12 stages), `PHASE_GROUPS` (6 phases), `GATE_STAGES` (approval gates)
-  - Formatters: `formatStageName()`, `formatDate()`, `timeAgo()`, `getRiskClass()`, `getRiskLabel()`, `getStatusLabel()`, `getStatusBadgeClass()`
-  - Helpers: `escapeHtml()`, `getRoleName()`, `daysUntil()`, `getProgressClass()`, `getQueryParam()`
-  - Exports: `exportToCSV()`, `exportToPDF()`
-
-**`js/review-system.js`:**
-- Purpose: Review/feedback system for inline comments on any page
-- Contains: `subscribeReviews()`, `addReview()`, `updateReviewStatus()`, `addReply()`, `deleteReview()`, `ReviewPanel` class
-- Data: Stores in `reviews` collection with fields: `pageId`, `pageUrl`, `authorId`, `type` (comment/issue/approval), `status` (open/resolved), `content`, `votes`, `replies`, `history`
-
-**`js/pages/*.js`:**
-- Purpose: Page-specific controllers — handle subscriptions, state, rendering, event listeners
-- Pattern: Each page file:
-  1. Imports auth guard and calls `guardPage()` to verify user
-  2. Imports shared components (nav, spinner, theme)
-  3. Imports firestore service for data subscriptions
-  4. Imports utils for formatting/helpers
-  5. Defines local state variables (`let projects = []`, `let checklistItems = []`, etc)
-  6. Sets up subscriptions with `onSnapshot` callbacks
-  7. Defines render function that clears `app.innerHTML` and rebuilds DOM
-  8. Attaches event listeners to rendered DOM elements
-  9. Returns unsubscribe functions on cleanup
-
-**`docs/manual.md`:**
-- Purpose: Single source of truth for user documentation (Korean)
-- Contains: 10+ sections (시작하기, 프로젝트관리, 작업관리, 승인workflow, 설계변경, 출시준비, 고객, 체크리스트관리, 역할별가이드, FAQ, 용어집)
-- Used by: `manual.js` parses and renders as HTML
+**`img/`:**
+- Purpose: Static images used in the manual page
+- Contains: 14 PNG screenshots referenced by `js/pages/manual.js`
+- Generated: Via `capture-screenshots.mjs` (Puppeteer)
+- Committed: Yes
 
 **`docs/deliverables/`:**
-- Purpose: Design deliverables (wireframes, flows, diagrams) with integrated feedback system
-- Contains: Static HTML files with embedded review system for design feedback
-- Key: Each page loads `deliverable-nav.js` for top nav + `review-bootstrap.js` for review panel
+- Purpose: Design deliverable documents for project review — wireframes, user flows, architecture diagrams, feedback collection
+- Contains: Self-contained HTML pages; each includes `deliverable-nav.js` as a classic `<script>` (IIFE, not ES module)
+- Key distinction: Uses its own standalone review system (`review-bootstrap.js`) rather than `js/review-system.js`
+- Not the main application — no auth guard, read-only views with Firestore feedback
 
 ## Key File Locations
 
 **Entry Points:**
-- `index.html` + `js/pages/login.js`: Login (demo cards + Microsoft OAuth)
-- `home.html` + `js/pages/home.js`: Home hub (navigation hub)
-- `dashboard.html` + `js/pages/dashboard.js`: Main dashboard (project-centric view)
-- `projects.html` + `js/pages/projects.js`: Project list (7 view modes)
-- `project.html` + `js/pages/project-detail.js`: Project detail (3 tabs)
-- `admin-checklists.html` + `js/pages/admin-checklists.js`: Template admin (observer only)
+- `index.html` + `js/pages/login.js`: Application entry — login
+- `home.html` + `js/pages/home.js`: Post-login hub
+- `landing.html`: Public marketing page (no auth, largely self-contained HTML)
+- `manual.html` + `js/pages/manual.js`: Public manual (no auth required)
 
 **Configuration:**
-- `firebase.json`: Firebase Hosting config (public dir, redirects)
-- `.firebaserc`: Firebase project ID mapping
-- `js/firebase-init.js`: Firebase SDK config and exports
-- `firestore.rules`: Firestore security rules (if deployed)
+- `js/firebase-init.js`: Firebase project config (API key, project ID, etc.) — hardcoded, safe for client
+- `firebase.json`: Hosting public directory, cache headers, rules file paths
+- `.firebaserc`: Firebase project alias (`processsss-appp`)
+- `firestore.rules`: Collection-level read/write rules (most collections: read=public, write=authenticated)
 
 **Core Logic:**
-- `js/firestore-service.js`: All Firestore operations (subscriptions, CRUD, seeding)
-- `js/auth.js`: Authentication and session management
-- `js/components.js`: Shared UI components and navigation
+- `js/firestore-service.js`: Single file for ALL data access — CRUD, subscriptions, business logic (completeTask, approveTask, recalculateProjectStats, applyTemplateToProject, seeding)
+- `js/auth.js`: Session management and authentication flows
+- `js/components.js`: Navigation rendering and theme management
 
-**Testing/Seeding:**
-- Mock data inline in `firestore-service.js:getMockData()` (193 template items)
-- `seedTemplatesIfEmpty()`: Auto-seed templates if collection is empty
-- Demo user login: 3 sample cards (김철수/worker, 이영희/manager, 박민수/observer)
+**Domain Constants:**
+- `js/utils.js`: `PHASE_GROUPS` (6 phases), `GATE_STAGES`, `departments` (10 dept names), `projectStages` (12 stage keys)
 
 ## Naming Conventions
 
 **Files:**
-- HTML pages: `kebab-case.html` (e.g., `admin-users.html`, `project-detail.html`)
-- JavaScript modules: `kebab-case.js` or `camelCase.js` (mixed — most are camelCase in `pages/`, kebab in root `js/`)
-- CSS: Single file `styles.css`
-- Directories: `kebab-case` (e.g., `js/pages/`, `docs/deliverables/`)
+- HTML shells: `kebab-case.html` matching the page name (e.g., `admin-checklists.html`, `customer-portal.html`)
+- Page controllers: `js/pages/kebab-case.js` matching the HTML shell name (e.g., `admin-checklists.js`)
+- Shared modules: `js/camelCase.js` (e.g., `firestore-service.js` uses hyphens; `auth.js`, `utils.js` use lowercase)
 
-**Functions:**
-- Exports: `camelCase` (e.g., `subscribeProjects()`, `completeTask()`, `renderNav()`)
-- Callbacks: Arrow functions inline (e.g., `(data) => { allProjects = data; render(); }`)
-- Event handlers: `handleXxx()` or bound directly via `addEventListener()`
+**JavaScript:**
+- Functions: `camelCase` (e.g., `guardPage`, `renderNav`, `subscribeProjects`, `completeTask`)
+- Constants: `UPPER_SNAKE_CASE` for arrays/objects of domain constants (e.g., `PHASE_GROUPS`, `GATE_STAGES`, `BASE_NAV_LINKS`)
+- Variables: `camelCase` for module-level state (e.g., `allProjects`, `activeTab`, `unsubscribers`)
 
-**Variables:**
-- Local state: camelCase (e.g., `allProjects`, `checklistItems`, `activeTab`)
-- Constants: UPPER_SNAKE_CASE (e.g., `STORAGE_KEY`, `ALLOWED_DOMAIN`, `CACHE_TTL`, `PHASE_GROUPS`)
-- DOM refs: `camelCase` with `-` for HTML IDs (e.g., `const user = document.getElementById("user-input")`)
+**CSS Classes:**
+- Component classes: `kebab-case` prefixed by component name (e.g., `.nav-link`, `.nav-dropdown`, `.card-header`, `.btn-primary`)
+- Page-specific: `.login-*`, `.hub-*`, `.manual-*` prefixes
+- Utility classes: short single-purpose (e.g., `.flex`, `.gap-8`, `.text-sm`, `.hidden`)
 
-**Types/Collections:**
-- Firestore collections: snake_case plurals (e.g., `projects`, `checklistItems`, `templateItems`, `notifications`, `reviews`)
-- Document fields: camelCase (e.g., `projectId`, `startDate`, `approvalStatus`, `isRequired`)
-- Enums/Status: snake_case (e.g., `pending`, `in_progress`, `completed`, `rejected`, `approved`)
+**Firestore Collections:**
+- camelCase singular: `users`, `projects`, `checklistItems`, `templateItems`, `templateStages`, `templateDepartments`, `notifications`, `changeRequests`, `customers`, `launchChecklists`, `portalNotifications`, `reviews`, `activityLogs`, `feedbacks`
 
 ## Where to Add New Code
 
-**New Feature (Component/Page):**
-1. Create new HTML file in root (e.g., `reports.html`)
-2. Create page controller in `js/pages/reports.js` (import auth guard, components, firestore service, utils)
-3. Set up subscriptions and state management pattern (see `projects.js` or `dashboard.js` as template)
-4. Add navigation link in `components.js:BASE_NAV_LINKS` and `docs/deliverables/js/deliverable-nav.js:MAIN_NAV` (keep in sync)
-5. Add CSS styling to `css/styles.css` using design tokens (`:root` custom properties)
+**New Application Page:**
+1. Create HTML shell: `[page-name].html` — copy structure from `dashboard.html` (minimal shell with `#nav-root`, `#app`, importmap, `<script type="module" src="js/pages/[page-name].js">`)
+2. Create page controller: `js/pages/[page-name].js` — start with auth guard, nav render, Firestore subscription
+3. Add nav link: Update `BASE_NAV_LINKS` in `js/components.js` AND `MAIN_NAV` in `docs/deliverables/js/deliverable-nav.js`
 
-**New Firestore Collection/Document Type:**
-1. Add transformer function in `firestore-service.js` (e.g., `docToNewType(id, data)` that converts Firestore Timestamps)
-2. Add subscription function (e.g., `subscribeNewType(callback)`)
-3. Add CRUD functions (e.g., `createNewType()`, `updateNewType()`, `deleteNewType()`)
-4. If collection affects project stats, call `recalculateProjectStats()` in mutation
-5. If collection should trigger notifications, call `createNotification()` in mutation
+**New Firestore Operation:**
+- Add to `js/firestore-service.js` in the appropriate section (grouped by collection)
+- Follow the `docTo*` mapper pattern for any new collection
+- Use `subscribe*` for real-time, `get*` / `fallbackLoad*` for one-time fetch
 
-**New Page Component (Modal, Dialog, Sidebar):**
-1. Create render function in relevant `pages/*.js` (e.g., `renderTaskModal(task)`)
-2. Use CSS classes from `styles.css` for styling (`.modal-*`, `.card-*`, `.btn-*`, `.badge-*`)
-3. Add event listeners to buttons in render function
-4. On close, set UI state flag and call `render()` to re-render main page
+**New Shared UI Component:**
+- Add to `js/components.js` and export
+- If it requires CSS, add to `css/styles.css` with a descriptive component prefix
 
-**New Utility Function:**
-1. Add to `js/utils.js` and export (e.g., `export function formatNewType() { ... }`)
-2. If it's a formatter for display, follow naming: `formatXxx()` / `getXxxLabel()` / `getXxxClass()`
-3. Add constants (departments, stages, etc) to utils exports
+**New Domain Constant or Utility Function:**
+- Add to `js/utils.js` and export
 
-**Database Seeding (for testing/demo):**
-1. Add mock data to `getMockData()` function in `firestore-service.js`
-2. If new collection, add to return object and import in seed functions
-3. Call `seedDatabaseIfEmpty()` or `seedTemplatesIfEmpty()` from login page
-4. Mock data is filtered via `filterDemo()` in subscriptions (for demo vs real data separation)
+**New Deliverable Design Document:**
+- Add HTML file to `docs/deliverables/`
+- Include `deliverable-nav.js` as a classic script (IIFE): `<script src="js/deliverable-nav.js"></script>`
+- Add the page to `SUB_PAGES` array in `docs/deliverables/js/deliverable-nav.js`
+- Do NOT use ES module `import` in deliverable pages — use IIFE globals
+
+**Page-Specific CSS:**
+- Prefer adding to `css/styles.css` with a page-specific prefix class
+- Small page-specific overrides may be placed in a `<style>` block in the HTML shell
+- `manual.js` uses an injected `<style>` tag inside the script — follow only for manual-scale isolated content
 
 ## Special Directories
 
-**`docs/deliverables/`:**
-- Purpose: Design artifacts with integrated feedback system
-- Generated: No (manually created HTML files)
+**`.planning/`:**
+- Purpose: GSD planning documents — not application code
+- Generated: No (written by Claude agents)
 - Committed: Yes
-- Notes: Each page loads `deliverable-nav.js` for navigation consistency with main app, and `review-bootstrap.js` for standalone review system
 
-**`docs/`:**
-- Purpose: Documentation (manual.md is source of truth)
-- Generated: `manual.js` renders `manual.md` content as HTML at runtime
-- Committed: Yes (markdown source + 14 PNG screenshots)
+**`.firebase/`:**
+- Purpose: Firebase CLI cache
+- Generated: Yes
+- Committed: No (in `.gitignore`)
 
 **`img/`:**
-- Purpose: Manual page screenshots
-- Generated: Yes (via Puppeteer in build process — not in CI, run manually: `node scripts/capture-screenshots.mjs`)
-- Committed: Yes (PNG files checked in)
+- Purpose: Manual screenshots
+- Generated: Via `capture-screenshots.mjs` Puppeteer script
+- Committed: Yes
 
-**`js/pages/`:**
-- Purpose: Page-specific controllers (one per HTML page)
-- Pattern: Each imports shared infrastructure, sets up subscriptions, defines state, renders UI, manages events
-- Size: 500-2000 lines per page (larger pages like dashboard.js, projects.js, project-detail.js)
+**`docs/deliverables/`:**
+- Purpose: Design review artifacts — wireframes, flows, diagrams, feedback
+- Generated: No (hand-crafted HTML)
+- Committed: Yes
+- Note: Uses separate nav system and standalone review system; treated as a sub-application with its own JS layer
 
 ---
 
-## Import/Export Patterns
-
-**ES Module Imports (all files use top-level imports):**
-```javascript
-// From auth.js
-import { getUser, logout } from "./auth.js";
-
-// From firestore-service.js
-import { subscribeProjects, createProject, updateProject } from "./firestore-service.js";
-
-// From Firebase CDN
-import { initializeApp } from "firebase/app";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
-
-// From utils.js
-import { departments, PHASE_GROUPS, formatDate, getRiskClass } from "./utils.js";
-```
-
-**Firebase Firestore Usage:**
-```javascript
-// Subscribe to real-time updates
-const unsubscribe = onSnapshot(query(collection(db, "projects"), where("status", "==", "active")), (snap) => {
-  const projects = snap.docs.map(doc => docToProject(doc.id, doc.data()));
-  callback(projects);
-});
-
-// Batch writes for bulk operations
-const batch = writeBatch(db);
-items.forEach(item => {
-  batch.update(doc(db, "checklistItems", item.id), { assignee: newAssignee });
-});
-await batch.commit();
-```
+*Structure analysis: 2026-03-12*

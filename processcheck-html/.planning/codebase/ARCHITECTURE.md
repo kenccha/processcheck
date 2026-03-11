@@ -4,189 +4,208 @@
 
 ## Pattern Overview
 
-**Overall:** Client-side SPA (Single Page Application) using vanilla JavaScript ES modules with real-time Firebase Firestore subscriptions.
+**Overall:** Multi-Page Application (MPA) with a per-page Controller pattern
 
 **Key Characteristics:**
-- No build step or framework — plain HTML + CSS + JavaScript
-- Firebase SDK v11.3.0 loaded via CDN with ES module `<script type="importmap">`
-- Event-driven reactive architecture with `onSnapshot` subscriptions
-- localStorage-based session management with Microsoft OAuth integration
-- Declarative UI rendering pattern with full re-render on state change
-- Light/dark theme support via CSS custom properties and `[data-theme="dark"]` attribute
+- Each HTML page is a shell: minimal static HTML with a single `<script type="module">` entry point
+- Each page's controller (in `js/pages/`) is responsible for auth guard, nav render, Firestore subscriptions, state management, and full DOM rendering via `innerHTML`
+- Shared infrastructure lives in `js/` (firebase init, auth, Firestore service, components, utils) and is imported as ES modules across all page controllers
+- No build step — all JS is native ES modules, Firebase SDK loaded via CDN `<script type="importmap">`
 
 ## Layers
 
-**Presentation Layer:**
-- Purpose: Render UI, handle user interactions, manage view state
-- Location: `js/pages/*.js` (page-specific controllers), `js/components.js` (shared UI components), `css/styles.css` (design system)
-- Contains: Page controllers with event listeners, DOM rendering functions, form handling, view mode switching
-- Depends on: Firestore Service, Auth, Utils
-- Used by: HTML pages
-
-**State & Subscription Layer:**
-- Purpose: Real-time data synchronization via Firestore `onSnapshot` subscriptions
-- Location: `js/firestore-service.js` (main data service)
-- Contains: Subscription functions (`subscribeProjects`, `subscribeChecklistItems`, etc.), real-time unsubscribe management, sessionStorage caching for performance
-- Depends on: Firebase SDK, Auth (for user context)
-- Used by: Page controllers
-
-**Data Access Layer:**
-- Purpose: CRUD operations and Firestore queries
-- Location: `js/firestore-service.js` (contains both subscriptions and CRUD)
-- Contains: `createUser`, `updateProject`, `completeTask`, `approveTask`, `bulkUpdateAssignee`, etc.
-- Depends on: Firebase Firestore SDK
-- Used by: Page controllers, Subscription Layer
+**Infrastructure / Firebase:**
+- Purpose: Initialize Firebase app and export singletons
+- Location: `js/firebase-init.js`
+- Contains: `db` (Firestore), `auth` (Firebase Auth), `storage` (Firebase Storage)
+- Depends on: Firebase CDN modules via importmap
+- Used by: `js/firestore-service.js`, `js/auth.js`, `js/review-system.js`
 
 **Authentication Layer:**
-- Purpose: Session management, login/logout, role/department assignment
+- Purpose: Session management, login flows, page guard
 - Location: `js/auth.js`
-- Contains: `login()` (demo cards), `loginWithMicrosoft()`, `completeRegistration()`, `logout()`, localStorage session persistence
-- Depends on: Firebase Auth, Firestore Service (for user lookup/creation)
-- Used by: Login page, components, page guards
+- Contains: `getUser()`, `login()` (demo cards), `loginWithMicrosoft()` (OAuth), `guardPage()`, `logout()`, `startSessionWatcher()`
+- Depends on: `js/firebase-init.js`, `js/firestore-service.js`
+- Used by: Every page controller (always called at module top level)
+- Session storage: `localStorage` key `pc_user`, 24-hour TTL
 
-**Infrastructure Layer:**
-- Purpose: Firebase initialization and shared utilities
-- Location: `js/firebase-init.js`, `js/utils.js`, `js/components.js`
-- Contains: Firebase app/auth/db/storage initialization, helper functions (date formatting, role mapping, filtering), shared components (navigation, theme, spinner)
-- Depends on: Firebase SDK, localStorage
-- Used by: All other layers
+**Data Access Layer:**
+- Purpose: All Firestore CRUD operations and real-time subscriptions
+- Location: `js/firestore-service.js` (132 KB, ~3300 lines)
+- Contains:
+  - Timestamp conversion helpers: `toDate()`, `docToProject()`, `docToChecklistItem()`, etc.
+  - `subscribe*` functions using `onSnapshot` for real-time data (e.g., `subscribeProjects`, `subscribeChecklistItems`, `subscribeAllChecklistItems`, `subscribeChecklistItemsByAssignee`)
+  - `fallbackLoad*` functions for one-time fetch (used for dashboard performance optimization)
+  - CRUD: `createProject`, `updateProject`, `completeTask`, `approveTask`, `rejectTask`, `restartTask`, `recalculateProjectStats`
+  - Template management: `seedTemplatesIfEmpty`, `applyTemplateToProject`
+  - Notification creation (auto-triggered inside `completeTask`, `approveTask`, `rejectTask`)
+  - Inline mock data (`getMockData()`) for seeding
+- Depends on: `js/firebase-init.js`
+- Used by: All page controllers
+
+**Shared UI / Components:**
+- Purpose: Navigation bar, theme management, spinner, shared badges
+- Location: `js/components.js`
+- Contains: `renderNav()` (injects full nav HTML into `#nav-root`, returns unsubscribe fn for notification listener), `renderSpinner()`, `initTheme()`, `toggleTheme()`, `getTheme()`, `setTheme()`
+- Navigation config: `BASE_NAV_LINKS` constant (role-aware — observer gets "사용자 관리" appended to review dropdown)
+- Depends on: `js/auth.js`, `js/firestore-service.js`, `js/utils.js`, `js/review-system.js`
+- Used by: All page controllers
+
+**Utilities:**
+- Purpose: Pure helper functions, domain constants
+- Location: `js/utils.js`
+- Contains: `PHASE_GROUPS` (6-phase definitions), `GATE_STAGES`, `departments`, `projectStages`, `formatStageName()`, `getStatusLabel()`, `getRiskLabel()`, `daysUntil()`, `escapeHtml()`, `formatDate()`, `getQueryParam()`, `exportToCSV()`, `exportToPDF()`
+- Depends on: nothing
+- Used by: All page controllers, `js/components.js`, `js/review-system.js`
+
+**Review System:**
+- Purpose: In-app review/feedback panel for all pages
+- Location: `js/review-system.js`
+- Contains: `ReviewPanel` class, `subscribeReviews()`, `addReview()`, vote/reply/status CRUD
+- Auth restriction: Write requires `authProvider === "microsoft"`, demo users can only read
+- Depends on: `js/firebase-init.js`, `js/auth.js`, `js/utils.js`, `js/firestore-service.js`
+- Used by: `js/components.js` (mounts panel via `#nav-review-btn`)
+
+**Page Controllers:**
+- Purpose: Page-specific business logic, state, and DOM rendering
+- Location: `js/pages/*.js`
+- Contains: One module per page; each handles auth guard, nav render, Firestore subscriptions, local state (module-level `let` variables), and full DOM re-render via `app.innerHTML = ...`
+- Pattern: Top-level imperative execution (not class-based), state is module-level variables
+- Depends on: `js/auth.js`, `js/components.js`, `js/firestore-service.js`, `js/utils.js`
+
+**Deliverable Pages (separate subsystem):**
+- Purpose: Design review documents (wireframes, flows, diagrams)
+- Location: `docs/deliverables/`
+- Contains: Self-contained HTML pages with their own nav injected by `docs/deliverables/js/deliverable-nav.js` (IIFE, not ES module)
+- Special JS: `docs/deliverables/js/review-bootstrap.js` (standalone review system), `docs/deliverables/js/checklist-live.js` (Firestore live data), `docs/deliverables/js/feedback-system.js` (screenshot feedback)
 
 ## Data Flow
 
-**User Login Flow:**
+**Page Load Flow:**
 
-1. User clicks demo card OR Microsoft button on `index.html` (login page)
-2. `login.js` calls `auth.js:login()` or `auth.js:loginWithMicrosoft()`
-3. Auth module queries Firestore for existing user via `firestore-service.js:getUserByName()` or `getUserByEmail()`
-4. If user doesn't exist, auto-creates with `createUser()` (demo gets role directly, Microsoft users created as `worker` with auto-assignment by admin later)
-5. User object stored in `localStorage` under key `pc_user`
-6. Redirect to `home.html` (hub page with navigation links)
+1. Browser loads HTML shell (minimal static content)
+2. Inline `<script>` in `<head>` reads `localStorage("pc-theme")` and sets `data-theme` on `<html>` (flash prevention)
+3. `<script type="importmap">` registers Firebase CDN URLs
+4. `<script type="module" src="js/pages/[page].js">` executes
+5. Page controller calls `initTheme()`, then `guardPage()` — redirects to `index.html` if unauthenticated or session expired
+6. Controller calls `renderNav(document.getElementById("nav-root"))` — injects nav HTML, subscribes to notifications, returns unsubscribe function
+7. Controller subscribes to Firestore collections via `subscribe*` functions
+8. Firestore `onSnapshot` callbacks update module-level state variables and re-invoke `render()`
+9. `render()` replaces `app.innerHTML` with freshly-generated HTML string
 
-**Real-time Data Subscription (Example: Dashboard):**
+**Authentication Flow:**
 
-1. `dashboard.js` calls `subscribeProjects()` → sets up Firestore `onSnapshot` listener on `projects` collection
-2. Listener callback updates local state `allProjects = [...]`
-3. State change triggers `render()` which re-renders the entire dashboard DOM
-4. User interacts with UI (approves task, updates assignee) → calls Firestore mutation like `approveTask(taskId, approvalData)`
-5. Firestore write triggers automatic notification for affected users (`createNotification` called inside mutation)
-6. Dashboard subscription receives updated project/task data → state updates → re-render
+1. User visits `index.html`, handled by `js/pages/login.js`
+2. Demo card: calls `login(name, role)` → `getUserByName` or `createUser` in Firestore → saves to `localStorage("pc_user")` → redirect to `home.html`
+3. Microsoft OAuth: `loginWithMicrosoft()` → Firebase Auth popup → validates `@inbody.com` domain → `getUserByEmail` lookup → if new, auto-creates as `worker` with empty department → saves to `localStorage` → redirect to `home.html`
+4. Production environment (non-localhost): demo cards are hidden automatically
+5. Session TTL: 24 hours, checked on every `guardPage()` call and by 5-minute interval via `startSessionWatcher()`
 
-**Task Completion & Approval Flow:**
+**Real-time Data Subscription Pattern:**
 
-1. Worker completes task → `completeTask(taskId)` sets `status: "completed"`, `completedDate: now`, `approvalStatus: "pending"`
-2. Notification auto-created for manager/observer
-3. Observer approves → `approveTask(taskId)` sets `approvalStatus: "approved"`, `approvedBy: user.name`, `approvedAt: now`
-4. Project stats auto-recalculated via `recalculateProjectStats()` (called inside approve/reject/complete/restart)
-5. All subscribers receive updated project and notification data → UI updates in real-time
+```javascript
+// Typical page controller pattern:
+const unsubProject = subscribeProjects((projects) => {
+  allProjects = projects;
+  computeDerived();
+  render();
+});
 
-**Template → Project Checklist Generation:**
+// Cleanup on page unload (not always implemented):
+window.addEventListener("beforeunload", () => {
+  unsubProject();
+});
+```
 
-1. User creates new project → `createProject()` stores project document
-2. On first load of project detail, user clicks "템플릿 적용" button
-3. Button calls `applyTemplateToProject(projectId, projectType, changeScale?)`
-4. Service queries all 193 `templateItems` + filters by project type (신규개발 uses all, 설계변경 filters by `isRequired` and phase)
-5. Creates `checklistItems` docs for each filtered template → Firestore batch write
-6. Project stats recalculated (`recalculateProjectStats()`)
-7. Subscription updates → Dashboard/Project Detail render new checklist
+**Dashboard Performance Pattern (two-phase load):**
+
+1. Phase 0: Render from `sessionStorage` cache (key: `pc_dash_{userId}`, TTL: 120 seconds) for instant display
+2. Phase 1: `fallbackLoad*` one-time fetches for fast targeted queries (no listener overhead)
+3. Phase 2: Background `subscribe*` `onSnapshot` listeners replace Phase 1 data for live updates
 
 **State Management:**
 
-- **Local State:** Page controllers maintain state in variables (`let allProjects = []`, `let checklistItems = []`)
-- **Persisted State:** Authentication via `localStorage` (`pc_user` key), theme preference via `localStorage` (`pc-theme` key)
-- **Session Cache:** Dashboard caches project/task data in `sessionStorage` for 2 minutes (120s TTL) to reduce API calls on tab refresh
-- **Subscription State:** Real-time subscriptions hold unsubscribe functions in arrays, cleaned up on page unload
+- All state is module-level `let` variables inside each page controller JS file
+- No global state store
+- Re-render triggered explicitly by calling `render()` after state mutation
+- `sessionStorage` used only by dashboard for cache; no other cross-page state except auth in `localStorage`
 
 ## Key Abstractions
 
-**Subscription Manager:**
-- Purpose: Encapsulate Firestore `onSnapshot` lifecycle (subscribe, unsubscribe, transform data)
-- Examples: `subscribeProjects()`, `subscribeChecklistItems()`, `subscribeNotifications()` in `firestore-service.js`
-- Pattern: Returns unsubscribe function; calls callback with transformed data; handles Firestore Timestamps → JS Date conversion
+**Page Shell Pattern:**
+- Purpose: HTML file is only a loading skeleton; all content is injected by JS
+- Examples: `dashboard.html`, `project.html`, `projects.html`, `task.html`
+- Pattern:
+  ```html
+  <div id="nav-root"></div>
+  <main id="app" class="page-content">
+    <div class="spinner-overlay">...</div>  <!-- shown until JS renders -->
+  </main>
+  <script type="module" src="js/pages/[page].js"></script>
+  ```
 
-**Review System:**
-- Purpose: Enable inline comments/feedback on any page (main app + deliverable pages)
-- Examples: `subscribeReviews()`, `addReview()`, `addReply()` in `review-system.js`
-- Pattern: Detects current page via `window.location.pathname`, renders review panel FAB or sidebar, syncs with `reviews` Firestore collection in real-time
+**Firestore Document Mappers:**
+- Purpose: Normalize Firestore Timestamp fields to JS Date objects on read
+- Examples: `docToProject()`, `docToChecklistItem()`, `docToChangeRequest()`, `docToCustomer()` in `js/firestore-service.js`
+- Pattern: All `subscribe*` and `get*` functions pass through these mappers before delivering data to page controllers
 
-**Notification System:**
-- Purpose: Auto-generate notifications on task completion/approval/change request status changes
-- Examples: `createNotification()` called inside `completeTask()`, `approveTask()`, `updateChangeRequest()`
-- Pattern: Stores in `notifications` collection; linked to user ID for role-based subscription (`subscribeNotifications(userId)`)
+**Role-Based Rendering:**
+- Purpose: UI adapts based on `user.role` (worker / manager / observer)
+- Pattern: Page controllers check `user.role` inline inside `render()` to conditionally show/hide buttons, filter data, or choose subscription type
+- Key rule: Only `user.role === "observer"` can approve tasks
 
-**Project Stats Recalculator:**
-- Purpose: Auto-calculate `progress`, `currentStage`, `riskLevel` based on checklist item statuses
-- Examples: `recalculateProjectStats(projectId)` called after any task change
-- Pattern: Counts completed/approved items per stage, determines current stage (first incomplete), calculates delay risk
+**Template → Checklist System:**
+- Purpose: `templateItems` (193 items across 6 phases × 10 departments) are applied to a project to generate `checklistItems`
+- Key function: `applyTemplateToProject(projectId, projectType, changeScale?)` in `js/firestore-service.js`
+- Filter logic: 신규개발 = all 193, 설계변경 minor = required only + 3 phases, medium = required only + all phases, major = all 193
 
 ## Entry Points
 
-**Login (`index.html`):**
+**Login:**
 - Location: `index.html` + `js/pages/login.js`
-- Triggers: User navigates to root or session expires
-- Responsibilities: Render login UI (demo cards + Microsoft OAuth), handle login flow, seed templates if needed, redirect to home on success
+- Triggers: Direct browser navigation
+- Responsibilities: Demo card login, Microsoft OAuth, redirect to `home.html` on success, seed templates on first load
 
-**Home Hub (`home.html`):**
+**Home (Hub):**
 - Location: `home.html` + `js/pages/home.js`
-- Triggers: Redirect after successful login
-- Responsibilities: Render hub page with 4 main navigation cards (Dashboard, Projects, Checklists, Reviews), establish auth guard
+- Triggers: Redirect after successful login, logo click in nav
+- Responsibilities: Two-card hub — link to `dashboard.html` or `sales.html`
 
-**Dashboard (`dashboard.html`):**
+**Dashboard:**
 - Location: `dashboard.html` + `js/pages/dashboard.js`
-- Triggers: Click "출시위원회" nav link or card on hub
-- Responsibilities: Project-centric overview with 4 tabs (Projects/Tasks/Approvals/Notifications), real-time subscription management, stat card rendering, task urgency grouping
+- Triggers: Navigation from hub
+- Responsibilities: Role-based project/task/approval/notification tabs, D-Day metrics
 
-**Projects (`projects.html`):**
-- Location: `projects.html` + `js/pages/projects.js`
-- Triggers: Click "출시위원회" / "설계변경" nav tabs or project card on hub
-- Responsibilities: 7 view modes (table/matrix/cards/gantt/kanban/timeline/calendar), filtering/sorting, create project dialog, type tab switching
-
-**Project Detail (`project.html`):**
+**Project Detail:**
 - Location: `project.html` + `js/pages/project-detail.js`
-- Triggers: Click project row or card in projects page
-- Responsibilities: 3-tab view (overview+tasks / schedule / bottleneck), checklist item CRUD, task approval management, template application, phase pipeline visualization
+- Triggers: Navigation from `projects.html?id={projectId}` or `dashboard.html`
+- Responsibilities: 3-tab view (overview+work, schedule, bottleneck), checklist CRUD, task assignment
 
-**Task Detail (`task.html`):**
-- Location: `task.html` + `js/pages/task-detail.js`
-- Triggers: Click task in project detail checklist
-- Responsibilities: Full task timeline, comment thread, file uploads, approval workflow, complete/reject/restart actions
-
-**Admin Checklists (`admin-checklists.html`):**
-- Location: `admin-checklists.html` + `js/pages/admin-checklists.js`
-- Triggers: Click "체크리스트" nav link (observer only)
-- Responsibilities: 3 view modes (matrix/tree/list), template item CRUD, stage/department management, bulk item edits
-
-**Admin Users (`admin-users.html`):**
-- Location: `admin-users.html` + `js/pages/admin-users.js`
-- Triggers: Click "사용자 관리" in review dropdown (observer only)
-- Responsibilities: User list, role/department assignment, bulk user imports
-
-**Deliverables (`docs/deliverables/*.html`):**
-- Location: `docs/deliverables/{wireframes, user-flows, diagram-viewer, feedback}.html`
-- Triggers: Click "리뷰" nav dropdown items
-- Responsibilities: Design artifact display, screenshot capture for feedback, feedback system UI
-
-**Manual (`manual.html`):**
-- Location: `manual.html` + `js/pages/manual.js`
-- Triggers: Click "매뉴얼" in review dropdown (no auth required)
-- Responsibilities: User documentation with search, sections for each role/feature, screenshot display
+**Sales Dashboard:**
+- Location: `sales.html` + `js/pages/sales.js`
+- Triggers: Hub card or nav "다른 사이트" dropdown
+- Responsibilities: Launch checklist D-Day tracking, 6 view modes, customer tracking
 
 ## Error Handling
 
-**Strategy:** Try-catch blocks in async functions; fallback to localStorage/sessionStorage cache; console logging for debugging; error messages shown in modals/toasts.
+**Strategy:** Silent catch with console.error; no global error boundary
 
 **Patterns:**
-- **Firestore Errors:** Caught in subscription callbacks; fallback functions like `fallbackLoadProjects()` use mock data
-- **Auth Errors:** Caught in login/logout flows; error message shown in `<div class="login-error">`; button state reset
-- **Validation Errors:** Input validation before Firestore writes; error toast shown via `showError()` helper
+- Firestore operations wrapped in try/catch in page controllers; errors typically logged and UI reverts to previous state
+- Auth errors shown inline in login form via `showError()` in `js/pages/login.js`
+- Non-critical side effects (notification creation, activity logging) caught silently: `try { ... } catch(e) { console.error(...) }`
+- `guardPage()` returns `null` and redirects on auth failure; page controllers check `if (!user) throw new Error("Not authenticated")`
 
 ## Cross-Cutting Concerns
 
-**Logging:** console.log/error/warn throughout; no centralized logger; timestamps added via `new Date().toISOString()`
+**Theme:** Dark/light toggle via `data-theme` attribute on `<html>`; stored in `localStorage("pc-theme")`; flash prevention via inline `<script>` in every HTML `<head>`
 
-**Validation:** Client-side only via form validation (required fields, email format); no server-side validation
+**Validation:** Role checks done inline in page render functions; no shared validation layer
 
-**Authentication:** localStorage session check in `auth.js:getUser()`; page guard in `auth.js:guardPage()` redirects to login if not authenticated
+**Authentication:** `guardPage()` called at top of every page controller module; session expiry checked on load and every 5 minutes by `startSessionWatcher()` (called from `renderNav`)
 
-**Authorization:** Role-based checks in components (e.g., `if (user.role === "observer")` to show admin buttons); Firestore rules (optional, not enforced in code) defined in `firestore.rules`
+**Navigation:** `renderNav()` in `js/components.js` is the single source of truth for nav structure; deliverable pages use a parallel `MAIN_NAV` in `docs/deliverables/js/deliverable-nav.js` — must be kept in sync manually
 
-**Theme:** CSS custom properties + `[data-theme="dark"]` attribute; theme read/write in `components.js` (getTheme/setTheme); initialized before page render to prevent flash
+---
+
+*Architecture analysis: 2026-03-12*

@@ -4,163 +4,146 @@
 
 ## APIs & External Services
 
-**Microsoft Azure AD (Microsoft OAuth):**
-- Service: Microsoft 365 / InBody Azure AD tenant authentication
-- What it's used for: Enterprise user login (alternative to demo cards)
-- SDK/Client: Firebase Auth `OAuthProvider("microsoft.com")`
-- Auth: Azure AD tenant ID `547afe76-db4a-45d9-9af8-c970051a4c7d` (hardcoded in `js/auth.js` line 46)
-- Scope: Restricted to `@inbody.com` email domain only
-- Implementation: `loginWithMicrosoft()` in `js/auth.js` (lines 43-80)
-- New user flow: Auto-registers as `worker` role, admin assigns role/department later
+**Firebase (Google):**
+- SDK Version: 11.3.0 (CDN via gstatic.com)
+- Project ID: `processsss-appp`
+- Initialized in: `js/firebase-init.js`
+- Services used: Firestore, Authentication, Storage
+
+**draw.io (diagrams.net):**
+- Used in: `docs/deliverables/diagram-viewer.html`
+- Purpose: Renders `.drawio` diagram files embedded in the page
+- Client: `https://viewer.diagrams.net/js/viewer-static.min.js`
+- Auth: None required
+
+**Chart.js:**
+- Used in: `reports.html` (loaded via `reports.html` `<script>` tag)
+- Purpose: Analytics charts (bar, doughnut, line, horizontal bar)
+- CDN: `https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js`
+
+**html2canvas:**
+- Used in: `js/feedback-widget.js`, `docs/deliverables/js/deliverable-nav.js`
+- Purpose: Viewport screenshot capture for feedback submissions
+- CDN: `https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js`
+- Loaded: Lazy (dynamically injected `<script>` only when user triggers capture)
 
 ## Data Storage
 
 **Databases:**
-- Firestore (Google Cloud)
-  - Project: `processsss-appp`
-  - Type: NoSQL document database
-  - Collections: users, projects, checklistItems, changeRequests, customers, launchChecklists, notifications, portalNotifications, reviews, templateStages, templateDepartments, templateItems
-  - Client: Firebase Firestore SDK v11.3.0 (CDN)
-  - Connection: Initialized in `js/firebase-init.js` → exported as `db`
+- **Firestore** (Google Cloud, NoSQL document database)
+  - Connection: hardcoded Firebase config in `js/firebase-init.js`
+  - Client: Firebase JS SDK v11.3.0
+  - Exported as: `db` from `js/firebase-init.js`
+  - Real-time via: `onSnapshot` subscriptions throughout `js/firestore-service.js`
+
+**Collections and their purpose:**
+
+| Collection | Purpose | Read | Write |
+|---|---|---|---|
+| `users` | User profiles and roles | public | authenticated |
+| `projects` | Project records | public | authenticated |
+| `checklistItems` | Per-project task items | public | authenticated |
+| `templateStages` | Phase template definitions | public | authenticated |
+| `templateDepartments` | Department templates | public | authenticated |
+| `templateItems` | Checklist item templates | public | authenticated |
+| `notifications` | In-app user notifications | public | authenticated |
+| `changeRequests` | Design change requests | public | authenticated |
+| `customers` | Customer/dealer records | public | authenticated |
+| `launchChecklists` | Sales launch prep checklists | public | authenticated |
+| `portalNotifications` | Customer portal notifications | public | authenticated |
+| `reviews` | Page review comments/issues | public | authenticated |
+| `activityLogs` | Activity audit trail | authenticated | authenticated |
+| `feedbacks` | Design deliverable feedback | public | authenticated |
 
 **File Storage:**
-- Firebase Storage (within same project)
-  - Bucket: `processsss-appp.firebasestorage.app`
-  - Use: Checklist item file attachments (UI-only, not fully integrated)
-  - Client: `getStorage()` in `js/firebase-init.js`
-  - Status: Not operationally integrated (no upload/download implementation)
+- Firebase Storage configured (`getStorage` exported from `js/firebase-init.js`)
+- Rules: authenticated read/write (`storage.rules`)
+- Status: UI-only — no active file upload integration in current code
 
 **Caching:**
-- None (client-side, browser cache only via HTTP headers)
+- None — no Redis, Memcache, or in-memory cache layer
+- Firebase SDK provides local Firestore cache automatically (IndexedDB)
 
 ## Authentication & Identity
 
-**Auth Provider:**
-- Hybrid: Demo cards (localStorage) + Microsoft OAuth (Firebase Auth)
+**Primary Auth Provider: Microsoft Azure AD (OAuth 2.0)**
+- Implementation: Firebase Auth `OAuthProvider("microsoft.com")`
+- Tenant: `547afe76-db4a-45d9-9af8-c970051a4c7d` (InBody Azure AD)
+- Domain restriction: `@inbody.com` emails only (enforced in `js/auth.js`)
+- Flow: popup → `signInWithPopup` → lookup user in Firestore by email → create if new (role: `worker`)
+- Code: `js/auth.js` → `loginWithMicrosoft()`
 
-**Demo Card Authentication:**
-- Implementation: 3 hardcoded sample users in `index.html` (lines 365-377)
-  - 김철수 (worker/개발팀)
-  - 이영희 (manager/개발팀)
-  - 박민수 (observer/경영관리팀)
-- Storage: localStorage under key `pc_user`
-- Used for: Testing, non-OAuth access
+**Secondary Auth: Demo Card Login**
+- No password, name-only lookup in Firestore → create if missing
+- Used for 3 demo persona cards on `index.html`
+- Code: `js/auth.js` → `login(name, role)`
 
-**Microsoft OAuth Flow:**
-- Implementation: `js/auth.js` lines 43-80
-- Steps:
-  1. User clicks "Microsoft 계정으로 로그인" button
-  2. `signInWithPopup()` opens Microsoft auth flow
-  3. Email domain validated (`@inbody.com` only)
-  4. User looked up in Firestore `users` collection by email
-  5. If new: auto-created as `worker` role
-  6. User stored in localStorage as `pc_user`
-- Session: No server-side session; Firebase Auth token in browser
+**Session Management:**
+- Storage: `localStorage` key `pc_user` (JSON serialized user object)
+- TTL: 24 hours; checked on page guard and via 5-minute interval watcher
+- Logout: clears localStorage + calls Firebase `signOut()`
+- Code: `js/auth.js` → `guardPage()`, `startSessionWatcher()`
 
-**Logout:**
-- Clears localStorage `pc_user`
-- Calls `signOut(auth)` (Firebase Auth)
-- Redirects to `index.html`
+**Customer Portal Auth:**
+- Separate from main auth — email-only verification against `customers.portalLoginEmail`
+- Also checks `customers.portalEnabled === true`
+- Session: `sessionStorage` key (not `localStorage`)
+- Code: `js/pages/customer-portal.js`
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None (no error tracking service integrated)
+- None — no Sentry, Rollbar, or equivalent
 
 **Logs:**
-- Browser console only (no centralized logging)
+- `activityLogs` Firestore collection — written by `js/firestore-service.js` on key actions
+- Browser console only; no structured logging service
+
+**Analytics:**
+- None — no Google Analytics, Mixpanel, or equivalent
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Firebase Hosting (Google Cloud)
-  - Project: `processsss-appp`
-  - Config: `processcheck-html/firebase.json`
-  - Linked in: `processcheck-html/.firebaserc`
+- Firebase Hosting — project `processsss-appp`
+- Config: `firebase.json` in `processcheck-html/`
+- Public dir: `.` (root of `processcheck-html/`)
 
 **CI Pipeline:**
-- GitHub Actions (in parent repo)
-  - Action: `FirebaseExtended/action-hosting-deploy@v0`
-  - Trigger: Push to `main` branch
-  - Secret required: `FIREBASE_SERVICE_ACCOUNT` (JSON key)
+- GitHub Actions: `FirebaseExtended/action-hosting-deploy@v0`
+- Trigger: push to `main` branch
+- Required secret: `FIREBASE_SERVICE_ACCOUNT` (GitHub repo secret)
+
+**Dev Server:**
+- `python3 -m http.server 8080` from `processcheck-html/` directory
 
 ## Environment Configuration
 
-**Required env vars:**
-- None (all Firebase config hardcoded in `js/firebase-init.js`)
-
-**Firebase config (public, safe to expose):**
-- `apiKey`: `AIzaSyCmQ4-zOqeZKIxBIdYP71uhIdZ0eQu2rn0`
-- `projectId`: `processsss-appp`
-- `authDomain`: `processsss-appp.firebaseapp.com`
-- `storageBucket`: `processsss-appp.firebasestorage.app`
-- `messagingSenderId`: `1041230235574`
-- `appId`: `1:1041230235574:web:de73f68d8c567ee5d96317`
+**Required configuration:**
+- Firebase client config is hardcoded in `js/firebase-init.js` — no env vars needed for browser runtime
+- Microsoft OAuth tenant ID hardcoded in `js/auth.js`
 
 **Secrets location:**
-- Firebase service account key: GitHub Actions secret `FIREBASE_SERVICE_ACCOUNT`
-- Firestore access: Controlled by `firestore.rules` (permissive for MVP, should restrict before production)
-
-**localStorage keys:**
-- `pc_user` — Current authenticated user
-- `pc-theme` — Light/dark mode preference
+- `FIREBASE_SERVICE_ACCOUNT` — GitHub repo secret (CI/CD deploy only; not used in browser)
+- No `.env` files in `processcheck-html/`
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None detected
+- None — no webhook endpoints (static hosting, no server)
 
 **Outgoing:**
-- Firestore writes trigger no external webhooks
-- Real-time subscriptions use `onSnapshot()` (client-side listener, no outbound calls)
+- None
 
-## Real-time Synchronization
+## Font CDNs
 
-**Firestore Subscriptions (via `onSnapshot`):**
-- Used throughout for live data
-- Examples:
-  - `subscribeProjects()` — `js/firestore-service.js`
-  - `subscribeChecklistItemsByAssignee()` — Filters by current user
-  - `subscribeAllChecklistItems()` — All items (managers/observers)
-  - `subscribeNotifications()` — Real-time alerts
-  - `subscribeReviews()` — Inline feedback/review comments
-- Updates automatically reflected in UI without page refresh
+**Pretendard (Korean UI font):**
+- CDN: `https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/`
+- Loaded in: `css/styles.css` via `@import`
 
-## Data Models & Collections
-
-**Core Collections (Firestore):**
-
-| Collection | Purpose | Key Fields |
-|-----------|---------|-----------|
-| `users` | User accounts | id, name, email, role, department, authProvider |
-| `projects` | Development projects | id, name, projectType, status, progress, startDate, endDate, pm, currentStage, riskLevel |
-| `checklistItems` | Work tasks (instances) | id, projectId, stage, title, assignee, status, approvalStatus, dueDate, comments |
-| `changeRequests` | Design change requests | id, projectId, title, status, affectedDepartments, requestSource, customerId |
-| `customers` | External partners/dealers | id, name, type (dealer/subsidiary/hospital), contractStatus, portalEnabled, portalLoginEmail |
-| `launchChecklists` | Sales launch prep checklist | id, projectId, title, dueDate, status, customerId |
-| `notifications` | User alerts | id, userId, type, title, message, link, read, createdAt |
-| `portalNotifications` | Customer portal alerts | id, customerId, type, message, createdAt |
-| `reviews` | Code/design review comments | id, pageId, type (comment/issue/approval), status, createdAt |
-| `templateStages` | Process phase definitions | id, phaseName, order |
-| `templateDepartments` | Department list | id, name |
-| `templateItems` | Checklist template items (193 total) | id, stageId, departmentId, content, isRequired |
-
-## Authentication Rules (Firestore Security)
-
-**Current Status:** Permissive (MVP mode)
-
-- Location: `processcheck-html/firestore.rules`
-- Rules:
-  - `users`: Read/write allowed (should restrict to user's own record)
-  - `projects`: Read/write allowed (should restrict to assigned users)
-  - `checklistItems`: Read/write allowed (should restrict by assignment)
-  - `reviews`: Write restricted to `isAuthenticated()` (Microsoft OAuth only)
-  - All template collections: Read allowed, write allowed (should restrict to observer role)
-
-**Client-side Auth Checks:**
-- Role validation happens in JavaScript, not Firestore rules
-- Example: Only `role === "observer"` can approve tasks
-- Firestore rules should be hardened before production
+**JetBrains Mono (monospace):**
+- CDN: `https://fonts.googleapis.com/`
+- Loaded in: `css/styles.css` via `@import`
 
 ---
 

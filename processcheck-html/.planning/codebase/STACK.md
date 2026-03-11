@@ -5,105 +5,119 @@
 ## Languages
 
 **Primary:**
-- JavaScript (ES modules) — Client-side logic, page controllers, utilities
-- HTML5 — Page markup and layout templates
-- CSS 3 — Design system with CSS custom properties (light/dark mode support)
+- JavaScript (ES2022+) - All application logic, vanilla ES modules, no transpilation
+- CSS3 - All styling via custom properties (design tokens), single file
 
 **Secondary:**
-- Firestore Security Rules — Database access control and permissions
+- HTML5 - Page templates (18 `.html` files, each a standalone SPA shell)
 
 ## Runtime
 
 **Environment:**
-- Browser-based (no Node.js required for runtime)
-- CDN-delivered Firebase SDK (v11.3.0)
+- Browser — no Node.js runtime in production; pages served as static files
+- ES module imports via native browser `<script type="module">` support
+- Firebase SDK loaded via `<script type="importmap">` — maps bare module specifiers to CDN URLs
 
-**Execution Model:**
-- Client-side SPA (Single Page Application)
-- No build step required
-- No framework — vanilla JavaScript ES modules with import/export
-- Dev server: `python3 -m http.server 8080`
+**Dev Server:**
+- `python3 -m http.server 8080` — zero-dependency local server
+
+**Package Manager:**
+- None — no `package.json` in `processcheck-html/`; all dependencies loaded via CDN
+- Puppeteer (screenshot tool) is a dev-only dependency in the parent repo (`/Users/injooncha/processcheck/`)
 
 ## Frameworks
 
-**UI/Components:**
-- None (vanilla HTML + CSS + JavaScript)
-- Custom component architecture in `js/components.js` for shared UI (navigation, theme, notifications)
-- Manual component composition via HTML templates
+**Core:**
+- None — plain HTML + CSS + vanilla JavaScript; no framework or build step
 
-**Firebase Integration:**
-- Firebase JavaScript SDK v11.3.0 (CDN via importmap)
-  - `firebase/app` — Core initialization
-  - `firebase/firestore` — Real-time database
-  - `firebase/auth` — Microsoft OAuth authentication
-  - `firebase/storage` — File storage (UI-only, not integrated)
+**Styling:**
+- Custom CSS design system — single file `css/styles.css` (~2800+ lines)
+- CSS custom properties for design tokens (surfaces, primary/success/warning/danger color scales)
+- Light mode default; dark mode via `[data-theme="dark"]` attribute
+- Theme persisted to `localStorage("pc-theme")`
 
-## Key Dependencies
+**Testing:**
+- None — no test framework configured
 
-**Critical:**
-- Firebase SDK v11.3.0 (CDN) — Database, auth, real-time subscriptions
-  - Location: Script importmap in each HTML page (e.g., `index.html` lines 10-19)
-  - Exports: `db`, `auth`, `storage` from `js/firebase-init.js`
+**Build/Dev:**
+- No build step — files are served directly
+- `capture-screenshots.mjs` — Puppeteer-based screenshot automation (dev tool only); requires Node.js
 
-**Infrastructure:**
-- Pretendard Font (CDN) — Korean typography support
-  - URL: `https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css`
-- JetBrains Mono (Google Fonts) — Code/monospace font
-  - URL: `https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap`
+## Key Dependencies (all CDN)
+
+**Firebase SDK v11.3.0 (gstatic CDN):**
+- `firebase/app` — app initialization
+- `firebase/firestore` — real-time database, all CRUD + subscriptions
+- `firebase/auth` — Microsoft OAuth (OAuthProvider)
+- `firebase/storage` — file storage (rules exist; UI-only, no active upload integration)
+
+Loaded via `importmap` in every HTML page:
+```html
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app":       "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+    "firebase/auth":      "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js",
+    "firebase/storage":   "https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js"
+  }
+}
+</script>
+```
+
+**Chart.js v4.4.7 (jsdelivr CDN):**
+- Used in `reports.html` only: bar, doughnut, line, horizontal bar charts
+- Loaded via `<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">`
+
+**html2canvas v1.4.1 (cdnjs CDN):**
+- Viewport screenshot capture in `js/feedback-widget.js` and `docs/deliverables/js/deliverable-nav.js`
+- Lazy-loaded on demand (not bundled)
+
+**draw.io Viewer (viewer.diagrams.net CDN):**
+- Used only in `docs/deliverables/diagram-viewer.html`
+- `<script src="https://viewer.diagrams.net/js/viewer-static.min.js">`
+
+**Fonts (CDN):**
+- Pretendard v1.3.9 — primary Korean UI font (cdn.jsdelivr.net)
+- JetBrains Mono — monospace/code font (fonts.googleapis.com)
+
+**Puppeteer (Node.js, dev-only):**
+- Used only by `capture-screenshots.mjs` to generate manual screenshots
+- Not part of the browser runtime
 
 ## Configuration
 
-**Environment:**
-- Firebase config hardcoded in `js/firebase-init.js` (lines 12-19)
-  - Project ID: `processsss-appp`
-  - API Key exposed (browser public key, safe)
-  - Auth domain: `processsss-appp.firebaseapp.com`
-  - Storage bucket: `processsss-appp.firebasestorage.app`
+**Firebase:**
+- Config is hardcoded in `js/firebase-init.js` (Firebase public client config; intentional for client-side apps)
+- Project: `processsss-appp` on Google Firebase
 
-**Build/Dev:**
-- `firebase.json` — Hosting configuration
-  - Public directory: `.` (root)
-  - Cache control: HTML (no-cache), JS/CSS (3600s), images (86400s)
-  - Ignores: `firebase.json`, `.firebaserc`, `node_modules/`, `capture-screenshots.mjs`
+**Theme:**
+- Flash prevention inline script on every HTML page:
+  ```html
+  <script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
+  ```
 
-**Page Structure:**
-- Entry points: 14 HTML files (no routing framework)
-  - `index.html` — Login page
-  - `dashboard.html` — Main dashboard (role-based)
-  - `project.html` — Single project detail
-  - `projects.html` — Project list (7 views)
-  - `task.html` — Task detail
-  - `admin-checklists.html` — Template management
-  - Others: sales, customers, activity, notifications, etc.
+**Hosting:**
+- `firebase.json` in repo root (`processcheck-html/`)
+- Cache headers: HTML = `no-cache`, JS/CSS = `max-age=3600`, images = `max-age=86400`
+- Firebase project linked via `.firebaserc` to `processsss-appp`
 
-**Session Management:**
-- localStorage-based auth (no server-side sessions)
-  - Key: `pc_user` — Stores user object (name, email, role, department)
-  - No persistent session tokens (demo cards) or Firebase Auth session (OAuth)
-
-**Theme System:**
-- CSS custom properties (`:root` for light, `[data-theme="dark"]` for dark)
-- localStorage key: `pc-theme` (values: "light" or "dark")
-- Default: light mode
-- Flash prevention: inline `<script>` in each HTML `<head>` (lines 8-9 in index.html)
+**Security Rules:**
+- Firestore rules: `firestore.rules` — most collections `read: true`, `write: if isAuthenticated()`
+- Storage rules: `storage.rules` — `read/write: if request.auth != null`
 
 ## Platform Requirements
 
 **Development:**
-- Browser with ES module support (all modern browsers)
-- Python 3 (for local dev server)
-- No build tools, npm, or Node.js required
+- Python 3 (for dev server) — `python3 -m http.server 8080`
+- Node.js (optional, for Puppeteer screenshots only)
+- A modern browser with ES module and importmap support (Chrome 89+, Firefox 108+, Safari 16.4+)
 
 **Production:**
-- Firebase Hosting
-- Custom domain or Firebase-provided domain
-- Firestore database
-- Firebase Authentication (Microsoft OAuth)
-
-**Client Requirements:**
-- Modern browser (ES2020+)
-- Cookies/localStorage enabled
-- JavaScript enabled
+- Firebase Hosting (static file hosting, no server)
+- All Firebase services: Firestore, Authentication, Storage
+- CI/CD: GitHub Actions via `FirebaseExtended/action-hosting-deploy@v0`
+- Secret required: `FIREBASE_SERVICE_ACCOUNT` (GitHub repo secret)
 
 ---
 

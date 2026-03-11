@@ -2,482 +2,237 @@
 
 **Analysis Date:** 2026-03-12
 
-## Security Issues
+---
 
-**Firestore Rules — Overly Permissive:**
-- Issue: All collections (projects, checklistItems, templateItems, notifications, changeRequests, customers, launchChecklists, portalNotifications) have `allow write: if true` with only inline comments indicating client-side enforcement
-- Files: `firestore.rules` (lines 26, 32, 38, 44, 50, 56, 62, 68, 74, 80)
-- Impact: Any unauthenticated user or compromised client can modify, delete, or corrupt critical business data (project schedules, approval statuses, customer information)
-- Current mitigation: Client-side role checks in JavaScript (e.g., `user.role === "observer"`)
-- Recommendations:
-  - Implement proper Firestore security rules: `allow write: if request.auth != null && request.auth.token.role == "observer"` for write-restricted collections
-  - Use `isAuthenticated()` helper (line 7-8) in all write rules
-  - Validate `request.resource.data` structure server-side for critical fields (approvalStatus, projectStatus, etc.)
-  - Document why reviews collection alone requires `isAuthenticated()` (line 86) vs. others
+## Security Considerations
 
-**Demo Card Authentication:**
-- Issue: Demo card login (`js/auth.js:24-40`) creates users with hardcoded role override (line 37: `const sessionUser = { ...user, role };`)
-- Files: `js/auth.js` (lines 24-40), `js/pages/login.js` (card login UI)
-- Impact: Anyone can log in as any role (worker/manager/observer) with demo cards; no email validation
-- Current mitigation: Demo cards are for development; production relies on Microsoft OAuth
-- Recommendations:
-  - Disable demo cards in production (use feature flag or environment check)
-  - If keeping for testing, restrict to IP whitelist or special domain only
-  - Never allow role override on client-side; role must come from server (Firestore user record)
+**Firestore Rules: Overly Permissive Reads**
+- Risk: Every collection except `activityLogs` allows `read: if true` (unauthenticated access). Any unauthenticated person can read all projects, checklist items, customers, notifications, change requests, launch checklists, and portal notifications directly from Firestore.
+- Files: `firestore.rules`
+- Current mitigation: None — rules are intentionally permissive for dropdown population (user list)
+- Recommendation: Move unauthenticated reads to only the `users` collection (needed for task assignment). All other collections should require `isAuthenticated()` on reads.
 
-**Email Domain Restriction Incomplete:**
-- Issue: Microsoft OAuth restricts to `@inbody.com` domain (`js/auth.js:10, 55`), but auto-registration as `worker` bypasses admin role assignment verification
-- Files: `js/auth.js` (lines 54-79)
-- Impact: Any @inbody.com email can register as worker/observer depending on intent; no audit of who created accounts
-- Current mitigation: Manual admin adjustment post-registration via admin-users.html
-- Recommendations:
-  - Log all Microsoft OAuth registrations with timestamp, email, auto-assigned role
-  - Add webhook to alert admin of new user registrations
-  - Implement user approval flow: new user → "pending" role until admin approves
+**Session Not Refreshed on Activity**
+- Risk: The 24-hour session TTL in `auth.js` is measured from `loginAt` (a fixed timestamp) and is never reset on user activity. A user actively working for 23+ hours will be abruptly logged out mid-session.
+- Files: `js/auth.js` lines 11, 115–127
+- Current mitigation: 5-minute polling interval in `startSessionWatcher()`
+- Recommendation: Update `loginAt` on meaningful user actions (e.g., any Firestore write) to implement sliding expiration.
 
-**HTML Injection via innerHTML:**
-- Issue: Multiple pages use `innerHTML` to render dynamic content without consistent HTML escaping
-- Files: `js/pages/dashboard.js` (line 361, 783), `js/pages/admin-checklists.js` (line 1137, 1146), `js/pages/project-detail.js` (line 1135, 1202), `js/pages/projects.js` (line 250)
-- Impact: If comment text, assignee names, or stage descriptions contain `<script>`, `<img onerror>`, or `<svg onload>`, could execute arbitrary JavaScript
-- Current mitigation: `escapeHtml()` function exists (`js/utils.js:154-158`) using `textContent` approach
-- Recommendations:
-  - Audit all `innerHTML` assignments; verify `escapeHtml()` is called on all user-sourced data (comments, task titles, project names)
-  - Replace `innerHTML` with `textContent` + template strings where possible
-  - Sanitize HTML in `renderSimpleMarkdown()` (js/utils.js:190-201) — currently allows HTML entities but not tags
+**Demo Cards Accessible in Production (Partial)**
+- Risk: The `IS_PROD` guard in `login.js` hides demo cards only when `hostname !== "localhost"`. This correctly hides them on Firebase Hosting, but any non-`localhost` dev environment (e.g., Docker, LAN IP, alternate port) would also suppress them. The HTML for the cards and the role-selection form is always present in the DOM — only hidden via `style.display`.
+- Files: `js/pages/login.js` lines 29–39, `index.html` lines 364–422
+- Recommendation: The demo card HTML could be conditionally injected from JS rather than always present in DOM and then hidden.
+
+**Azure AD Tenant ID Hardcoded in Source**
+- Risk: The Azure AD tenant ID (`547afe76-db4a-45d9-9af8-c970051a4c7d`) and allowed domain (`inbody.com`) are hardcoded in source committed to git. While these are semi-public identifiers, rotating the tenant or expanding to other domains requires a code change.
+- Files: `js/auth.js` lines 10, 47
+- Recommendation: Move to a config object or environment-injected constant. Since this is plain HTML with no build step, a `config.js` module that is gitignored and replaced at deploy time is the cleanest approach.
+
+**Storage Rules: No Path or Size Restrictions**
+- Risk: Any authenticated Firebase user can read or write any path in Cloud Storage with no file-size or path restrictions.
+- Files: `storage.rules`
+- Current mitigation: Client-side 10MB limit and MIME type validation in `js/utils.js` `validateFile()`
+- Recommendation: Add server-side `request.resource.size < 10 * 1024 * 1024` and content-type checks. Scope write rules to `tasks/{projectId}/{taskId}/{fileId}` path pattern.
+
+**Firebase Config Exposed in Source**
+- Files: `js/firebase-init.js` lines 12–18
+- Current mitigation: Comment says "these values are safe to expose" — this is correct for Firebase's client SDK model, provided Firestore rules are tight (see above)
+- No action needed beyond tightening Firestore rules.
 
 ---
 
 ## Tech Debt
 
-**Large Monolithic Files:**
-- Files:
-  - `js/firestore-service.js` (2,060 lines) — all CRUD + subscriptions in one file
-  - `js/pages/sales.js` (1,694 lines) — sales dashboard UI + logic
-  - `js/pages/admin-checklists.js` (1,313 lines) — 3 view modes (matrix/tree/list) + CRUD
-  - `js/pages/projects.js` (1,292 lines) — 7 view modes + filtering + sorting
-  - `js/pages/project-detail.js` (1,231 lines) — 3 tabs + 5 checklist views + matrix + export
+**`subscribeAllChecklistItems` Fetches the Entire Collection Without Limits**
+- Issue: `subscribeAllChecklistItems()` in `firestore-service.js` opens a real-time listener on the entire `checklistItems` collection with no `where`, `orderBy`, or `limit` clause. Observer-role dashboard and the reports page both use this subscription.
+- Files: `js/firestore-service.js` line 826–830, `js/pages/dashboard.js` line 170, `js/pages/reports.js` line 9
+- Impact: As the database grows (e.g., 193 items × N projects), every document in the collection is downloaded to every observer browser session on every change anywhere. This will degrade to unusably slow at scale.
+- Fix approach: Add composite indexes and filter by project IDs the user is authorized to see. For the dashboard, the fallback loaders (`loadDashboardActiveTasks`) are already targeted — the background subscription should mirror that filter.
 
-- Impact:
-  - Hard to debug; multiple concerns mixed together
-  - Difficult to reuse code across pages (e.g., project subscription used in dashboard, project-detail, sales)
-  - Expensive to test changes to one feature without regression in others
-  - Maintenance burden: finding where a specific function is defined requires searching 1000+ lines
+**`onSnapshot` Subscriptions Lack Error Callbacks**
+- Issue: All 18 `onSnapshot` calls in `firestore-service.js` use only the success callback form. If Firestore rules deny access or the network fails, the snapshot silently stops updating with no UI feedback.
+- Files: `js/firestore-service.js` — all `onSnapshot(q, (snap) => {...})` calls
+- Impact: Users see stale data with no indication that live updates have stopped. There is no reconnect or degraded-state UI.
+- Fix approach: Add error handler as third argument: `onSnapshot(q, callback, (err) => { console.error(err); showOfflineBanner(); })`.
 
-- Recommendations:
-  - Refactor `firestore-service.js` into domain modules:
-    - `services/projects.js` (subscribeProjects, updateProject, etc.)
-    - `services/checklists.js` (subscribeChecklistItems, completeTask, etc.)
-    - `services/templates.js` (subscribeTemplateItems, applyTemplateToProject)
-    - Keep `firestore-service.js` as barrel export
-  - Extract view rendering functions into separate files (e.g., `views/matrix-view.js`, `views/timeline-view.js`)
-  - Create shared utility modules: `helpers/filter.js`, `helpers/sort.js`, `helpers/format.js`
+**Dead Code: `completeRegistration` / Role Selection UI**
+- Issue: Per CLAUDE.md (2026-03-11), new Microsoft OAuth users are auto-registered as `worker` without role selection. However, `completeRegistration()` is still exported from `auth.js`, imported in `login.js`, and the full role-selection HTML form (`#role-selection`, `#role-select`, `#dept-select`) remains in `index.html`. The `pendingAuthInfo` variable in `login.js` is always `null` because `loginWithMicrosoft()` no longer returns `isNewUser: true`.
+- Files: `js/auth.js` lines 84–95, `js/pages/login.js` lines 21–161, `index.html` lines 380–422
+- Impact: Dead code increases maintenance surface; the hidden role-selection form adds DOM bloat.
+- Fix approach: Remove `completeRegistration()` from `auth.js`, remove its import and all related DOM refs from `login.js`, and remove the `#role-selection` block from `index.html`.
 
-**Unsubscribe Management — Incomplete:**
-- Issue: Some pages track unsubscribers correctly (`js/pages/dashboard.js:65-110`, `js/pages/task-detail.js:66-85`), but others don't
-- Files: `js/pages/sales.js` (no unsubscriber tracking for projects/launchChecklists subscriptions, lines 138-150)
-- Impact: Firestore `onSnapshot` listeners remain active even after navigating away, consuming quota + memory leaks
-- Current pattern (correct): `const unsubscribers = []; unsubscribers.push(...); window.addEventListener("beforeunload", ...)` (dashboard.js)
-- Recommendations:
-  - Audit ALL pages: grep for `subscribe*` calls not assigned to unsubscriber array
-  - Create helper: `subscribeWithCleanup(callback)` that auto-registers with cleanup array
-  - Add page unload handler pattern to every page:
-    ```javascript
-    const unsubscribers = [];
-    window.addEventListener("beforeunload", () => {
-      unsubscribers.forEach(fn => fn && fn());
-    });
-    ```
+**`seedDatabaseIfEmpty()` Dead Code Still Present**
+- Issue: The function is still exported from `firestore-service.js` even though CLAUDE.md (2026-03-11) states auto-seeding is disabled and all sample data was deleted. `seedTemplatesIfEmpty()` is still called from `login.js` line 62.
+- Files: `js/firestore-service.js` lines 404–700+, `js/pages/login.js` line 62
+- Impact: `seedDatabaseIfEmpty` is a large code block (~300 lines) that represents dead weight. `seedTemplatesIfEmpty` is still active and will re-seed templates on every login page load if templates are missing.
+- Fix approach: Confirm template seeding behavior is intentional, then remove or clearly mark `seedDatabaseIfEmpty` as archived.
 
-**Missing Error Recovery:**
-- Issue: Failed Firestore operations log errors but don't recover gracefully
-- Files: `js/firestore-service.js` (lines 897, 1003, 1038, 1121, 1191), `js/pages/project-detail.js` (line 1119), `js/pages/sales.js` (lines 1495, 1512, 1528, 1542, 1612, 1667, 1686)
-- Impact: Users see spinner forever if Firestore fails; no retry logic; no user-facing error message in most cases
-- Current pattern: `catch (e) { console.error(...); }` — logs error but doesn't stop spinner or notify user
-- Recommendations:
-  - Implement retry logic with exponential backoff for failed writes:
-    ```javascript
-    async function retryOperation(fn, maxRetries = 3, delayMs = 1000) {
-      for (let i = 0; i < maxRetries; i++) {
-        try { return await fn(); }
-        catch (e) {
-          if (i === maxRetries - 1) throw e;
-          await new Promise(r => setTimeout(r, delayMs * Math.pow(2, i)));
-        }
-      }
-    }
-    ```
-  - Show user feedback on error: `showFeedback("error", "작업 저장 실패. 다시 시도해주세요.")` (pattern from task-detail.js:762)
-  - Add global error boundary for unhandled promise rejections
+**Hardcoded Task-level Checklist in `task-detail.js`**
+- Issue: `task-detail.js` line 49–55 initializes a hardcoded `checklist` array with 5 static items ("요구사항 문서 검토 완료", etc.) that are local state only and never persisted to Firestore. These appear to be a placeholder from initial development.
+- Files: `js/pages/task-detail.js` lines 49–55
+- Impact: The checklist UI in task detail appears to work but tracks no real data. Checking items does not save to Firestore.
+- Fix approach: Either remove the local checklist UI entirely (tasks already have Firestore-backed status/approval fields) or implement persistence to a `checklist` subcollection/array field on the `checklistItems` document.
 
-**Hardcoded Role Logic:**
-- Issue: Role-based access control is spread across multiple files with hardcoded strings
-- Files:
-  - `js/auth.js` (line 10: hardcoded "inbody.com" domain)
-  - `js/utils.js` (line 95-99: role name mapping)
-  - `js/pages/admin-checklists.js` (line 25: `if (user.role !== "observer")` check)
-  - `js/pages/dashboard.js` (line 167: conditional subscription based on role)
-  - `js/pages/admin-users.js` (line 27: `if (user.role !== "observer")` check)
+**`--nav-hover` CSS Variable Self-Reference in Dark Mode**
+- Issue: `css/styles.css` line 128 defines `--nav-hover: var(--nav-hover)` in the `[data-theme="dark"]` block. This is a circular CSS variable reference — browsers resolve it to the initial value (empty/invalid) or fall back to the light-mode value. Dark mode nav hover states likely render incorrectly.
+- Files: `css/styles.css` line 128
+- Impact: Dark mode nav link hover background renders incorrectly.
+- Fix approach: Replace with explicit dark-mode value, e.g. `--nav-hover: rgba(255, 255, 255, 0.06)`.
 
-- Impact: Changing role names or adding new roles requires updating multiple files; easy to miss a spot and create permission bypass
-- Recommendations:
-  - Create `js/auth-constants.js` with:
-    ```javascript
-    export const ROLES = {
-      WORKER: "worker",
-      MANAGER: "manager",
-      OBSERVER: "observer",
-    };
-    export const ROLE_PERMISSIONS = {
-      [ROLES.WORKER]: ["view:own-tasks", "create:comments"],
-      [ROLES.MANAGER]: ["assign:tasks", "view:team"],
-      [ROLES.OBSERVER]: ["approve:all", "edit:templates"],
-    };
-    ```
-  - Create `canUserAction(user, action)` helper that checks permissions centrally
+**Gantt Chart Phase Bars Use Equal Divisions**
+- Issue: The schedule tab in `project-detail.js` divides total project duration evenly across all 6 phases (`phaseDuration = totalDays / 6`). This bears no relation to actual task due dates per phase.
+- Files: `js/pages/project-detail.js` lines 621–622
+- Impact: The Gantt view is visually misleading — it shows all phases as equal width regardless of actual workload distribution.
+- Fix approach: Compute each phase's actual date range from the `dueDate` values of its checklist items.
+
+**`exportToPDF` Opens Unblocked Popup**
+- Issue: `utils.js` `exportToPDF()` uses `window.open("", "_blank")` and then `printWindow.document.write()`. This approach is blocked by popup blockers in most browsers and is deprecated by several browser vendors. It also does not produce a true PDF file.
+- Files: `js/utils.js` lines 241–266
+- Impact: PDF export silently fails for most users with default browser settings.
+- Fix approach: Use a print CSS stylesheet (`@media print`) on the current page triggered by `window.print()`, or adopt a client-side PDF library like jsPDF.
+
+**`reports.html` Not Linked from Navigation**
+- Issue: `reports.html` and its page controller `js/pages/reports.js` exist and are fully implemented with Chart.js charts, but `reports.html` appears in no navigation link in `components.js`.
+- Files: `reports.html`, `js/pages/reports.js`, `js/components.js` `BASE_NAV_LINKS`
+- Impact: The reports page is a dead end — users can only reach it by typing the URL directly.
+- Fix approach: Add a "리포트" link to `BASE_NAV_LINKS` or to the "리뷰" dropdown.
 
 ---
 
 ## Performance Bottlenecks
 
-**Unfiltered Real-Time Subscriptions:**
-- Issue: Some pages subscribe to ALL items, then filter client-side
-- Files:
-  - `js/pages/admin-checklists.js` (line 54: `subscribeAllTemplateItems(callback)` loads all 193 template items for matrix/list view)
-  - `js/pages/sales.js` (line 145: `subscribeAllLaunchChecklists()` loads entire launchChecklists collection, then filters by project/status)
-  - `js/pages/project-detail.js` (line 80: `subscribeChecklistItems(projectId)` correctly scoped by projectId ✓)
+**Full Re-render on Every State Change**
+- Problem: All page controllers call `render()` (which does `app.innerHTML = ...`) on every Firestore update, filter change, or tab switch. This destroys and rebuilds the entire DOM including form elements, focus positions, and scroll state.
+- Files: `js/pages/dashboard.js` lines 161, 165, 183, 188, `js/pages/project-detail.js` lines 77, 82, 882, 890, 908, 913, 915
+- Cause: innerHTML-based rendering with no virtual DOM or diffing
+- Impact: Filter dropdowns lose focus, scroll positions reset, and the page flickers on every Firestore update (which arrives every time any checklist item changes anywhere).
+- Improvement path: Separate data-update renders from interaction-state renders. Cache DOM nodes for interactive elements (filters, tabs). Consider an incremental render approach for the task list items.
 
-- Impact:
-  - As template/launch data grows, initial load becomes slower
-  - Each page render iterates through all items to filter
-  - High Firestore document read cost
+**Notification Subscription Opened Twice for Dashboard Users**
+- Problem: `renderNav` in `components.js` opens `subscribeNotifications(user.id, ...)` for the nav bell icon. `dashboard.js` also opens `subscribeNotifications(user.id, ...)` for the notifications tab. This creates two simultaneous Firestore listeners on the same query for the same user on the dashboard page.
+- Files: `js/components.js` line 255, `js/pages/dashboard.js` line 192
+- Cause: No shared subscription registry
+- Impact: Double Firestore reads, double network traffic for notifications on the dashboard.
+- Improvement path: Lift the notification subscription to a shared module or pass the data downward from nav to page.
 
-- Recommendations:
-  - Implement Firestore `query(where(...))` in subscribeAllLaunchChecklists:
-    ```javascript
-    export function subscribeLaunchChecklistsByStatus(status, callback) {
-      const q = query(collection(db, "launchChecklists"), where("status", "==", status));
-      return onSnapshot(q, snap => callback(snap.docs.map(d => docToLaunchChecklist(d.id, d.data()))));
-    }
-    ```
-  - For template items, add query by phase/department to admin-checklists.js
-  - Cache filtered results in state, re-query only when filters change
+**Dashboard Cache May Serve Stale Approval Data**
+- Problem: The sessionStorage cache (`pc_dash_{userId}`) has a 2-minute TTL. During those 2 minutes, approvals completed by other users are not reflected. This is particularly visible in the "승인 대기" tab where items may already be approved but still show as pending.
+- Files: `js/pages/dashboard.js` lines 70–106
+- Impact: Incorrect approval count display; observer approving an already-approved item will get a Firestore error.
+- Improvement path: Cache is intended for speed only — the background `onSnapshot` subscriptions that replace it within seconds are the right approach. Consider shortening or removing the cache, or invalidating it on any write from this session.
 
-**Missing Pagination:**
-- Issue: Pages load all data and render all rows; no pagination for large lists
-- Files:
-  - `js/pages/projects.js` (table/matrix/card views render all projects, could be 100+)
-  - `js/pages/notifications.js` (renders all notifications, could be 1000s)
-  - `js/pages/activity.js` (activity log has no limit)
+---
 
-- Impact: Initial render is slow; browser memory usage grows; scrolling becomes janky
-- Recommendations:
-  - Implement virtual scrolling or pagination (load 50 items initially, "Load more" button)
-  - For notifications, store read/unread flag and show recent 30 by default
-  - Add query limits: `query(collection(...), orderBy("createdAt", "desc"), limit(50))`
+## UX / UI Concerns
 
-**Expensive Recalculations on Every Render:**
-- Issue: Matrix views (project-detail.js, admin-checklists.js) recalculate cell data on every render
-- Files: `js/pages/project-detail.js` (lines 89-97: `getMatrixCellData()` called for each cell), `js/pages/admin-checklists.js` (similar pattern in matrix rendering)
-- Impact: O(n²) or O(n³) complexity if there are many stages/departments/items
-- Recommendations:
-  - Memoize `getMatrixCellData()` results:
-    ```javascript
-    const matrixCache = new Map();
-    function getMatrixCellData(stageName, dept) {
-      const key = `${stageName}|${dept}`;
-      if (matrixCache.has(key)) return matrixCache.get(key);
-      const result = { /* calculation */ };
-      matrixCache.set(key, result);
-      return result;
-    }
-    // Clear cache in render() when checklistItems change
-    ```
-  - Use DocumentFragment for bulk DOM updates instead of string concatenation + innerHTML
+**No Global Error State UI**
+- Problem: When Firestore operations fail (network, permissions, quota), errors are logged to `console.error` but the user sees no feedback. The page silently stays in whatever state it was in before the failure.
+- Affected: All page controllers — `project-detail.js`, `projects.js`, `dashboard.js`, etc.
+- Impact: Users cannot distinguish "loading" from "failed" states. Especially problematic for approval/completion actions where silent failure means real work is lost.
+- Fix approach: Add a toast/banner component to `components.js` and call it in `.catch()` handlers on all mutation operations.
+
+**`bg-grid` Class Inconsistently Applied**
+- Problem: Some pages use `class="page-wrapper bg-grid"` while others use just `class="page-wrapper"`. The grid background is missing on `admin-checklists.html`, `admin-users.html`, `project.html`, `task.html`, and `manual.html`.
+- Files: `admin-checklists.html` line 21, `admin-users.html` line 21, `project.html` line 21, `task.html` line 21, `manual.html` line 21
+- Impact: Visual inconsistency — task/project detail pages have a flat background while dashboard and projects pages have the grid texture.
+- Fix approach: Apply `bg-grid` consistently to all `page-wrapper` divs.
+
+**Approval Action in Dashboard Has No Rejection Path**
+- Problem: The "승인 대기" tab in `dashboard.js` renders a quick-approve button (checkmark icon) for each pending task. There is no corresponding quick-reject button. The only way to reject is to navigate to the task detail page.
+- Files: `js/pages/dashboard.js` lines 636–637
+- Impact: Observer role approval workflow is fragmented — approving can be done in one click from the dashboard but rejection requires navigating away, losing dashboard context.
+- Fix approach: Add a reject button with a small inline reason input, or a confirmation popover.
+
+**No "Back to Project" Navigation on Task Detail**
+- Problem: `task.html` loads with a nav that has no breadcrumb or back link to the originating project. The browser back button is the only way to return. If the user navigated from the dashboard, back goes to dashboard, not project.
+- Files: `js/pages/task-detail.js`, `task.html`
+- Impact: Disorienting navigation — users lose their place in the project checklist context.
+- Fix approach: Add a breadcrumb using the `projectId` query param: "프로젝트 > [project name] > [task title]" with a clickable project link.
+
+**Mobile Navigation Shows Parent Icons for Dropdown Children**
+- Problem: In `components.js` `renderNav()`, the mobile menu flattens dropdown children and uses the *parent* link's icon for each child item. For example, all "리뷰" dropdown children (wireframes, user flows, diagrams, feedback, manual, user admin) show the "리뷰" icon instead of no icon or a per-item icon.
+- Files: `js/components.js` lines 199–205
+- Impact: All mobile menu items under dropdowns show identical icons, making them harder to distinguish.
+- Fix approach: Either omit icons for child items in mobile menu, or assign per-item icons.
+
+**Notification Panel Click Does Not Navigate**
+- Problem: In `components.js` `renderNotifPanel()`, notification items mark themselves read on click but do not navigate to the linked page. The comment at line 294 says "link navigation could be added here" — it is not implemented.
+- Files: `js/components.js` line 294
+- Impact: Clicking a notification in the nav bell panel marks it read but does nothing else. Users must go to `notifications.html` to follow notification links.
+- Fix approach: Apply the same `convertNotifLink()` logic from `dashboard.js` to the nav notification panel click handler.
+
+**Sales Page Has Custom Nav Instead of Standard `renderNav`**
+- Problem: `js/pages/sales.js` implements its own `renderSalesNav()` function (lines 80–128) duplicating nav HTML, theme toggle, logout, and feedback widget initialization. Changes to the standard nav in `components.js` are not reflected in the sales page.
+- Files: `js/pages/sales.js` lines 80–128, `js/components.js`
+- Impact: Nav drift — if nav structure changes, sales page requires a separate update. The sales page also lacks the notification bell, review panel, and session watcher that `renderNav` provides.
+- Fix approach: Refactor `renderNav` to accept an `options` object (e.g., `{minimal: true, brand: "SL"}`) to allow the sales page to use the shared component.
+
+**Gantt Today Marker Has Broken CSS Calculation**
+- Problem: The today marker in `renderScheduleTab()` uses two duplicate `left:` declarations with a malformed calc: `left:calc(100px + ${todayPct}% * (100% - 100px) / 100%);left:calc(100px + ${todayPct / 100 * (100)}%)`. The second declaration overrides the first, and `todayPct / 100 * 100` simply equals `todayPct`, which does not account for the 100px label offset.
+- Files: `js/pages/project-detail.js` line 672
+- Impact: The "오늘" marker position is wrong — it does not correctly align within the bar area that starts at 100px from the left.
+- Fix approach: Use a single correct calculation: `left: calc(100px + ${todayPct}% * (100% - 100px) / 100%)` or compute the absolute pixel offset with JS.
+
+**Inline Styles Are Pervasive in Render Functions**
+- Problem: Render functions in `dashboard.js` and `project-detail.js` contain 51 and 164 inline `style="..."` attributes respectively. These hardcode color values, spacing, and layout directly in JS strings rather than using CSS classes.
+- Files: `js/pages/dashboard.js`, `js/pages/project-detail.js`
+- Impact: Dark/light theme overrides cannot reliably target inline styles. Refactoring layout or colors requires scanning JS string literals. Inline styles also bypass the specificity system.
+- Fix approach: Extract repeated style patterns to named CSS classes in `styles.css`. At minimum, replace `style="color: var(--danger-400)"` patterns with CSS classes like `.text-danger` already available in the stylesheet.
 
 ---
 
 ## Fragile Areas
 
-**Browser Storage (localStorage/sessionStorage) for Authentication:**
-- Files: `js/auth.js` (entire file), `js/pages/dashboard.js` (lines 74-101 CACHE_KEY), `js/pages/customer-portal.js` (lines 42, 418, 439)
-- Why fragile:
-  - localStorage is readable by any script on the domain (XSS vulnerability)
-  - Stored user object includes role — if XSS exists, attacker can elevate themselves to observer
-  - No expiration on localStorage (user stays logged in forever, even if account is revoked)
-  - Sync across tabs: if user revokes permission in one tab, other tabs still have cached role
+**`project-detail.js` Renders on Both Project and Checklist Subscriptions Independently**
+- Files: `js/pages/project-detail.js` lines 75–83
+- Why fragile: `unsubProject` and `unsubChecklist` both call `render()` independently. If a project update and a checklist update arrive within the same tick (common after bulk operations), `render()` runs twice in rapid succession, causing double DOM reconstruction and potential scroll position loss.
+- Safe modification: Add a debounce or a `requestAnimationFrame` guard before `render()` calls from subscriptions.
+- Test coverage: None.
 
-- Safe modification approach:
-  - Use HTTP-only cookies instead of localStorage (requires backend)
-  - Add expiration: store `expiresAt` and validate on each access
-  - Remove stored user after 24h of inactivity
-  - Regenerate role from server on page load (call `getUserByEmail()` first)
-  - Clear all tabs on logout: use `storage` event listener to detect logout in other tabs
+**`approveTask` in Dashboard Has No Idempotency Guard**
+- Files: `js/pages/dashboard.js` lines 778–791
+- Why fragile: The approve button disables itself on click and shows "..." but the `onSnapshot` subscription re-renders `app.innerHTML` (including a fresh, re-enabled approve button) while the async `approveTask()` call is still in flight. A quick-clicking user can trigger multiple simultaneous approval calls for the same task.
+- Safe modification: Track in-flight task IDs in a `Set` checked before calling `approveTask`.
+- Test coverage: None.
 
-**Template → Project Checklist Generation:**
-- Files: `js/firestore-service.js` (lines 1408-1490: `applyTemplateToProject()`)
-- Why fragile:
-  - No idempotency check: calling twice creates duplicate items
-  - If Firestore write fails mid-batch, items are partially created (no rollback)
-  - Hardcoded MINOR_PHASES (line 1423) — if phase structure changes, logic breaks silently
-  - No validation that template data exists before referencing it (lines 1441-1448)
-
-- Safe modification approach:
-  - Check if checklistItems exist before generating: `if (await hasChecklistItems(projectId)) return 0;`
-  - Use transaction instead of batch to ensure atomicity
-  - Add error handling: if batch commit fails, rollback any added items
-  - Move MINOR_PHASES to config constant (`js/auth-constants.js`)
-  - Validate all template lookups before use
-
-**Complex State Management in Large Pages:**
-- Files: `js/pages/sales.js` (state: allItems, projects, viewMode, filters, selection state, expanded sets, pending confirm, bulk mode)
-- Why fragile:
-  - Multiple state sources of truth: viewMode + expanded state, selectedItems + bulkMode
-  - State updates scattered across click handlers; no centralized state machine
-  - If user clicks "Bulk start" then immediately changes view, pending bulk operation may update wrong items
-  - Modal dialog state (`pendingConfirmId`) could leak if render fails
-
-- Safe modification approach:
-  - Create state reducer: `function appStateReducer(state, action) { switch (action.type) { ... } }`
-  - Centralize all state updates in dispatch function
-  - Add invariant checks: `console.assert(selectedItems.size === 0 || bulkMode, "State violation")`
-  - Add loading/error flags to prevent concurrent operations
-
----
-
-## Known Bugs
-
-**Firestore Timestamp Conversion Edge Case:**
-- Symptoms: Date fields sometimes show as "Invalid Date" or "NaN days until"
-- Files: `js/firestore-service.js` (lines 14-19: `toDate()` fallback), `js/utils.js` (lines 137-143: `daysUntil()`)
-- Trigger: When Firestore returns a timestamp as a plain JS object (not Timestamp instance)
-- Current code: `if (val instanceof Date) return val; if (typeof val === "string" || typeof val === "number") return new Date(val);` — does NOT handle `{seconds, nanoseconds}` format
-- Workaround: None — dates will be invalid
-- Fix: Add case for Firestore Timestamp format:
-  ```javascript
-  function toDate(val) {
-    if (val && typeof val.toDate === "function") return val.toDate();
-    if (val && typeof val.seconds === "number") return new Date(val.seconds * 1000); // Timestamp object
-    if (val instanceof Date) return val;
-    if (typeof val === "string" || typeof val === "number") return new Date(val);
-    return new Date();
-  }
-  ```
-
-**Modal Overlay Not Closed on Error:**
-- Symptoms: Create checklist item modal stays open if network error occurs; user must refresh page
-- Files: `js/pages/project-detail.js` (lines 1116-1119: try/catch doesn't close modal), `js/pages/admin-checklists.js` (lines 161-173: same pattern)
-- Trigger: Fill form, click create, network fails mid-request
-- Workaround: Manual page refresh
-- Fix: Store modal reference, close in finally block:
-  ```javascript
-  try {
-    await createChecklistItem(...);
-  } catch (err) {
-    alert("실패: " + err.message);
-  } finally {
-    overlay.remove(); // Always close modal
-  }
-  ```
-
-**Missing Project ID Validation:**
-- Symptoms: If project doesn't exist, project-detail page shows spinner forever
-- Files: `js/pages/project-detail.js` (lines 41-45: checks projectId exists in URL but not in Firestore)
-- Trigger: Share project link, then delete project, click old link
-- Current behavior: Subscribes to projects, waits indefinitely for project match that never comes
-- Fix: Add timeout or check:
-  ```javascript
-  setTimeout(() => {
-    if (!project) {
-      app.innerHTML = `<div class="card p-6 mt-6"><p>프로젝트를 찾을 수 없습니다.</p></div>`;
-    }
-  }, 5000);
-  ```
-
-**Bulk Operations Not Atomic:**
-- Symptoms: If "Bulk approve 10 tasks" fails on task 7, user doesn't know 6 succeeded and 3 failed
-- Files: `js/pages/dashboard.js` (line 779-789: `bulkApproveTasks()` has no per-item error tracking), `js/pages/sales.js` (lines 1667, 1686: bulk start/complete)
-- Trigger: Network flaky, some requests timeout
-- Workaround: Retry individual tasks manually
-- Fix: Return per-item results:
-  ```javascript
-  const results = await Promise.allSettled(taskIds.map(id => approveTask(id)));
-  const succeeded = results.filter(r => r.status === "fulfilled").length;
-  const failed = results.filter(r => r.status === "rejected").length;
-  showFeedback("info", `성공: ${succeeded}, 실패: ${failed}`);
-  ```
-
----
-
-## Scaling Limits
-
-**Firestore Read Cost — No Query Optimization:**
-- Current usage pattern: Every dashboard.js load does `subscribeProjects()` (reads all docs) + `subscribeChecklistItemsByAssignee()` (scoped by assignee)
-- At scale (100 projects, 10,000 checklist items), initial dashboard render triggers ~11,000 reads
-- With 100 daily active users, that's 1.1M reads/day from dashboard alone
-- Firestore generous free tier (50K reads/day) will be exceeded at ~5 DAU
-
-- Scaling path:
-  - Implement pagination: `subscribeProjects(limit: 20)` + lazy load more on scroll
-  - Use composite indexes for filtered queries: `WHERE department == X AND status == "in_progress" ORDER BY dueDate`
-  - Cache read results client-side with TTL: refresh only every 60s unless user forces refresh
-  - Implement read coalescing: if multiple pages ask for same data in same second, share subscription
-
-**Data Size Growth — No Archive/Cleanup:**
-- Issue: `launchChecklists` and `notifications` collections grow unbounded
-- At scale (1000 products/year × 10 launch categories × 100 customers = 1M launch checklist items), firestore becomes slow
-- Same for notifications: 10 teams × 5 actions/day = 50 notifications/day × 365 days = 18,250 notifications/year, explodes with years
-- Impact: Slow queries, slower backups, higher storage cost
-
-- Scaling path:
-  - Archive completed notifications/launch checklists to separate collection after 90 days
-  - Add retention policy: delete archived items after 2 years
-  - Implement pagination with cursor-based pagination (not offset) for efficiency
-  - Move historical data to BigQuery via Cloud Firestore export for analytics
-
-**No Rate Limiting on Firestore Writes:**
-- Issue: Any user can spam writes (e.g., click "approve" 1000x, update same item repeatedly)
-- Impact: Quotas exhausted, write failures for legitimate users, potential cost spike
-
-- Scaling path:
-  - Implement client-side debouncing: `updateProject()` calls debounced to 500ms
-  - Firestore Rules: `allow write: if request.time - resource.data.__lastUpdate > duration.value(1, 's')`
-  - Add rate limiting middleware (if using Cloud Functions)
+**Hardcoded Checklist Phase Divisions for Template Application**
+- Files: `js/firestore-service.js` `seedDatabaseIfEmpty()` line 494 — `MINOR_PHASES = ["phase0", "phase3", "phase5"]`
+- Why fragile: The phase IDs for design-change "minor" projects are hardcoded as an array literal in the seed function. If phase IDs or the minor/medium/major rules change, this constant must be updated in two places (also `applyTemplateToProject`).
+- Safe modification: Extract `MINOR_PHASES` and `MEDIUM_PHASES` as named exports from a shared constants module.
 
 ---
 
 ## Missing Critical Features
 
-**No Transaction/Rollback Support:**
-- Problem: If "approve task" operation includes:
-  1. Update checklistItem.approvalStatus
-  2. Update checklistItem.approvedBy
-  3. Create notification
-  4. Update project.progress
+**File Upload UI Exists But Storage Backend Is Incomplete**
+- Problem: `task.html` shows a file upload area with drag-and-drop and progress bar. `task-detail.js` imports Firebase Storage SDK and implements `uploadBytesResumable`. However, the `storage.rules` have no path-level restrictions and `addFileMetadata` / `removeFileMetadata` in `firestore-service.js` only store metadata (URL, name, size) — but the UI for listing and downloading previously uploaded files relies on these metadata entries having valid `downloadUrl` values. The full upload → metadata → display loop appears functional but has not been tested in production (per CLAUDE.md "Known Gaps").
+- Files: `js/pages/task-detail.js` lines 111–148, `js/firestore-service.js` lines 2045–2060, `storage.rules`
 
-  And step 3 fails, steps 1-2 are already committed (no rollback)
+**Stage Auto-Transition After Approval**
+- Problem: When a gate stage task is approved, the project's `currentStage` is not automatically advanced to the next work stage. The project header and phase pipeline display the current phase based on a live computation over checklist items, but the `project.currentStage` field in Firestore is never updated by `approveTask`.
+- Files: `js/firestore-service.js` `approveTask()`, `recalculateProjectStats()`
+- Impact: Project list views and any external systems relying on `project.currentStage` show stale stage data.
 
-- Impact: Data inconsistency (task marked approved but notification never sent, project progress wrong)
-- Files: `js/firestore-service.js` (approveTask, completeTask, etc. — no transaction wrapping)
-- Fix: Use Firestore transactions or implement compensating actions
-
-**No Audit Trail:**
-- Problem: Who approved task X? When did project status change? No history.
-- Impact: Can't track who made critical decisions for compliance/debugging
-- Files: No audit collection exists
-- Recommendation: Add `auditLogs` collection:
-  ```javascript
-  {
-    userId, userName, action, targetId, targetType, timestamp,
-    changedFields: { approvalStatus: ["pending", "approved"] }
-  }
-  ```
-
-**No Conflict Resolution for Concurrent Edits:**
-- Problem: If two managers edit same checklist item simultaneously, one change is lost
-- Impact: Data loss on concurrent edits
-- Recommendation: Use client-side timestamps + last-write-wins or operational transforms
+**Change Request Department-level Approval Flow**
+- Problem: Change requests can be approved/rejected at the project level but the domain model references individual department approvals. No per-department approval tracking exists in the data model or UI.
+- Files: CLAUDE.md "Remaining Gaps"
 
 ---
 
 ## Test Coverage Gaps
 
-**Zero Automated Tests:**
-- What's not tested: Any function, any page, any integration
-- Files: No test files found (`*.test.js`, `*.spec.js`, `jest.config.js`, `vitest.config.js`)
-- Risk: High — changes to Firestore schema, auth logic, or filtering could break silently
-- Priority: High
+**No Test Framework Exists**
+- What's not tested: Everything. There are no unit tests, integration tests, or E2E tests of any kind.
+- Files: All `js/` files
+- Risk: All Firestore CRUD operations (`completeTask`, `approveTask`, `rejectTask`, `bulkApproveTasks`, `applyTemplateToProject`) run with zero automated verification. Auth session logic, role-based rendering decisions, and D-Day calculations are all untested.
+- Priority: High — auth logic, role guards, and approval flows are the most critical to cover first.
 
-- Recommendation:
-  - Set up Vitest (lightweight, modern, works with ES modules)
-  - Write unit tests for utilities (`utils.js` date formatting, filtering, escaping)
-  - Write integration tests for Firestore service (mock Firebase SDK)
-  - Write e2e tests for critical flows: login → create project → approve task → view dashboard
-  - Target: 60%+ coverage for business logic files
-
-**Manual Testing Dependency:**
-- All QA happens via manual browser testing (no CI checks)
-- Impact: Regressions caught late, deployment risk high
-- Recommendation: Integrate tests into CI/CD (GitHub Actions → `npm run test` before deploy)
+**No Tests for Role-Based Access Control**
+- What's not tested: The `user.role === "observer"` checks that gate approval actions. If the role check is accidentally removed or inverted, any worker could approve their own tasks.
+- Files: `js/pages/dashboard.js` line 608, `js/firestore-service.js` `approveTask()`
+- Risk: Security regression with no automated detection.
+- Priority: High.
 
 ---
 
-## CSS & Design Fragility
-
-**Hardcoded Color/Spacing Values:**
-- Issue: Colors and sizing scattered across `css/styles.css` and hardcoded in JS
-- Files:
-  - `css/styles.css` (CSS custom properties defined, good ✓)
-  - `js/pages/sales.js` (line 90: hardcoded `color:#f59e0b` in HTML string)
-  - `js/pages/project-detail.js` (various inline styles)
-
-- Impact: Theme changes require updating CSS + JS; hard to maintain consistent design
-- Recommendation: Export CSS variables to JavaScript or use utility classes instead of inline styles
-
-**Responsive Design Gaps:**
-- Issue: Page built for desktop; mobile experience not tested
-- Files: All `.html` files lack viewport testing
-- Impact: On mobile, wide tables overflow, modals might not fit
-- Recommendation: Test on mobile devices, add `@media (max-width: 768px)` breakpoints
-
----
-
-## Documentation Gaps
-
-**No JSDoc Comments:**
-- Issue: Complex functions like `applyTemplateToProject()` have doc comments, but most don't
-- Files: `firestore-service.js` (good JSDoc), most page files (minimal comments)
-- Impact: New contributors can't understand code intent, easy to use API incorrectly
-- Recommendation: Add JSDoc to all exported functions
-
-**No API Documentation:**
-- Missing: How to add a new checklist view? How to add a new page? How to extend Firestore schema?
-- Recommendation: Create `docs/development-guide.md` with:
-  - Folder structure and naming conventions
-  - How to add a Firestore collection
-  - How to add a page + navigation link
-  - How to create a new view mode in existing page
-  - Firestore query patterns
-
----
-
-## Environment & Deployment Concerns
-
-**No Environment Variable Validation:**
-- Issue: Firebase SDK initialized without checking required config keys exist
-- Files: `js/firebase-init.js` (no error if keys missing)
-- Impact: If `.firebaserc` or Firebase config is wrong, app silently fails at runtime
-- Recommendation: Add startup validation:
-  ```javascript
-  const requiredKeys = ["apiKey", "projectId", "storageBucket"];
-  for (const key of requiredKeys) {
-    if (!firebaseConfig[key]) throw new Error(`Missing Firebase config: ${key}`);
-  }
-  ```
-
-**Hardcoded Azure AD Tenant ID:**
-- Issue: Microsoft OAuth tenant hardcoded in `js/auth.js` (line 46)
-- Impact: Can't easily switch between dev/staging/prod Azure tenants
-- Recommendation: Read from Firebase config or .firebaserc
-
----
-
-## Recommendations Priority
-
-**High (Security/Critical Data Loss):**
-1. Fix Firestore Rules — implement proper authentication checks
-2. Add transaction support to multi-step operations (approve, complete, reject)
-3. Implement HTML injection protection audit
-4. Add retry logic with proper error feedback
-
-**Medium (Performance/Maintainability):**
-5. Refactor monolithic files into smaller modules
-6. Implement subscription cleanup on all pages
-7. Add pagination/lazy loading for large lists
-8. Fix timestamp conversion edge case
-
-**Low (Technical Debt/Nice-to-Have):**
-9. Add JSDoc documentation
-10. Set up automated testing framework
-11. Centralize role/permission logic
-12. Implement audit trail
-
+*Concerns audit: 2026-03-12*
