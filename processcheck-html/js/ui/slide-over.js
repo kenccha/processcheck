@@ -1,4 +1,5 @@
 // Slide-over panel for previewing tasks/projects without page navigation
+import { trapFocus, releaseFocus } from "./focus-trap.js";
 
 let slideOverEl = null;
 
@@ -24,10 +25,13 @@ export function openSlideOver(title, bodyContent, footerContent = "") {
     if (e.target === slideOverEl) closeSlideOver();
   });
   document.addEventListener("keydown", handleEsc);
+  const panel = slideOverEl.querySelector(".slide-over-panel");
+  if (panel) trapFocus(panel, closeSlideOver);
 }
 
 export function closeSlideOver() {
   if (!slideOverEl) return;
+  releaseFocus();
   document.removeEventListener("keydown", handleEsc);
   slideOverEl.classList.remove("open");
   const el = slideOverEl;

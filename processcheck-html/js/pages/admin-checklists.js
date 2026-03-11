@@ -3,6 +3,8 @@
 // =============================================================================
 
 import { guardPage, getUser } from "../auth.js";
+import { confirmModal } from "../ui/confirm-modal.js";
+import { trapFocus, releaseFocus } from "../ui/focus-trap.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
@@ -147,9 +149,14 @@ function navigateToTreeCell(stageId, deptId) {
 function openModal(type, data = {}) {
   modal = { type, data };
   render();
+  requestAnimationFrame(() => {
+    const el = document.querySelector(".modal-overlay .modal-content, .modal-overlay");
+    if (el) trapFocus(el, closeModal);
+  });
 }
 
 function closeModal() {
+  releaseFocus();
   modal = null;
   render();
 }
@@ -192,7 +199,7 @@ async function handleEditItem(itemId, content, isRequired) {
 }
 
 async function handleDeleteItem(itemId) {
-  if (!confirm("이 항목을 삭제하시겠습니까?")) return;
+  if (!await confirmModal("이 항목을 삭제하시겠습니까?")) return;
   try {
     await deleteTemplateItem(itemId);
   } catch (err) {
@@ -221,7 +228,7 @@ async function handleAddStage(name, workStageName, gateStageName) {
 async function handleDeleteStage(stageId) {
   const stage = stages.find(s => s.id === stageId);
   const stageName = stage ? stage.name : stageId;
-  if (!confirm(`"${stageName}" 단계를 삭제하시겠습니까?\n\n이 단계에 속한 모든 체크리스트 항목도 함께 삭제됩니다.`)) return;
+  if (!await confirmModal(`"${stageName}" 단계를 삭제하시겠습니까? 이 단계에 속한 모든 체크리스트 항목도 함께 삭제됩니다.`)) return;
   try {
     await deleteTemplateStage(stageId);
     stages = await getTemplateStages();
@@ -251,7 +258,7 @@ async function handleAddDept(name) {
 async function handleDeleteDept(deptId) {
   const dept = departments.find(d => d.id === deptId);
   const deptName = dept ? dept.name : deptId;
-  if (!confirm(`"${deptName}" 부서를 삭제하시겠습니까?\n\n이 부서에 속한 모든 체크리스트 항목도 함께 삭제됩니다.`)) return;
+  if (!await confirmModal(`"${deptName}" 부서를 삭제하시겠습니까? 이 부서에 속한 모든 체크리스트 항목도 함께 삭제됩니다.`)) return;
   try {
     await deleteTemplateDepartment(deptId);
     departments = await getTemplateDepartments();

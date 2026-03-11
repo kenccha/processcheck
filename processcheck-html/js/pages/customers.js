@@ -6,6 +6,7 @@ import { initTheme } from "../components.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, navigate } from "../components.js";
 import { guardPage, getUser } from "../auth.js";
+import { trapFocus, releaseFocus } from "../ui/focus-trap.js";
 import {
   subscribeCustomers,
   createCustomer,
@@ -311,6 +312,7 @@ function openModal(customer) {
   }
 
   modal.classList.remove("hidden");
+  trapFocus(modal, () => { modal.classList.add("hidden"); releaseFocus(); });
 }
 
 async function handleSave() {

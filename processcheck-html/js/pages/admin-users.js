@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage } from "../auth.js";
+import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
@@ -269,7 +270,7 @@ function bindEvents() {
   // Deactivate
   app.querySelectorAll("[data-deactivate]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (!confirm("이 사용자를 비활성화하시겠습니까?")) return;
+      if (!await confirmModal("이 사용자를 비활성화하시겠습니까?")) return;
       try {
         await deactivateUser(btn.dataset.deactivate);
       } catch (err) {

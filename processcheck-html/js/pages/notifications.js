@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
+import { confirmModal } from "../ui/confirm-modal.js";
 import { renderNav, initTheme } from "../components.js";
 import {
   subscribeNotifications,
@@ -329,7 +330,7 @@ function bindEvents() {
   const markAllBtn = app.querySelector("#nc-mark-all-read");
   if (markAllBtn) {
     markAllBtn.addEventListener("click", async () => {
-      if (confirm("모든 알림을 읽음 처리하시겠습니까?")) {
+      if (await confirmModal("모든 알림을 읽음 처리하시겠습니까?")) {
         markAllBtn.disabled = true;
         markAllBtn.textContent = "처리 중...";
         try {

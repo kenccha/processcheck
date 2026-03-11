@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { guardPage, getUser } from "../auth.js";
+import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
@@ -1199,7 +1200,7 @@ function bindControls() {
       if (!projectId || !newStatus) return;
       const proj = projects.find((p) => p.id === projectId);
       if (!proj || proj.status === newStatus) return;
-      if (!confirm(`"${proj.name}" 상태를 "${getProjectStatusLabel(newStatus)}"(으)로 변경하시겠습니까?`)) return;
+      if (!await confirmModal(`"${proj.name}" 상태를 "${getProjectStatusLabel(newStatus)}"(으)로 변경하시겠습니까?`)) return;
       try {
         await updateProject(projectId, { status: newStatus });
       } catch (err) {

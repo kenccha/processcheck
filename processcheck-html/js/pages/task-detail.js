@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { guardPage, getUser } from "../auth.js";
+import { confirmModal } from "../ui/confirm-modal.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -749,7 +750,7 @@ function bindEvents() {
   app.querySelectorAll("[data-delete-file]").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm("파일을 삭제하시겠습니까?")) return;
+      if (!await confirmModal("파일을 삭제하시겠습니까?")) return;
       const fileId = btn.dataset.deleteFile;
       const filePath = btn.dataset.filePath;
       try {
@@ -779,7 +780,7 @@ function bindEvents() {
   // Comment delete
   app.querySelectorAll("[data-delete-comment]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("코멘트를 삭제하시겠습니까?")) return;
+      if (!await confirmModal("코멘트를 삭제하시겠습니까?")) return;
       await deleteComment(task.id, btn.dataset.deleteComment);
       showFeedback("success", "코멘트 삭제 완료");
     });

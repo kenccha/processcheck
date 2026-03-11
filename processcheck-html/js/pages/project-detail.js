@@ -4,6 +4,7 @@
 
 import { guardPage } from "../auth.js";
 import { showToast } from "../ui/toast.js";
+import { confirmModal } from "../ui/confirm-modal.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
 import {
@@ -1032,7 +1033,7 @@ function bindEvents() {
         showToast('error', `모든 작업이 완료되어야 승인 가능합니다. (${gateCheck.workStage} 미완료)`);
         return;
       }
-      if (!confirm(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
+      if (!await confirmModal(`${selectedTaskIds.size}개 작업을 일괄 승인하시겠습니까?`)) return;
       try {
         const { successCount, failCount } = await bulkApproveTasks([...selectedTaskIds], user.name);
         if (failCount > 0) showToast('warning', `${successCount}건 성공, ${failCount}건 실패`);

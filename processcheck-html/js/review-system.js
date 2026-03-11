@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { db } from "./firebase-init.js";
+import { confirmModal } from "./ui/confirm-modal.js";
 import { showToast } from "./ui/toast.js";
 import { getUser } from "./auth.js";
 import { escapeHtml, timeAgo } from "./utils.js";
@@ -392,7 +393,7 @@ export class ReviewPanel {
             await this.updateStatus(review, "open");
             break;
           case "delete":
-            if (confirm("이 리뷰를 삭제하시겠습니까?")) {
+            if (await confirmModal("이 리뷰를 삭제하시겠습니까?")) {
               await deleteReview(reviewId);
             }
             break;
