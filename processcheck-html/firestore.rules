@@ -3,87 +3,97 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper Functions ───────────────────────────────────────────────────
+    // ─── Helper Functions ─────────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isStoredUser() {
-      // Allow access for users who logged in via demo cards (no Firebase Auth)
-      // or via MS OAuth (Firebase Auth present)
-      return true; // Client-side auth check via localStorage
-    }
-
-    // ─── Users ──────────────────────────────────────────────────────────────
+    // ─── Users ────────────────────────────────────────────────────────────
+    // Read open: user list needed for task assignment dropdowns
     match /users/{userId} {
       allow read: if true;
-      allow write: if isAuthenticated() || true; // Demo users need write too
+      allow write: if isAuthenticated();
     }
 
-    // ─── Projects ───────────────────────────────────────────────────────────
+    // ─── Projects ─────────────────────────────────────────────────────────
     match /projects/{projectId} {
       allow read: if true;
-      allow write: if true; // TODO: restrict to authenticated users
+      allow write: if isAuthenticated();
     }
 
-    // ─── Checklist Items ────────────────────────────────────────────────────
+    // ─── Checklist Items ──────────────────────────────────────────────────
     match /checklistItems/{itemId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Template Stages ────────────────────────────────────────────────────
+    // ─── Template Stages ──────────────────────────────────────────────────
     match /templateStages/{stageId} {
       allow read: if true;
-      allow write: if true; // Observer role only (enforced client-side)
+      allow write: if isAuthenticated();
     }
 
-    // ─── Template Departments ───────────────────────────────────────────────
+    // ─── Template Departments ─────────────────────────────────────────────
     match /templateDepartments/{deptId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Template Items ─────────────────────────────────────────────────────
+    // ─── Template Items ───────────────────────────────────────────────────
     match /templateItems/{itemId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Notifications ──────────────────────────────────────────────────────
+    // ─── Notifications ────────────────────────────────────────────────────
     match /notifications/{notifId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Change Requests ────────────────────────────────────────────────────
+    // ─── Change Requests ──────────────────────────────────────────────────
     match /changeRequests/{requestId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Customers ──────────────────────────────────────────────────────────
+    // ─── Customers ────────────────────────────────────────────────────────
     match /customers/{customerId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Launch Checklists ──────────────────────────────────────────────────
+    // ─── Launch Checklists ────────────────────────────────────────────────
     match /launchChecklists/{checklistId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Portal Notifications ───────────────────────────────────────────────
+    // ─── Portal Notifications ─────────────────────────────────────────────
     match /portalNotifications/{notifId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
-    // ─── Reviews (NEW) ──────────────────────────────────────────────────────
+    // ─── Reviews ──────────────────────────────────────────────────────────
     match /reviews/{reviewId} {
       allow read: if true;
-      allow write: if isAuthenticated(); // Only MS OAuth authenticated users
+      allow write: if isAuthenticated();
     }
+
+    // ─── Activity Logs ────────────────────────────────────────────────────
+    // Written by firestore-service.js; was missing from rules (implicit deny)
+    match /activityLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ─── Feedbacks ────────────────────────────────────────────────────────
+    // Written by docs/deliverables/js/feedback-system.js
+    match /feedbacks/{feedbackId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
   }
 }
