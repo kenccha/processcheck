@@ -37,14 +37,13 @@
 
 ### Active
 
-<!-- 실사용 준비 + UX 개선 + 신규 기능 -->
+<!-- v2.0 UX/UI 대규모 개선 — 경쟁사 분석 기반 -->
 
-- [ ] 전반적 UX 정리 및 개선 (사용성, 일관성, 반응형)
-- [ ] 기존 버그 수정 (타임스탬프 변환, 모달 에러, 프로젝트 미존재 처리 등)
-- [ ] Firestore 보안 규칙 강화 (현재 write: true → 인증 기반)
-- [ ] 파일 업로드 Firebase Storage 연동 (현재 UI만 존재)
-- [ ] 태스크 승인 후 스테이지 자동 전환
-- [ ] 실사용자가 바로 쓸 수 있는 수준의 안정성 확보
+- [ ] 즉시 체감 UX 개선 (인라인 승인, 토스트, 슬라이드 패널, 인라인 상태 변경)
+- [ ] 시각적 품질 향상 (Battery-bar, 3색 시스템, 스켈레톤 로딩, CSS 토큰 정리)
+- [ ] 파워유저 생산성 (Cmd+K, 필터 pill, 뷰 상태 저장, 일괄 작업, 워크로드 히트맵)
+- [ ] 정보 구조 개선 (D-Day 컬럼, 뷰 정리, 승인 전용 페이지, 간트/히스토리 실데이터)
+- [ ] 칸반 드래그앤드롭 (HTML DnD API, 부서 스윔레인, 긴급 고정 레인)
 
 ### Out of Scope
 
@@ -81,5 +80,16 @@
 | Observer만 승인 권한 | 기획조정실 중심 거버넌스 | ✓ Good |
 | 라이트모드 기본 + 다크모드 토글 | 사용자 선호도 반영 | ✓ Good |
 
+## Current Milestone: v2.0 UX/UI 대규모 개선
+
+**Goal:** 경쟁사 분석(Linear, Notion, Monday.com, Arena PLM, Jira, ClickUp) 기반으로 ProcessCheck의 UX/UI를 전면 개선하여 실무자가 매일 쓰고 싶은 도구로 만든다.
+
+**Target features:**
+- 즉시 체감 UX (A1-A6): 체크리스트 연동, 인라인 승인, 알림 이동, 토스트, 슬라이드 패널, 인라인 상태 변경
+- 시각적 품질 (B1-B6): Battery-bar, 3색 시스템, 스켈레톤 로딩, Hover 액션, CSS 토큰 정리, 뷰 전환 애니메이션
+- 파워유저 생산성 (C1-C5): Cmd+K, 필터 pill, 뷰 상태 저장, 일괄 작업, 워크로드 히트맵
+- 정보 구조 (D1-D7): D-Day 컬럼, 뷰 정리, 리포트 연결, Sales 네비, 승인 전용 페이지, 간트 실데이터, 히스토리 실데이터
+- 칸반/DnD (E1-E3): 드래그앤드롭, 부서 스윔레인, 긴급 고정 레인
+
 ---
-*Last updated: 2026-03-12 after initialization (brownfield)*
+*Last updated: 2026-03-12 after milestone v2.0 started*
