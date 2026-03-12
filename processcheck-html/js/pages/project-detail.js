@@ -209,7 +209,7 @@ function render() {
 
   app.innerHTML = `
     <div class="container">
-      ${renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPending)}
+      ${renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks, approvalPending)}
 
       <!-- Tabs -->
       <div class="tab-group mb-4" style="margin-top:1rem;">
@@ -242,7 +242,7 @@ function render() {
 // Project Header — D-Day + Phase + Delay Reason (merged, compact)
 // =============================================================================
 
-function renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPending) {
+function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks, approvalPending) {
   const p = project;
   const currentPhaseName = phaseIndex >= 0 ? PHASE_GROUPS[phaseIndex].name : formatStageName(p.currentStage);
 
