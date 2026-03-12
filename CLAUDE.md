@@ -304,6 +304,10 @@ docs/
 - 변경 요청 부서별 개별 승인 흐름 없음
 
 ### ✅ Recently Fixed (최근 수정)
+- ~~영업 준비 페이지에 프로젝트 안 나옴~~ → `launchChecklists` 생성 경로 추가: 프로젝트 상세에 "🚀 출시 준비 적용" 버튼 + 영업 페이지에서 직접 생성 가능
+- ~~영업 일괄 버튼 영구 비활성화~~ → 처리 후 버튼 re-enable + 원래 텍스트 복원
+- ~~영업 확인 처리 후 UI 갱신 없음~~ → 성공 토스트 추가 (UI는 onSnapshot 자동 갱신)
+- ~~영업 출시 체크리스트 생성 시 고객 목록 미전달~~ → `subscribeCustomers` 구독 + `applyLaunchChecklistToProject`에 customers 배열 전달
 - ~~피드백 페이지 네비게이션 없음~~ → `deliverable-nav.js` IIFE에서 `user` 변수가 `MAIN_NAV` 선언보다 나중에 정의되어 TDZ ReferenceError 발생 → `user` 선언을 `MAIN_NAV` 이전으로 이동하여 수정 (모든 deliverable 페이지 영향)
 - ~~개별 작업 승인 절차~~ → 제거됨 (실무자 완료 처리 = 최종 완료), 위원회(gate) 승인만 유지
 - ~~PM 표시~~ → 전체 페이지에서 PM 필드/표시 제거 (프로젝트 생성/목록/상세/대시보드/CSV)
