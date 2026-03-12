@@ -15,6 +15,7 @@ import {
   updateLaunchChecklist,
   confirmLaunchChecklist,
   applyLaunchChecklistToProject,
+  subscribeCustomers,
   LAUNCH_CATEGORY_LABELS,
 } from "../firestore-service.js";
 import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName } from "../utils.js";
@@ -46,6 +47,7 @@ const VIEW_MODES = [
 
 let allItems = [];
 let projects = [];
+let customers = [];
 let viewMode = "product";
 let filterProject = "all";
 let filterCategory = "all";
@@ -136,6 +138,7 @@ function renderSalesNav(container) {
 
 let unsubProjects = null;
 let unsubItems = null;
+let unsubCustomers = null;
 
 function init() {
   renderSalesNav(navRoot);
@@ -154,11 +157,16 @@ function init() {
     dataLoaded.items = true;
     render();
   });
+
+  unsubCustomers = subscribeCustomers((data) => {
+    customers = data;
+  });
 }
 
 window.addEventListener("beforeunload", () => {
   unsubProjects?.();
   unsubItems?.();
+  unsubCustomers?.();
 });
 
 // =============================================================================
@@ -694,7 +702,8 @@ function render() {
         el.disabled = true;
         el.textContent = "생성 중...";
         try {
-          const count = await applyLaunchChecklistToProject(pId, pType, cScale, endDate);
+          const custList = customers.map(c => ({ id: c.id, name: c.name }));
+          const count = await applyLaunchChecklistToProject(pId, pType, cScale, endDate, custList);
           if (count > 0) {
             showToast("success", `${getProjectName(pId)}: ${count}개 출시 준비 체크리스트 생성 완료`);
             el.textContent = "완료";
@@ -890,8 +899,25 @@ function renderViewContent(filtered) {
 }
 
 // =============================================================================
-// View 1: 제품별 카드뷰
+// View 1: 제품별 카드뷰 (신호등 + D-Day)
 // =============================================================================
+
+// Traffic light status for a category group
+function getCategorySignal(items, category) {
+  const catItems = items.filter(i => i.category === category);
+  if (catItems.length === 0) return null;
+  const done = catItems.filter(i => i.status === "completed").length;
+  const hasOverdue = catItems.some(i => {
+    if (i.status === "completed") return false;
+    const d = daysUntil(i.dueDate);
+    return d !== null && d < 0;
+  });
+  const pct = Math.round((done / catItems.length) * 100);
+  if (hasOverdue) return { color: "var(--danger)", label: "지연", pct, done, total: catItems.length };
+  if (pct >= 80) return { color: "var(--success)", label: "양호", pct, done, total: catItems.length };
+  if (pct >= 40) return { color: "var(--warning)", label: "진행", pct, done, total: catItems.length };
+  return { color: "var(--danger)", label: "미시작", pct, done, total: catItems.length };
+}
 
 function renderProductCards(filtered) {
   const grouped = {};
@@ -900,21 +926,30 @@ function renderProductCards(filtered) {
     grouped[item.projectId].push(item);
   }
 
+  // Sort: overdue first, then by D-Day (soonest first)
   const sortedGroups = Object.entries(grouped).sort((a, b) => {
     const overdueA = a[1].filter(i => i.status !== "completed" && i.dueDate && daysUntil(i.dueDate) !== null && daysUntil(i.dueDate) < 0).length;
     const overdueB = b[1].filter(i => i.status !== "completed" && i.dueDate && daysUntil(i.dueDate) !== null && daysUntil(i.dueDate) < 0).length;
-    return overdueB - overdueA;
+    if (overdueB !== overdueA) return overdueB - overdueA;
+    const projA = projects.find(p => p.id === a[0]);
+    const projB = projects.find(p => p.id === b[0]);
+    const dA = projA?.endDate ? daysUntil(projA.endDate) ?? 9999 : 9999;
+    const dB = projB?.endDate ? daysUntil(projB.endDate) ?? 9999 : 9999;
+    return dA - dB;
   });
 
   if (sortedGroups.length === 0) return renderEmpty();
 
-  let html = `<div class="grid grid-cols-1 gap-4" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr));">`;
+  let html = `<div class="grid grid-cols-1 gap-4" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr));">`;
 
   for (const [projectId, items] of sortedGroups) {
     const proj = projects.find(p => p.id === projectId);
     const pName = getProjectName(projectId);
+
+    // All items stats
     const completedCount = items.filter(i => i.status === "completed").length;
-    const pct = items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+    const totalCount = items.length;
+    const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     const overdueCount = items.filter(i => {
       if (i.status === "completed") return false;
       const d = daysUntil(i.dueDate);
@@ -924,6 +959,40 @@ function renderProductCards(filtered) {
     const unchecked = custItems.filter(i => !i.checkedBy).length;
     const isExpanded = expandedProducts.has(projectId);
 
+    // D-Day from project.endDate
+    const projectDDay = proj?.endDate ? daysUntil(proj.endDate) : null;
+    let dDayText = "—";
+    let dDayColor = "var(--slate-400)";
+    if (projectDDay !== null) {
+      if (projectDDay < 0) {
+        dDayText = `D+${Math.abs(projectDDay)}`;
+        dDayColor = "var(--danger)";
+      } else if (projectDDay === 0) {
+        dDayText = "D-Day";
+        dDayColor = "var(--danger)";
+      } else if (projectDDay <= 14) {
+        dDayText = `D-${projectDDay}`;
+        dDayColor = "var(--warning)";
+      } else {
+        dDayText = `D-${projectDDay}`;
+        dDayColor = "var(--success)";
+      }
+    }
+
+    // Card left border color
+    let borderColor = "var(--surface-3)";
+    if (overdueCount > 0) borderColor = "var(--danger)";
+    else if (pct >= 80) borderColor = "var(--success)";
+    else if (projectDDay !== null && projectDDay <= 14) borderColor = "var(--warning)";
+
+    // Traffic light signals for SALES_CORE_CATEGORIES
+    const signals = SALES_CORE_CATEGORIES.map(cat => {
+      const sig = getCategorySignal(items, cat);
+      const label = LAUNCH_CATEGORY_LABELS[cat] || cat;
+      return { cat, label, sig };
+    });
+
+    // Non-core items for expanded detail
     const catMap = {};
     for (const item of items) {
       if (!catMap[item.category]) catMap[item.category] = { total: 0, done: 0 };
@@ -937,42 +1006,72 @@ function renderProductCards(filtered) {
     });
 
     html += `
-      <div class="card card-hover cursor-pointer" data-product-card="${projectId}" style="padding:0;overflow:hidden;${isExpanded ? 'outline:2px solid var(--primary);' : ''}">
-        <div style="padding:1.25rem;">
-          <div class="flex items-center justify-between mb-2">
-            <div>
-              <a href="project.html?id=${projectId}" class="project-link" style="color:var(--slate-100);font-size:1.05rem;font-weight:bold;text-decoration:none;" title="프로젝트 상세 보기" onclick="event.stopPropagation();">${escapeHtml(pName)}</a>
-              ${proj && proj.currentStage ? `<span class="text-xs text-soft" style="margin-left:6px;">${escapeHtml(proj.currentStage)}</span>` : ""}
+      <div class="card card-hover cursor-pointer" data-product-card="${projectId}"
+        style="padding:0;overflow:hidden;border-left:4px solid ${borderColor};${isExpanded ? 'outline:2px solid var(--primary);' : ''}">
+
+        <!-- Card Header -->
+        <div style="padding:1rem 1.25rem 0.75rem;">
+          <!-- Top row: project name + D-Day -->
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div style="min-width:0;">
+              <a href="project.html?id=${projectId}" class="project-link"
+                style="color:var(--slate-100);font-size:1rem;font-weight:700;text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="프로젝트 상세 보기" onclick="event.stopPropagation();">${escapeHtml(pName)}</a>
+              <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                ${proj?.currentStage ? `<span class="badge badge-neutral" style="font-size:10px;">${escapeHtml(proj.currentStage)}</span>` : ""}
+                ${proj?.endDate ? `<span class="text-xs text-soft">${formatDate(proj.endDate)}</span>` : ""}
+              </div>
             </div>
-            <span class="text-lg font-mono font-bold" style="color:var(--primary-400)">${pct}%</span>
+            <!-- D-Day badge -->
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:1.5rem;font-weight:800;line-height:1;color:${dDayColor};font-family:monospace;">${dDayText}</div>
+              <div class="text-xs text-soft" style="margin-top:2px;">출시일</div>
+            </div>
           </div>
-          <div class="progress-bar mb-3" style="height:6px;">
-            <div class="progress-fill" style="width:${pct}%;${pct >= 80 ? 'background:var(--success)' : pct >= 50 ? 'background:var(--primary)' : 'background:var(--warning)'}"></div>
+
+          <!-- Overall progress bar -->
+          <div style="margin:0.5rem 0 0.75rem;">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-soft">전체 진행률</span>
+              <span class="text-xs font-mono" style="color:${pct >= 80 ? 'var(--success)' : pct >= 40 ? 'var(--primary-400)' : 'var(--warning)'};">${pct}% (${completedCount}/${totalCount})</span>
+            </div>
+            <div class="progress-bar" style="height:5px;">
+              <div class="progress-fill" style="width:${pct}%;${pct >= 80 ? 'background:var(--success)' : pct >= 40 ? '' : 'background:var(--warning)'}"></div>
+            </div>
           </div>
-          <div class="flex items-center gap-2 flex-wrap mb-3">
-            <span class="badge badge-neutral">${completedCount}/${items.length} 완료</span>
-            ${overdueCount > 0 ? `<span class="badge badge-danger">${overdueCount} 지연</span>` : ""}
-            ${unchecked > 0 ? `<span class="badge badge-warning">${unchecked} 미확인</span>` : ""}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            ${catEntries.slice(0, 6).map(([cat, data]) => {
-              const catPct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
-              const catLabel = LAUNCH_CATEGORY_LABELS[cat] || cat;
+
+          <!-- Traffic lights: SALES_CORE_CATEGORIES -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:0.75rem;">
+            ${signals.map(({ cat, label, sig }) => {
+              if (!sig) {
+                return `
+                  <div style="background:var(--surface-2);border-radius:8px;padding:8px 6px;text-align:center;opacity:0.4;">
+                    <div style="width:10px;height:10px;border-radius:50%;background:var(--slate-600);margin:0 auto 4px;"></div>
+                    <div class="text-xs text-soft" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(label)}</div>
+                    <div class="text-xs text-soft" style="font-size:9px;">—</div>
+                  </div>`;
+              }
               return `
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="text-xs" style="width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--slate-400);">${escapeHtml(catLabel)}</span>
-                  <div class="progress-bar" style="flex:1;height:4px;">
-                    <div class="progress-fill" style="width:${catPct}%;${catPct >= 100 ? 'background:var(--success)' : ''}"></div>
-                  </div>
-                  <span class="text-xs text-soft" style="min-width:36px;text-align:right;">${data.done}/${data.total}</span>
+                <div style="background:var(--surface-2);border-radius:8px;padding:8px 6px;text-align:center;border:1px solid ${sig.color}22;">
+                  <div style="width:10px;height:10px;border-radius:50%;background:${sig.color};margin:0 auto 4px;box-shadow:0 0 6px ${sig.color}66;"></div>
+                  <div class="text-xs font-medium" style="font-size:10px;color:var(--slate-300);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(label)}">${escapeHtml(label.length > 6 ? label.slice(0,6)+'…' : label)}</div>
+                  <div class="text-xs" style="font-size:9px;color:${sig.color};">${sig.done}/${sig.total} · ${sig.pct}%</div>
                 </div>`;
             }).join("")}
-            ${catEntries.length > 6 ? `<span class="text-xs text-soft">외 ${catEntries.length - 6}개 카테고리</span>` : ""}
           </div>
-          <div class="text-xs text-soft text-center" style="margin-top:10px;">
-            ${isExpanded ? "▲ 접기" : "▼ 상세 보기"}
+
+          <!-- Warning badges -->
+          <div class="flex items-center gap-2 flex-wrap" style="min-height:18px;">
+            ${overdueCount > 0 ? `<span class="badge badge-danger" style="font-size:10px;">${overdueCount}건 지연</span>` : ""}
+            ${unchecked > 0 ? `<span class="badge badge-warning" style="font-size:10px;">${unchecked}건 미확인</span>` : ""}
+            ${overdueCount === 0 && unchecked === 0 && pct >= 80 ? `<span class="badge badge-success" style="font-size:10px;">✓ 준비 완료</span>` : ""}
+          </div>
+
+          <div class="text-xs text-soft text-center" style="margin-top:0.625rem;">
+            ${isExpanded ? "▲ 접기" : "▼ 전체 항목 보기"}
           </div>
         </div>
+
         ${isExpanded ? renderProductDetail(projectId, items, catEntries) : ""}
       </div>`;
   }
@@ -1660,6 +1759,7 @@ function bindEvents() {
       await confirmLaunchChecklist(pendingConfirmId, name, note);
       modal.classList.add("hidden");
       pendingConfirmId = null;
+      showToast('success', "거래처 확인 처리가 완료되었습니다.");
     } catch (err) {
       console.error("확인 처리 실패:", err);
       showToast('error', "확인 처리에 실패했습니다.");
@@ -1721,6 +1821,8 @@ function bindEvents() {
     }
     selectedItems.clear();
     showToast('success', `${count}개 항목이 진행 중으로 변경되었습니다.`);
+    btn.disabled = false;
+    btn.textContent = "일괄 시작";
   });
 
   document.getElementById("bulk-complete")?.addEventListener("click", async () => {
@@ -1745,6 +1847,8 @@ function bindEvents() {
     selectedItems.clear();
     if (failCount > 0) showToast('warning', `${count}건 완료, ${failCount}건 실패`);
     else showToast('success', `${count}개 항목이 완료되었습니다.`);
+    btn.disabled = false;
+    btn.textContent = "일괄 완료";
   });
 }
 
