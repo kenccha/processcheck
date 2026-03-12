@@ -19,10 +19,6 @@ import { departments, escapeHtml, getRoleName } from "../utils.js";
 // --- Auth guard ---
 const user = guardPage();
 if (!user) throw new Error("Not authenticated");
-if (user.role !== "observer") {
-  window.location.href = "dashboard.html";
-  throw new Error("Not authorized");
-}
 
 // --- DOM refs ---
 const navRoot = document.getElementById("nav-root");

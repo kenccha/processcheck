@@ -108,19 +108,20 @@ docs/
 - **자동 시딩 비활성화**: 실제 데이터 사용
 - `logout()` 시 Firebase Auth `signOut()`도 함께 호출
 
-### Dashboard Design (확정) — 프로젝트 중심 뷰
+### Dashboard Design (확정 — 2026-03-12 변경) — 프로젝트 중심 뷰
 - **프로젝트 중심**: 기본 탭이 "프로젝트" — 프로젝트 목록 D-Day + 지연 사유 표시
-- **탭 4개**: 프로젝트 / 작업 / 승인 대기 / 알림
+- **탭 3개**: 프로젝트 / 작업 / 알림 (승인 대기 탭 제거됨)
 - **D-Day + 스케줄 지연 중심**: 진행률(%) 대신 D-Day 남은 일수와 지연 사유가 핵심 지표
-- **프로젝트 카드**: D-Day(큰 글씨) + 현재Phase 뱃지 + 지연 사유 1줄 요약
+- **프로젝트 카드**: D-Day(큰 글씨) + 현재Phase 뱃지 + 지연 사유 1줄 요약 (PM 제거됨)
 - **긴급도 그룹핑**: 작업 탭에서 마감초과 → 오늘 → 이번주 → 이후 순 정렬, 이후 항목은 접힌 상태
-- **통계 카드 4개**: 프로젝트(지연 N건), 긴급(초과+오늘), 승인 대기, 알림
+- **통계 카드 3개**: 프로젝트(지연 N건), 긴급(초과+오늘), 알림 (승인 대기 카드 제거됨)
 - **알림 탭**: 최근 알림 타임라인 표시
+- **헤더**: 사용자 이름만 표시 (부서명 제거됨)
 - **역할별 구독 분리**:
   - 실무자: `subscribeChecklistItemsByAssignee` (자기 이름 기준)
   - 매니저: `subscribeAllChecklistItems` → 자기 부서 필터
   - 기획조정실: `subscribeAllChecklistItems` (전체)
-- **모든 승인은 observer만**: 매니저는 작업 배분만 담당
+- **위원회 승인은 observer만**: 개별 작업 승인 없음, 매니저는 작업 배분만 담당
 
 ### Checklist Admin Design (확정)
 - **3가지 뷰 모드**: 매트릭스(matrix), 트리(tree), 리스트(list) — 기본값 matrix
@@ -134,7 +135,7 @@ docs/
 ### User Roles (3 roles) — 확정 (2026-03-11 변경)
 - **실무자 (worker):** 실제 업무 담당자. 태스크 수행, 체크리스트 완료, 파일 업로드, 코멘트 작성.
 - **매니저 (manager):** 부서별 관리자. **작업 배분/재배분만** (승인 권한 없음). 자기 부서 체크리스트 편집.
-- **기획조정실 (observer):** 전체 프로젝트 현황 모니터링, **모든 승인** (work stage + gate stage 전부), 스테이지/부서 추가·삭제, 모든 체크리스트 열람/편집, 사용자 관리.
+- **기획조정실 (observer):** 전체 프로젝트 현황 모니터링, **위원회(gate) 승인만** (개별 작업 승인 제거됨), 스테이지/부서 추가·삭제, 모든 체크리스트 열람/편집, 사용자 관리.
 
 ### Departments
 10 departments: 개발팀, 품질팀, 영업팀, 제조팀, 구매팀, CS팀, 경영관리팀, 글로벌임상팀, 디자인연구소, 인증팀
@@ -148,7 +149,7 @@ docs/
     - 대규모(major): 기존 6 phase 전체
 
 ### Project Stages (6 phases, 각각 작업+승인 쌍)
-스테이지는 "작업 단계"와 "승인 위원회"가 한 쌍으로 묶여 표시됨 (동그라미 2개).
+스테이지는 "작업 단계"와 "승인 위원회"가 한 쌍으로 묶여 있음.
 숫자 접두사 제거, 의미 있는 이름 사용:
 
 | Phase | 작업 단계 (●) | 승인 게이트 (●) |
@@ -160,7 +161,7 @@ docs/
 | **MSG** | MasterGatePilot | MSG승인회 |
 | **양산/이관** | 양산 | 영업이관 |
 
-- 매트릭스/진행률 UI에서 한 Phase 안에 동그라미 2개(작업●, 승인●)로 표현
+- 매트릭스 UI에서 한 Phase 안에 동그라미 1개(작업 완료/전체)로 표현
 - 승인 위원회 = 해당 프로세스의 최종 게이트
 - 사용자 UI에서는 항상 6개 phase만 표시. DB의 12개 stage name은 내부 데이터 키로만 사용.
 
@@ -187,35 +188,43 @@ docs/
 - 프로젝트 상세 체크리스트 탭: 항목이 0개이면 "템플릿에서 체크리스트 생성" 버튼 표시
 - 시드 데이터: 각 프로젝트별 `applyTemplateToProject()` 호출 후 프로젝트 상태에 맞게 status 업데이트
 
-### 승인 구조 (확정 — 2026-03-11 변경)
-- **모든 승인은 기획조정실(observer)만 수행** — 매니저는 승인 권한 없음
-- work stage + gate stage 구분 없이 observer가 전부 승인/반려
+### 승인 구조 (확정 — 2026-03-12 변경)
+- **개별 작업 승인 절차 제거됨**: 실무자가 작업 완료 처리하면 바로 완료 (approvalStatus 없음)
+- `completeTask()`: status를 "completed"로 직접 변경, approvalStatus 미사용
+- `approveTask()`, `rejectTask()`: stub 함수 (호출 시 console.warn만)
+- **위원회 승인(gate approval)은 유지**: Phase별 `gateRecords` 컬렉션으로 승인/반려 관리
+- `updateGateRecord()`: Phase 단위 위원회 승인/반려/초기화 (observer만 가능)
+- Phase 뷰에 인라인으로 위원회 승인 상태 표시 + 승인/반려 버튼 (observer만)
 - 매니저 주 역할: 작업 배분/재배분 (적합한 사람에게 작업 할당)
-- `checklistItems`의 `approvalStatus`, `approvedBy`, `approvedAt` 필드 사용
-- **승인 권한 규칙 (코드)**: `user.role === "observer"`만 승인 가능
 
-### Task Detail Design (확정)
+### Task Detail Design (확정 — 2026-03-12 변경)
 - 타임라인에 각 이벤트별 날짜+행위자 표시
-- 승인 대기 시 검토자 이름 + 완료일 표시
-- 반려 시 worker에게 "재작업 시작" 버튼 제공 (`restartTask()`)
-- `completeTask()` 시 `approvalStatus: "pending"` 자동 설정
+- 개별 작업 승인/반려 UI **제거됨** — 완료 처리만 표시
+- `completeTask()` 시 status만 "completed"로 변경 (approvalStatus 미사용)
 
-### Project Detail Design (확정 — 2026-03-11 재설계)
+### Project Detail Design (확정 — 2026-03-12 변경)
 - **3탭 구조**: `개요+작업 | 스케줄 | 병목` (기존 4탭에서 변경)
   - 파일 탭, 설계변경 탭 **제거**
   - 개요+체크리스트 **합침**
 - **프로젝트 헤더 (탭 위, 항상 표시)**:
-  - 제목 + Phase 뱃지 + D-Day (큰 글씨, 색상 강조) + PM/기간
+  - 제목 + Phase 뱃지 + D-Day (큰 글씨, 색상 강조) + 기간 (PM 제거됨)
   - 지연 시 사유 1줄 요약 (빨강 배너): "품질팀 WM제작 미완료로 3일 지연"
   - 정상 시 녹색 배너: "정상 진행"
   - Phase 파이프라인 (✔완료/▶현재/미래)
-  - 우측: 전체작업/지연/승인대기 숫자
+  - 우측: 전체작업/지연 숫자 (승인대기 제거됨)
 - **개요+작업 탭 (2컬럼)**:
   - 좌측: 체크리스트 (max-height + 스크롤)
   - 우측: 최근 활동 타임라인 (sticky, 스크롤)
   - 5가지 뷰: Phase/타임라인/부서/보드(칸반)/리스트
-  - Phase 뷰: 각 Phase 그룹 상단에 위원회 승인 배너 (색상 구분)
-  - 체크리스트 아이템: **단일 동그라미** (기존 2개 → 1개)
+  - **Phase 뷰 (인라인 카드 구조)**:
+    - Phase 헤더: 이름 + 진행률 + 날짜범위 + 지연표시 + 접기/펼치기
+    - Phase 설명: `PHASE_DESCRIPTIONS` 1줄 텍스트
+    - **위원회 승인 인라인**: gateRecords 상태 표시 + observer일 때 승인/반려 버튼
+    - **회의록 인라인**: 최근 2건 표시, "더 보기" 토글, "+ 등록" 인라인 textarea
+    - 체크리스트: max 5개 표시, 지연→진행→대기→완료 순 정렬, "더 보기" 토글
+    - 좌측 보더 컬러코딩: 완료=녹색, 진행중=파란색, 지연=빨간색, 대기=회색
+    - 완료 Phase 기본 접힘, 현재/미래 Phase 펼침
+  - 체크리스트 아이템: **단일 동그라미** + 인라인 상태 드롭다운
   - 필터: 단계, 부서
 - **스케줄 탭**: 간트 차트 + Phase별 상세 테이블
 - **병목 탭**: Phase×부서 히트맵 + 파이프라인 다이어그램 + 지연 원인 상세
@@ -223,7 +232,7 @@ docs/
 
 ### Matrix View Design (확정)
 - **6개 phase 열** (발의, 기획, WM, Tx, MSG, 양산/이관)
-- 각 셀에 **동그라미 2개**: 왼쪽 ●=작업(completed/total), 오른쪽 ●=승인위원회(✓/✗/⏳/—)
+- 각 셀에 **동그라미 1개**: ●=작업(completed/total)
 - `PHASE_GROUPS` 배열: `utils.js`에서 export
 - 미승인 시: 경고만 표시 (다음 phase 진행 가능, 잠금 없음)
 
@@ -250,7 +259,8 @@ docs/
 
 ### Task & Importance
 - **Task statuses:** pending, in_progress, completed, rejected
-- **Approval statuses:** pending, approved, rejected
+- **개별 작업 approval 제거됨** — completeTask() → 바로 completed (approvalStatus 미사용)
+- **위원회 승인**: gateRecords 컬렉션의 gateStatus (pending/approved/rejected) — Phase 단위
 - **Importance levels (중요도):** green(보통), yellow(중요), red(긴급)
 
 ### Projects Page View Order (확정)
@@ -268,12 +278,12 @@ docs/
 - ~~시드 데이터 불일치~~ → firestoreService 시드와 mockData 통일
 - ~~대시보드 간격 깨짐~~ → mb-8 CSS 클래스 추가
 - ~~뷰 탭 순서~~ → 테이블 → 매트릭스 → 카드 순으로 재배치
-- ~~승인 권한 분리~~ → work stage=매니저, gate stage=기획조정실
+- ~~승인 권한 분리~~ → 개별 작업 승인 제거, 위원회(gate) 승인만 observer가 수행
 - ~~작업 상세 히스토리 날짜 없음~~ → 타임라인에 날짜+행위자 표시
 - ~~승인 대기 정보 부족~~ → 검토자 + 완료일 표시
 - ~~반려 재작업 없음~~ → restartTask() + "재작업 시작" 버튼 추가
-- ~~completeTask에 approvalStatus 없음~~ → "pending" 자동 설정
-- ~~매트릭스 12열~~ → 6 phase 열 + 동그라미 2개 (작업+승인)
+- ~~completeTask에 approvalStatus 없음~~ → approvalStatus 제거됨, completeTask()는 직접 completed 처리
+- ~~매트릭스 12열~~ → 6 phase 열 + 동그라미 1개 (작업만)
 - ~~시드 데이터 부족~~ → gate stage + 전 부서 + 설계변경 프로젝트 커버 (59 tasks, 10 projects)
 - ~~프로젝트 상세 stat 카드 클릭 안됨~~ → 5개 카드 전부 클릭 가능
 - ~~캘린더 담당자 없음~~ → assignee 표시
@@ -291,12 +301,17 @@ docs/
 
 ### Remaining Gaps
 - 파일 업로드: UI만 있고 Firebase Storage 연동 없음
-- 태스크 승인 후 스테이지 자동 전환 없음
 - 변경 요청 부서별 개별 승인 흐름 없음
-- 프로젝트 progress/riskLevel/currentStage 자동 계산 없음
 
 ### ✅ Recently Fixed (최근 수정)
-- ~~대시보드 세로 나열 너무 김~~ → 탭 UI(작업/승인/프로젝트) + 차트 접기/펼치기 + 알림 스크롤 컴팩트화
+- ~~피드백 페이지 네비게이션 없음~~ → `deliverable-nav.js` IIFE에서 `user` 변수가 `MAIN_NAV` 선언보다 나중에 정의되어 TDZ ReferenceError 발생 → `user` 선언을 `MAIN_NAV` 이전으로 이동하여 수정 (모든 deliverable 페이지 영향)
+- ~~개별 작업 승인 절차~~ → 제거됨 (실무자 완료 처리 = 최종 완료), 위원회(gate) 승인만 유지
+- ~~PM 표시~~ → 전체 페이지에서 PM 필드/표시 제거 (프로젝트 생성/목록/상세/대시보드/CSV)
+- ~~대시보드 부서 표시~~ → 헤더에서 부서명 뱃지 제거
+- ~~Phase 뷰 인라인 카드~~ → 설명/위원회승인/회의록/체크리스트 인라인 구조 구현
+- ~~매트릭스 뷰 동그라미 2개~~ → 1개로 축소 (작업만)
+- ~~피드백 캡처 흐릿함~~ → html2canvas scale을 devicePixelRatio로 변경
+- ~~대시보드 세로 나열 너무 김~~ → 탭 UI(작업/프로젝트) + 차트 접기/펼치기 + 알림 스크롤 컴팩트화
 - ~~대시보드 부가 정보 부족~~ → 오늘 날짜, 통계 카드 서브텍스트, 마감 임박 하이라이트, Phase 뱃지 추가
 - ~~태스크 생성 모달 없음~~ → project-detail.js 체크리스트 탭에 "작업 추가" 모달 구현
 - ~~프로젝트 정렬 미구현~~ → projects.js 테이블 뷰에 정렬 기능 추가 (이름, 상태, PM, 진행률, 시작일)
@@ -330,8 +345,9 @@ docs/
 - 템플릿 데이터도 삭제 (210개) — 사용자가 직접 입력
 - `seedDatabaseIfEmpty()` 비활성화
 
-### Feedback/Screenshot System Design (확정)
+### Feedback/Screenshot System Design (확정 — 2026-03-12 변경)
 - **뷰포트 캡처**: html2canvas로 현재 보이는 영역만 캡처 (전체 페이지 X)
+- **해상도**: `scale: window.devicePixelRatio` 사용 (Retina 디스플레이 선명도 보장)
 - **다중 스크린샷**: "저장 & 더 캡처" 버튼 → 페이지로 복귀 → 스크롤/이동 → 추가 캡처 → "피드백 작성"
 - **플로팅 바**: 캡처 중 하단에 썸네일 + "추가 캡처" / "피드백 작성" / "취소" 버튼
 - **Firestore `feedbacks` 컬렉션**: `screenshots` 배열 필드 (레거시 `screenshot` 문자열과 하위 호환)

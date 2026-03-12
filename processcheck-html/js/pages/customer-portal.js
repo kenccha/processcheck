@@ -246,7 +246,6 @@ function renderProjectsView() {
                 <h3 class="text-base font-bold" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
                 <span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span>
               </div>
-              <span class="text-xs text-dim">PM: ${escapeHtml(p.pm || "-")}</span>
             </div>
             <div class="text-xs text-dim mb-3">${escapeHtml(p.productType || "")} · ${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</div>
 

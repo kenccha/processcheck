@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProcessCheck — 체크리스트 관리 상세 와이어프레임</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ─── Theme tokens ─── */
+:root {
+  --ink: #1a1a2e;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --ink-4: #94a3b8;
+  --ink-5: #cbd5e1;
+  --surface-0: #e9ecef;
+  --surface-1: #f8f9fa;
+  --surface-2: #ffffff;
+  --border: #dee2e6;
+  --border-light: #e2e8f0;
+  --accent: #4A90D9;
+  --accent-bg: rgba(74,144,217,.08);
+  --accent-bg-strong: rgba(74,144,217,.18);
+  --cyan: #06b6d4;
+  --cyan-bg: rgba(6,182,212,.1);
+  --cyan-border: rgba(6,182,212,.3);
+  --red: #ef4444;
+  --red-bg: #fee2e2;
+  --red-fg: #991b1b;
+  --green: #22c55e;
+  --green-bg: #d1fae5;
+  --green-fg: #065f46;
+  --yellow: #f59e0b;
+  --yellow-bg: #fef3c7;
+  --yellow-fg: #92400e;
+  --purple: #8b5cf6;
+  --purple-bg: #ede9fe;
+  --shadow: 0 4px 20px rgba(0,0,0,.06);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,.1);
+  --mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  --radius: 8px;
+}
+
+[data-theme="dark"] {
+  --ink: #e2e8f0;
+  --ink-2: #cbd5e1;
+  --ink-3: #94a3b8;
+  --ink-4: #64748b;
+  --ink-5: #475569;
+  --surface-0: #0b0f1a;
+  --surface-1: #111827;
+  --surface-2: #1e293b;
+  --border: #334155;
+  --border-light: #2d3748;
+  --accent-bg: rgba(74,144,217,.15);
+  --accent-bg-strong: rgba(74,144,217,.25);
+  --cyan-bg: rgba(6,182,212,.15);
+  --red-bg: rgba(239,68,68,.15);
+  --red-fg: #fca5a5;
+  --green-bg: rgba(34,197,94,.15);
+  --green-fg: #86efac;
+  --yellow-bg: rgba(245,158,11,.15);
+  --yellow-fg: #fde68a;
+  --purple-bg: rgba(139,92,246,.15);
+  --shadow: 0 4px 20px rgba(0,0,0,.3);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,.4);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--surface-0);
+  color: var(--ink);
+  line-height: 1.5;
+  min-width: 1000px;
+}
+
+/* ─── Top bar ─── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  height: 52px;
+  background: rgba(26,26,46,.95);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center;
+  padding: 0 24px; gap: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+}
+.topbar-logo { color: var(--cyan); font-weight: 800; font-size: 1rem; letter-spacing: -.02em; white-space: nowrap; }
+.topbar-logo small { color: #94a3b8; font-weight: 400; font-size: .75rem; margin-left: 6px; }
+.topbar-tabs { display: flex; gap: 2px; margin-left: 24px; }
+.topbar-tab {
+  padding: 8px 18px; border-radius: 6px; font-size: .8rem; font-weight: 500;
+  color: #a8dadc; cursor: pointer; transition: all .2s; border: none; background: none; white-space: nowrap;
+}
+.topbar-tab:hover { background: rgba(168,218,220,.1); color: #f1faee; }
+.topbar-tab.active { background: rgba(74,144,217,.2); color: #fff; font-weight: 600; }
+.topbar-tab .num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.15); font-size: .6rem; font-weight: 700; margin-right: 5px; }
+.topbar-tab.active .num { background: var(--accent); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.topbar-right span { font-size: .72rem; color: #94a3b8; }
+.theme-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #475569; background: none; color: #94a3b8; cursor: pointer; font-size: .8rem; display: flex; align-items: center; justify-content: center; }
+
+/* ─── Container ─── */
+.container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+/* ─── View panels ─── */
+.view-panel { display: none; }
+.view-panel.active { display: block; }
+
+/* ─── Section header ─── */
+.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.section-num { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; font-size: .95rem; flex-shrink: 0; }
+.section-title { font-size: 1.3rem; font-weight: 700; color: var(--ink); }
+.section-sub { font-size: .8rem; color: var(--ink-3); }
+
+/* ─── Browser frame (wireframe mock) ─── */
+.frame { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); box-shadow: var(--shadow); margin-bottom: 16px; }
+.frame-bar { height: 32px; background: var(--surface-1); display: flex; align-items: center; padding: 0 12px; gap: 6px; border-bottom: 1px solid var(--border); }
+.frame-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,.06); }
+.frame-dot.r { background: #ff5f56; } .frame-dot.y { background: #ffbd2e; } .frame-dot.g { background: #27c93f; }
+.frame-url { height: 22px; background: var(--surface-0); border-radius: 11px; padding: 0 10px; font-size: .65rem; color: var(--ink-3); display: flex; align-items: center; flex: 1; margin-left: 8px; font-family: var(--mono); }
+.frame-body { background: var(--surface-1); min-height: 400px; }
+
+/* ─── Mock nav ─── */
+.mock-nav { height: 42px; background: #0f172a; display: flex; align-items: center; padding: 0 14px; gap: 10px; }
+.mock-nav-logo { display: flex; align-items: center; gap: 5px; }
+.mock-nav-icon { width: 24px; height: 24px; border-radius: 5px; background: linear-gradient(135deg, #06b6d4, #0891b2); display: flex; align-items: center; justify-content: center; color: #fff; font-size: .55rem; font-weight: 700; }
+.mock-nav-text { color: #e2e8f0; font-size: .78rem; font-weight: 600; }
+.mock-nav-text em { color: #06b6d4; font-style: normal; }
+.mock-nav-links { display: flex; gap: 2px; margin-left: 12px; }
+.mock-nav-link { color: #94a3b8; font-size: .65rem; padding: 5px 8px; border-radius: 5px; }
+.mock-nav-link.active { color: #06b6d4; background: rgba(6,182,212,.1); }
+.mock-nav-right { margin-left: auto; font-size: .62rem; color: #64748b; }
+
+/* ─── Mock page header ─── */
+.mock-header { padding: 16px 20px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.mock-header h2 { font-size: .95rem; font-weight: 700; color: var(--ink); }
+.mock-header h2 small { font-size: .65rem; color: var(--ink-4); font-weight: 400; margin-left: 6px; font-family: var(--mono); }
+.mock-view-switch { display: flex; gap: 2px; background: var(--surface-0); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+.mock-view-btn { padding: 4px 10px; border-radius: 5px; font-size: .65rem; font-weight: 500; color: var(--ink-3); cursor: default; }
+.mock-view-btn.active { background: var(--accent-bg-strong); color: var(--accent); }
+
+/* ─── Annotation system ─── */
+.anno-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: .6rem; font-weight: 700;
+  position: absolute; z-index: 10;
+  box-shadow: 0 0 0 3px rgba(74,144,217,.25);
+  line-height: 1;
+}
+.annotations-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; }
+.annotations-box h4 { font-size: .8rem; font-weight: 700; color: var(--ink); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.anno-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px; }
+.anno-item { font-size: .72rem; color: var(--ink-2); display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; }
+.anno-num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .55rem; font-weight: 700; flex-shrink: 0; }
+
+/* ─── Matrix table ─── */
+.mx-wrap { padding: 12px 16px; overflow-x: auto; }
+.mx-table { border-collapse: collapse; width: 100%; font-size: .62rem; }
+.mx-table th { padding: 8px 6px; background: var(--surface-0); font-weight: 600; color: var(--ink-3); border: 1px solid var(--border); text-align: center; white-space: nowrap; position: relative; }
+.mx-table th:first-child { text-align: left; min-width: 80px; position: sticky; left: 0; z-index: 2; background: var(--surface-0); }
+.mx-table td { padding: 6px; border: 1px solid var(--border); text-align: center; vertical-align: middle; }
+.mx-table td:first-child { text-align: left; font-weight: 600; color: var(--ink-2); position: sticky; left: 0; z-index: 1; background: var(--surface-2); }
+.mx-table tr:nth-child(even) td { background: var(--surface-1); }
+.mx-table tr:nth-child(even) td:first-child { background: var(--surface-1); }
+.mx-table .total-row td { background: var(--surface-0) !important; font-weight: 700; color: var(--ink-2); border-top: 2px solid var(--border); }
+.mx-table .total-col { background: var(--surface-0) !important; font-weight: 700; color: var(--ink-2); border-left: 2px solid var(--border); }
+.mx-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 8px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.mx-cell:hover { background: var(--accent-bg-strong); }
+.mx-cell .cnt { font-size: .75rem; font-weight: 700; color: var(--accent); }
+.mx-cell .req { font-size: .55rem; color: var(--red); font-family: var(--mono); }
+.mx-cell-empty { color: var(--ink-5); font-size: .8rem; }
+.mx-total { font-size: .75rem; font-weight: 700; color: var(--ink-2); }
+.mx-tooltip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 4px 10px; border-radius: 5px; font-size: .6rem; white-space: nowrap; z-index: 20; pointer-events: none; }
+.mx-cell:hover .mx-tooltip { display: block; }
+
+/* ─── Tree view ─── */
+.tree-layout { display: flex; gap: 0; min-height: 420px; }
+.tree-sidebar { width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--surface-2); display: flex; flex-direction: column; }
+.tree-sidebar-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.tree-sidebar-header span { font-size: .75rem; font-weight: 600; color: var(--ink-2); }
+.tree-stage { padding: 9px 14px; border-bottom: 1px solid var(--border-light); border-left: 3px solid transparent; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 8px; position: relative; }
+.tree-stage:hover { background: var(--accent-bg); }
+.tree-stage.active { background: var(--cyan-bg); border-left-color: var(--cyan); }
+.tree-stage-name { font-size: .75rem; font-weight: 500; color: var(--ink); flex: 1; }
+.tree-stage.active .tree-stage-name { color: var(--cyan); font-weight: 600; }
+.tree-stage-sub { font-size: .58rem; color: var(--ink-4); }
+.tree-stage-count { font-size: .58rem; font-family: var(--mono); color: var(--ink-4); background: var(--surface-0); padding: 1px 6px; border-radius: 3px; }
+.tree-stage-del { display: none; width: 18px; height: 18px; border-radius: 4px; border: none; background: var(--red-bg); color: var(--red); cursor: pointer; font-size: .6rem; align-items: center; justify-content: center; flex-shrink: 0; }
+.tree-stage:hover .tree-stage-del { display: inline-flex; }
+.tree-sidebar-warn { padding: 8px 14px; font-size: .58rem; color: var(--red); background: var(--red-bg); border-top: 1px solid var(--border); margin-top: auto; }
+
+.tree-main { flex: 1; display: flex; flex-direction: column; }
+.tree-tabs { display: flex; align-items: center; border-bottom: 1px solid var(--border); overflow-x: auto; background: var(--surface-2); }
+.tree-tab { padding: 9px 12px; font-size: .65rem; color: var(--ink-3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: all .15s; }
+.tree-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tree-tab-actions { display: flex; gap: 4px; margin-left: auto; padding: 0 8px; flex-shrink: 0; }
+.tree-breadcrumb { padding: 10px 16px; font-size: .72rem; display: flex; align-items: center; gap: 6px; color: var(--ink-3); background: var(--surface-2); border-bottom: 1px solid var(--border-light); }
+.tree-breadcrumb strong { color: var(--ink); }
+.tree-items { padding: 12px 16px; flex: 1; background: var(--surface-1); }
+.tree-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; transition: all .15s; position: relative; }
+.tree-item:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(74,144,217,.1); }
+.tree-item.dragging { opacity: .5; border-style: dashed; }
+.tree-item.drop-target { border-color: var(--cyan); border-style: dashed; border-width: 2px; }
+.drag-handle { color: var(--ink-5); cursor: grab; font-size: .8rem; flex-shrink: 0; user-select: none; }
+.item-name { font-size: .75rem; font-weight: 500; color: var(--ink); flex: 1; }
+.item-badge { font-size: .55rem; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+.item-badge.required { background: var(--red-bg); color: var(--red-fg); }
+.item-badge.optional { background: var(--surface-0); color: var(--ink-4); }
+.item-actions { display: flex; gap: 3px; }
+.item-btn { width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-4); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .65rem; transition: all .12s; }
+.item-btn:hover { border-color: var(--accent); color: var(--accent); }
+.item-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.tree-add-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 2px dashed var(--border); border-radius: 6px; color: var(--ink-4); font-size: .72rem; cursor: pointer; transition: all .15s; margin-top: 4px; }
+.tree-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.drag-indicator { position: absolute; left: -8px; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+
+/* ─── List view ─── */
+.list-wrap { padding: 14px 16px; }
+.list-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.list-input { height: 32px; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; font-size: .72rem; background: var(--surface-2); color: var(--ink); flex: 1; max-width: 240px; }
+.list-select { height: 32px; border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; font-size: .72rem; background: var(--surface-2); color: var(--ink); }
+.list-count { font-size: .65rem; color: var(--ink-4); margin-left: auto; font-family: var(--mono); }
+.list-table { width: 100%; border-collapse: collapse; font-size: .7rem; }
+.list-table th { padding: 9px 10px; background: var(--surface-0); font-weight: 600; color: var(--ink-3); border-bottom: 2px solid var(--border); text-align: left; }
+.list-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); color: var(--ink-2); }
+.list-table tr:hover td { background: var(--accent-bg); }
+.list-edit { color: var(--accent); cursor: pointer; font-size: .7rem; }
+.list-edit:hover { text-decoration: underline; }
+.list-edit-tooltip { font-size: .55rem; color: var(--ink-4); display: block; }
+
+/* ─── Modals section ─── */
+.modal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.modal-mock { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.modal-mock-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: .8rem; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.modal-mock-header .tag { font-size: .58rem; padding: 2px 6px; border-radius: 3px; background: var(--purple-bg); color: var(--purple); font-weight: 600; }
+.modal-mock-body { padding: 14px; }
+.modal-overlay { background: rgba(0,0,0,.3); border: 2px dashed var(--ink-5); border-radius: 8px; padding: 16px; }
+.modal-dialog { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-lg); }
+.modal-dialog h3 { font-size: .82rem; font-weight: 600; margin-bottom: 12px; color: var(--ink); }
+.mock-field { margin-bottom: 10px; }
+.mock-field label { display: block; font-size: .65rem; color: var(--ink-3); margin-bottom: 3px; font-weight: 500; }
+.mock-field-input { width: 100%; height: 30px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-1); padding: 0 8px; font-size: .7rem; color: var(--ink-3); }
+.mock-field-input.filled { color: var(--ink); background: var(--surface-2); }
+.mock-check { display: flex; align-items: center; gap: 6px; font-size: .68rem; color: var(--ink-2); }
+.mock-check-box { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: .6rem; }
+.mock-check-box.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+.modal-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; }
+.modal-btn { padding: 6px 14px; border-radius: 5px; font-size: .68rem; font-weight: 500; border: none; cursor: default; }
+.modal-btn.primary { background: var(--accent); color: #fff; }
+.modal-btn.ghost { background: var(--surface-0); color: var(--ink-3); border: 1px solid var(--border); }
+.modal-btn.danger { background: var(--red); color: #fff; }
+
+/* ─── Data flow diagram ─── */
+.flow-diagram { padding: 24px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.flow-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.flow-box { padding: 14px 20px; border-radius: var(--radius); border: 2px solid var(--border); text-align: center; min-width: 160px; position: relative; }
+.flow-box.db { border-color: var(--cyan); background: var(--cyan-bg); }
+.flow-box.fn { border-color: var(--purple); background: var(--purple-bg); border-style: dashed; }
+.flow-box.out { border-color: var(--green); background: var(--green-bg); }
+.flow-box .label { font-size: .68rem; font-weight: 600; color: var(--ink); }
+.flow-box .sub { font-size: .58rem; color: var(--ink-3); margin-top: 2px; }
+.flow-arrow { font-size: 1.2rem; color: var(--ink-4); flex-shrink: 0; }
+.flow-rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 16px; }
+.flow-rule { padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); }
+.flow-rule .rule-title { font-size: .72rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.flow-rule .rule-desc { font-size: .62rem; color: var(--ink-3); line-height: 1.5; }
+.flow-rule .rule-badge { display: inline-block; font-size: .55rem; padding: 1px 6px; border-radius: 3px; font-weight: 600; margin-right: 4px; }
+
+/* ─── Helpers ─── */
+.mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; } .mb-4 { margin-bottom: 16px; } .mb-6 { margin-bottom: 24px; }
+.relative { position: relative; }
+.text-center { text-align: center; }
+.text-sm { font-size: .75rem; }
+.text-xs { font-size: .65rem; }
+.text-mono { font-family: var(--mono); }
+.flex { display: flex; } .items-center { align-items: center; } .gap-2 { gap: 8px; } .gap-1 { gap: 4px; }
+
+/* ─── Interaction arrows ─── */
+.interaction-arrow {
+  position: absolute;
+  border-top: 2px dashed var(--accent);
+  z-index: 5;
+}
+.interaction-label {
+  position: absolute;
+  font-size: .55rem;
+  color: var(--accent);
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 6;
+  border: 1px solid var(--accent);
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- TOP BAR                                                                     -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <span class="topbar-logo">ProcessCheck <small>체크리스트 관리 와이어프레임</small></span>
+  <div class="topbar-tabs">
+    <button class="topbar-tab active" data-view="matrix"><span class="num">1</span>매트릭스 뷰</button>
+    <button class="topbar-tab" data-view="tree"><span class="num">2</span>트리 뷰</button>
+    <button class="topbar-tab" data-view="list"><span class="num">3</span>리스트 뷰</button>
+    <button class="topbar-tab" data-view="modals"><span class="num">4</span>모달</button>
+    <button class="topbar-tab" data-view="dataflow"><span class="num">5</span>데이터 흐름</button>
+  </div>
+  <div class="topbar-right">
+    <span>admin-checklists.html</span>
+    <button class="theme-btn" id="themeToggle">☽</button>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW 1: MATRIX                                                              -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="view-panel active" id="view-matrix">
+  <div class="section-header mb-3">
+    <span class="section-num">1</span>
+    <div><div class="section-title">매트릭스 뷰</div><div class="section-sub">6 Phase × 10 부서 — 셀 클릭 시 트리 뷰 전환. 기본 뷰.</div></div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-bar">
+      <span class="frame-dot r"></span><span class="frame-dot y"></span><span class="frame-dot g"></span>
+      <div class="frame-url">processcheck.example.com/admin-checklists.html</div>
+    </div>
+    <div class="frame-body">
+      <!-- Mock nav -->
+      <div class="mock-nav">
+        <div class="mock-nav-logo"><div class="mock-nav-icon">PC</div><span class="mock-nav-text">Process<em>Check</em></span></div>
+        <div class="mock-nav-links">
+          <span class="mock-nav-link">대시보드</span><span class="mock-nav-link">프로젝트</span><span class="mock-nav-link">고객</span><span class="mock-nav-link">영업 준비</span><span class="mock-nav-link active">체크리스트</span><span class="mock-nav-link">매뉴얼</span>
+        </div>
+        <div class="mock-nav-right">박민수 · 기획조정실 &nbsp; 로그아웃</div>
+      </div>
+
+      <!-- Header -->
+      <div class="mock-header relative" style="padding-bottom: 12px;">
+        <h2>체크리스트 템플릿 관리 <small>총 193개 항목</small>
+          <span class="anno-dot" style="top: -4px; right: -8px; position: relative;">1</span>
+        </h2>
+        <div class="mock-view-switch relative">
+          <span class="mock-view-btn active">▦ 매트릭스</span>
+          <span class="mock-view-btn">⊞ 트리</span>
+          <span class="mock-view-btn">☰ 리스트</span>
+          <span class="anno-dot" style="top: -8px; right: -8px;">2</span>
+        </div>
+      </div>
+
+      <!-- Matrix -->
+      <div class="mx-wrap relative">
+        <span class="anno-dot" style="top: 4px; right: 16px;">3</span>
+        <table class="mx-table">
+          <thead>
+            <tr>
+              <th>단계 ＼ 부서</th>
+              <th>개발팀</th><th>품질팀</th><th>영업팀</th><th>제조팀</th><th>구매팀</th>
+              <th>CS팀</th><th>경영관리</th><th>글로벌임상</th><th>디자인연구소</th><th>인증팀</th>
+              <th class="total-col">합계</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>발의</td>
+              <td><span class="mx-cell"><span class="cnt">5</span><span class="req">필수 3</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">1</span><span class="req">필수 1</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span><span class="mx-tooltip">클릭 → 트리 뷰 전환</span></span></td>
+              <td class="total-col"><span class="mx-total">28</span></td>
+            </tr>
+            <tr>
+              <td>기획</td>
+              <td><span class="mx-cell"><span class="cnt">6</span><span class="req">필수 4</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td class="total-col"><span class="mx-total">36</span></td>
+            </tr>
+            <tr>
+              <td>WM</td>
+              <td><span class="mx-cell"><span class="cnt">5</span><span class="req">필수 4</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">5</span><span class="req">필수 4</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">1</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 3</span></span></td>
+              <td class="total-col"><span class="mx-total">30</span></td>
+            </tr>
+            <tr>
+              <td>Tx</td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">5</span><span class="req">필수 4</span></span></td>
+              <td class="total-col"><span class="mx-total">29</span></td>
+            </tr>
+            <tr>
+              <td>MSG</td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td class="total-col"><span class="mx-total">25</span></td>
+            </tr>
+            <tr>
+              <td>양산/이관</td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">4</span><span class="req">필수 3</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">2</span><span class="req">필수 1</span></span></td>
+              <td><span class="mx-cell"><span class="cnt">3</span><span class="req">필수 2</span></span></td>
+              <td class="total-col"><span class="mx-total">29</span></td>
+            </tr>
+            <!-- Total row -->
+            <tr class="total-row">
+              <td>합계</td>
+              <td>27</td><td>20</td><td>14</td><td>22</td><td>16</td>
+              <td>10</td><td>17</td><td>14</td><td>16</td><td>21</td>
+              <td class="total-col" style="color: var(--accent); font-size: .8rem;"><strong>193</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding: 8px 0; font-size: .6rem; color: var(--ink-4);">
+          <span style="color: var(--accent);">N</span>개 항목 / <span style="color: var(--red);">필수 M</span> — 셀 hover 시 툴팁, 셀 클릭 시 트리 뷰 해당 위치로 전환
+          <span class="anno-dot" style="position: relative; top: -2px; margin-left: 8px;">4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotations-box">
+    <h4>📝 매트릭스 뷰 어노테이션</h4>
+    <div class="anno-grid">
+      <div class="anno-item"><span class="anno-num">1</span> 페이지 타이틀 + 총 항목 수(193개). <code>allItems.length</code>로 실시간 카운트</div>
+      <div class="anno-item"><span class="anno-num">2</span> 뷰 전환 토글: 매트릭스(기본) / 트리 / 리스트. <code>viewMode</code> 상태로 관리</div>
+      <div class="anno-item"><span class="anno-num">3</span> 6행(Phase) × 10열(부서) 그리드. 첫 열 <code>position: sticky</code> 고정. 가로 스크롤 지원</div>
+      <div class="anno-item"><span class="anno-num">4</span> 셀 클릭 → <code>navigateToTreeCell(stageId, deptId)</code> 호출 → 트리 뷰 해당 위치로 전환</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW 2: TREE                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="view-panel" id="view-tree">
+  <div class="section-header mb-3">
+    <span class="section-num">2</span>
+    <div><div class="section-title">트리 뷰</div><div class="section-sub">좌측 Phase 사이드바 + 상단 부서 탭 + 항목 카드 (드래그앤드롭 순서변경)</div></div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-bar">
+      <span class="frame-dot r"></span><span class="frame-dot y"></span><span class="frame-dot g"></span>
+      <div class="frame-url">processcheck.example.com/admin-checklists.html?view=tree</div>
+    </div>
+    <div class="frame-body">
+      <div class="mock-nav">
+        <div class="mock-nav-logo"><div class="mock-nav-icon">PC</div><span class="mock-nav-text">Process<em>Check</em></span></div>
+        <div class="mock-nav-links">
+          <span class="mock-nav-link">대시보드</span><span class="mock-nav-link">프로젝트</span><span class="mock-nav-link">고객</span><span class="mock-nav-link">영업 준비</span><span class="mock-nav-link active">체크리스트</span><span class="mock-nav-link">매뉴얼</span>
+        </div>
+        <div class="mock-nav-right">이영희 · 매니저 &nbsp; 로그아웃</div>
+      </div>
+
+      <div class="mock-header" style="padding-bottom: 8px;">
+        <h2>체크리스트 템플릿 관리 <small>총 193개 항목</small></h2>
+        <div class="mock-view-switch">
+          <span class="mock-view-btn">▦ 매트릭스</span>
+          <span class="mock-view-btn active">⊞ 트리</span>
+          <span class="mock-view-btn">☰ 리스트</span>
+        </div>
+      </div>
+
+      <!-- Tree layout -->
+      <div class="tree-layout relative" style="margin: 8px 16px 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
+        <!-- Sidebar -->
+        <div class="tree-sidebar relative">
+          <span class="anno-dot" style="top: 6px; right: 6px;">1</span>
+          <div class="tree-sidebar-header">
+            <span>단계 목록</span>
+            <span style="font-size: .6rem; padding: 3px 8px; border-radius: 4px; background: var(--accent); color: #fff; cursor: pointer;">+ 추가</span>
+          </div>
+          <div class="tree-stage active">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">발의</div>
+              <div class="tree-stage-sub">발의검토 / 발의승인</div>
+            </div>
+            <span class="tree-stage-count">28</span>
+            <button class="tree-stage-del" style="display: inline-flex;">✕</button>
+          </div>
+          <div class="tree-stage">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">기획</div>
+              <div class="tree-stage-sub">기획검토 / 기획승인</div>
+            </div>
+            <span class="tree-stage-count">36</span>
+          </div>
+          <div class="tree-stage">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">WM</div>
+              <div class="tree-stage-sub">WM제작 / WM승인회</div>
+            </div>
+            <span class="tree-stage-count">30</span>
+          </div>
+          <div class="tree-stage">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">Tx</div>
+              <div class="tree-stage-sub">Tx단계 / Tx승인회</div>
+            </div>
+            <span class="tree-stage-count">29</span>
+          </div>
+          <div class="tree-stage">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">MSG</div>
+              <div class="tree-stage-sub">MasterGatePilot / MSG승인회</div>
+            </div>
+            <span class="tree-stage-count">25</span>
+          </div>
+          <div class="tree-stage">
+            <div style="flex: 1;">
+              <div class="tree-stage-name">양산/이관</div>
+              <div class="tree-stage-sub">양산 / 영업이관</div>
+            </div>
+            <span class="tree-stage-count">29</span>
+          </div>
+          <div class="tree-sidebar-warn">⚠ 단계 삭제 시 해당 단계의 모든 항목도 함께 삭제됩니다</div>
+        </div>
+
+        <!-- Main area -->
+        <div class="tree-main">
+          <!-- Department tabs -->
+          <div class="tree-tabs relative">
+            <span class="anno-dot" style="top: 4px; right: 80px; z-index: 10;">2</span>
+            <span class="tree-tab active">개발팀</span>
+            <span class="tree-tab">품질팀</span>
+            <span class="tree-tab">영업팀</span>
+            <span class="tree-tab">제조팀</span>
+            <span class="tree-tab">구매팀</span>
+            <span class="tree-tab">CS팀</span>
+            <span class="tree-tab">경영관리</span>
+            <span class="tree-tab">글로벌임상</span>
+            <span class="tree-tab">디자인연구소</span>
+            <span class="tree-tab">인증팀</span>
+            <div class="tree-tab-actions">
+              <span style="font-size: .58rem; padding: 3px 8px; border-radius: 4px; background: var(--accent); color: #fff;">+ 부서</span>
+              <span style="font-size: .58rem; padding: 3px 8px; border-radius: 4px; background: var(--red-bg); color: var(--red);">삭제</span>
+            </div>
+          </div>
+
+          <!-- Breadcrumb -->
+          <div class="tree-breadcrumb relative">
+            <span class="anno-dot" style="top: 4px; right: 8px;">3</span>
+            <strong>발의</strong> <span style="color: var(--ink-5);">›</span> <strong>개발팀</strong>
+            <span style="margin-left: 8px; font-family: var(--mono); color: var(--ink-4);">— 5개 항목</span>
+          </div>
+
+          <!-- Items -->
+          <div class="tree-items relative">
+            <span class="anno-dot" style="top: 6px; right: 8px;">4</span>
+
+            <div class="tree-item">
+              <span class="drag-handle">☰</span>
+              <span class="item-name">요구사항 문서 작성</span>
+              <span class="item-badge required">필수</span>
+              <div class="item-actions">
+                <button class="item-btn" title="편집">✎</button>
+                <button class="item-btn danger" title="삭제">✕</button>
+              </div>
+            </div>
+
+            <div class="tree-item">
+              <span class="drag-handle">☰</span>
+              <span class="item-name">기술 스펙 초안 작성</span>
+              <span class="item-badge required">필수</span>
+              <div class="item-actions">
+                <button class="item-btn" title="편집">✎</button>
+                <button class="item-btn danger" title="삭제">✕</button>
+              </div>
+            </div>
+
+            <!-- Dragging demo item -->
+            <div class="tree-item dragging" style="opacity: .45; border-style: dashed;">
+              <span class="drag-handle">☰</span>
+              <span class="item-name">회로 시뮬레이션</span>
+              <span class="item-badge optional">선택</span>
+              <div class="item-actions">
+                <button class="item-btn">✎</button>
+                <button class="item-btn danger">✕</button>
+              </div>
+              <span class="drag-indicator">↕</span>
+            </div>
+
+            <!-- Drop target indicator -->
+            <div class="tree-item drop-target" style="border-width: 2px;">
+              <span class="drag-handle">☰</span>
+              <span class="item-name">경쟁사 제품 분석</span>
+              <span class="item-badge required">필수</span>
+              <div class="item-actions">
+                <button class="item-btn">✎</button>
+                <button class="item-btn danger">✕</button>
+              </div>
+            </div>
+
+            <div class="tree-item">
+              <span class="drag-handle">☰</span>
+              <span class="item-name">특허 선행기술 조사</span>
+              <span class="item-badge optional">선택</span>
+              <div class="item-actions">
+                <button class="item-btn">✎</button>
+                <button class="item-btn danger">✕</button>
+              </div>
+            </div>
+
+            <div class="tree-add-btn">
+              <span style="font-size: .9rem;">+</span> 항목 추가
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotations-box">
+    <h4>📝 트리 뷰 어노테이션</h4>
+    <div class="anno-grid">
+      <div class="anno-item"><span class="anno-num">1</span> 좌측 Phase 사이드바: 6개 phase, 선택 시 cyan 좌측 보더. 각 항목 옆 카운트 뱃지. hover 시 삭제 버튼 표시. 하단 경고 문구</div>
+      <div class="anno-item"><span class="anno-num">2</span> 부서 탭 바: 10개 탭 + "부서 추가"/"삭제" 버튼. <code>selectedDeptId</code>로 관리. overflow-x 스크롤</div>
+      <div class="anno-item"><span class="anno-num">3</span> 브레드크럼: "Phase명 › 부서명 — N개 항목" 형식. 현재 선택 위치를 명확히 표시</div>
+      <div class="anno-item"><span class="anno-num">4</span> 아이템 목록: ☰드래그핸들(grab커서) + 항목명 + 필수/선택 뱃지 + 편집/삭제 버튼. 드래그앤드롭으로 <code>reorderTemplateItems()</code> 호출. 드래그 중인 카드는 점선+반투명, 드롭 타겟은 cyan 점선 보더</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW 3: LIST                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="view-panel" id="view-list">
+  <div class="section-header mb-3">
+    <span class="section-num">3</span>
+    <div><div class="section-title">리스트 뷰</div><div class="section-sub">전체 193개 항목 플랫 테이블. 검색 + Phase 필터 + 부서 필터 조합</div></div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-bar">
+      <span class="frame-dot r"></span><span class="frame-dot y"></span><span class="frame-dot g"></span>
+      <div class="frame-url">processcheck.example.com/admin-checklists.html?view=list</div>
+    </div>
+    <div class="frame-body">
+      <div class="mock-nav">
+        <div class="mock-nav-logo"><div class="mock-nav-icon">PC</div><span class="mock-nav-text">Process<em>Check</em></span></div>
+        <div class="mock-nav-links">
+          <span class="mock-nav-link">대시보드</span><span class="mock-nav-link">프로젝트</span><span class="mock-nav-link">고객</span><span class="mock-nav-link">영업 준비</span><span class="mock-nav-link active">체크리스트</span><span class="mock-nav-link">매뉴얼</span>
+        </div>
+        <div class="mock-nav-right">박민수 · 기획조정실 &nbsp; 로그아웃</div>
+      </div>
+
+      <div class="mock-header" style="padding-bottom: 8px;">
+        <h2>체크리스트 템플릿 관리 <small>총 193개 항목</small></h2>
+        <div class="mock-view-switch">
+          <span class="mock-view-btn">▦ 매트릭스</span>
+          <span class="mock-view-btn">⊞ 트리</span>
+          <span class="mock-view-btn active">☰ 리스트</span>
+        </div>
+      </div>
+
+      <div class="list-wrap">
+        <!-- Filters -->
+        <div class="list-filter relative">
+          <span class="anno-dot" style="top: -8px; left: -8px;">1</span>
+          <input class="list-input" placeholder="🔍 항목 검색..." value="회로">
+          <select class="list-select">
+            <option>전체 Phase</option>
+            <option>발의</option><option>기획</option><option>WM</option><option>Tx</option><option>MSG</option><option>양산/이관</option>
+          </select>
+          <select class="list-select">
+            <option selected>개발팀</option>
+            <option>전체 부서</option><option>품질팀</option><option>영업팀</option>
+          </select>
+          <span class="list-count relative">
+            12개 항목 표시 (총 193개 중)
+            <span class="anno-dot" style="top: -10px; right: -10px;">2</span>
+          </span>
+        </div>
+
+        <!-- Table -->
+        <div class="relative">
+          <span class="anno-dot" style="top: -4px; right: -4px;">3</span>
+          <table class="list-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>항목명</th>
+                <th style="width: 80px;">Phase</th>
+                <th style="width: 90px;">부서</th>
+                <th style="width: 60px;">필수</th>
+                <th style="width: 60px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-family: var(--mono); color: var(--ink-4);">1</td>
+                <td style="font-weight: 500;">요구사항 문서 작성</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--cyan-bg); color: var(--cyan);">발의</span></td>
+                <td>개발팀</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--red-bg); color: var(--red-fg); font-weight: 600;">필수</span></td>
+                <td>
+                  <span class="list-edit">✎ 편집</span>
+                  <span class="list-edit-tooltip">→ 트리 뷰로 전환</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-family: var(--mono); color: var(--ink-4);">2</td>
+                <td style="font-weight: 500;"><mark style="background: #fef3c7; padding: 0 2px; border-radius: 2px;">회로</mark> 시뮬레이션</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--cyan-bg); color: var(--cyan);">발의</span></td>
+                <td>개발팀</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--surface-0); color: var(--ink-4);">선택</span></td>
+                <td><span class="list-edit">✎ 편집</span></td>
+              </tr>
+              <tr>
+                <td style="font-family: var(--mono); color: var(--ink-4);">3</td>
+                <td style="font-weight: 500;"><mark style="background: #fef3c7; padding: 0 2px; border-radius: 2px;">회로</mark> 설계 검증 완료</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--yellow-bg); color: var(--yellow-fg);">WM</span></td>
+                <td>개발팀</td>
+                <td><span style="font-size: .6rem; padding: 2px 6px; border-radius: 3px; background: var(--red-bg); color: var(--red-fg); font-weight: 600;">필수</span></td>
+                <td><span class="list-edit">✎ 편집</span></td>
+              </tr>
+              <tr style="border-top: 2px dashed var(--border); color: var(--ink-4);">
+                <td colspan="6" style="text-align: center; padding: 12px; font-size: .7rem;">⋮ 나머지 9개 항목 ⋮</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotations-box">
+    <h4>📝 리스트 뷰 어노테이션</h4>
+    <div class="anno-grid">
+      <div class="anno-item"><span class="anno-num">1</span> 필터 바: 텍스트 검색(<code>listSearchQuery</code>) + Phase 셀렉트(<code>listFilterStage</code>) + 부서 셀렉트(<code>listFilterDept</code>). 실시간 필터링</div>
+      <div class="anno-item"><span class="anno-num">2</span> 필터 결과 카운트: "N개 항목 표시 (총 193개 중)". <code>getFilteredListItems().length</code></div>
+      <div class="anno-item"><span class="anno-num">3</span> 플랫 테이블: 전체 항목을 한눈에. 검색 키워드 하이라이트(노란 마커). 편집 클릭 → <code>navigateToTreeCell()</code>로 트리 뷰 해당 위치 전환</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW 4: MODALS                                                              -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="view-panel" id="view-modals">
+  <div class="section-header mb-3">
+    <span class="section-num">4</span>
+    <div><div class="section-title">모달 다이얼로그</div><div class="section-sub">CRUD 모달 4종. 배경 오버레이 + 중앙 다이얼로그 패턴</div></div>
+  </div>
+
+  <div class="modal-grid">
+    <!-- Modal A: Add item -->
+    <div class="modal-mock">
+      <div class="modal-mock-header"><span class="tag">A</span> 항목 추가 모달</div>
+      <div class="modal-mock-body">
+        <div class="modal-overlay">
+          <div class="modal-dialog">
+            <h3>✚ 새 항목 추가</h3>
+            <div class="mock-field">
+              <label>항목명 *</label>
+              <input class="mock-field-input" placeholder="체크리스트 항목 내용을 입력하세요" disabled>
+            </div>
+            <div class="mock-field">
+              <div class="mock-check">
+                <span class="mock-check-box">✓</span>
+                <span>필수 항목으로 지정</span>
+              </div>
+            </div>
+            <div style="font-size: .58rem; color: var(--ink-4); margin-bottom: 8px; padding: 6px 8px; background: var(--surface-1); border-radius: 4px;">
+              현재 위치: <strong style="color: var(--ink-2);">발의 › 개발팀</strong><br>
+              <code>addTemplateItem({ stageId, departmentId, content, isRequired, order })</code>
+            </div>
+            <div class="modal-actions">
+              <button class="modal-btn ghost">취소</button>
+              <button class="modal-btn primary">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal B: Edit item -->
+    <div class="modal-mock">
+      <div class="modal-mock-header"><span class="tag">B</span> 항목 편집 모달</div>
+      <div class="modal-mock-body">
+        <div class="modal-overlay">
+          <div class="modal-dialog">
+            <h3>✎ 항목 수정</h3>
+            <div class="mock-field">
+              <label>항목명 *</label>
+              <input class="mock-field-input filled" value="요구사항 문서 작성" disabled>
+            </div>
+            <div class="mock-field">
+              <div class="mock-check">
+                <span class="mock-check-box checked">✓</span>
+                <span>필수 항목으로 지정</span>
+              </div>
+            </div>
+            <div style="font-size: .58rem; color: var(--ink-4); margin-bottom: 8px; padding: 6px 8px; background: var(--surface-1); border-radius: 4px;">
+              <code>updateTemplateItem(itemId, { content, isRequired })</code>
+            </div>
+            <div class="modal-actions">
+              <button class="modal-btn ghost">취소</button>
+              <button class="modal-btn danger">삭제</button>
+              <button class="modal-btn primary">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal C: Add stage -->
+    <div class="modal-mock">
+      <div class="modal-mock-header"><span class="tag">C</span> 단계(Phase) 추가 모달</div>
+      <div class="modal-mock-body">
+        <div class="modal-overlay">
+          <div class="modal-dialog">
+            <h3>✚ 새 단계 추가</h3>
+            <div class="mock-field">
+              <label>Phase 이름 *</label>
+              <input class="mock-field-input" placeholder="예: 인증" disabled>
+            </div>
+            <div class="mock-field">
+              <label>작업 단계명 (Work Stage)</label>
+              <input class="mock-field-input" placeholder="예: 인증검토" disabled>
+            </div>
+            <div class="mock-field">
+              <label>승인 게이트명 (Gate Stage)</label>
+              <input class="mock-field-input" placeholder="예: 인증승인" disabled>
+            </div>
+            <div style="font-size: .58rem; color: var(--ink-4); margin-bottom: 8px; padding: 6px 8px; background: var(--surface-1); border-radius: 4px;">
+              <code>addTemplateStage({ name, workStageName, gateStageName })</code>
+            </div>
+            <div class="modal-actions">
+              <button class="modal-btn ghost">취소</button>
+              <button class="modal-btn primary">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal D: Add department -->
+    <div class="modal-mock">
+      <div class="modal-mock-header"><span class="tag">D</span> 부서 추가 모달</div>
+      <div class="modal-mock-body">
+        <div class="modal-overlay">
+          <div class="modal-dialog">
+            <h3>✚ 새 부서 추가</h3>
+            <div class="mock-field">
+              <label>부서명 *</label>
+              <input class="mock-field-input" placeholder="예: 마케팅팀" disabled>
+            </div>
+            <div style="font-size: .58rem; color: var(--ink-4); margin-bottom: 8px; padding: 6px 8px; background: var(--surface-1); border-radius: 4px;">
+              <code>addTemplateDepartment({ name })</code><br>
+              추가 후 매트릭스에 새 열, 트리에 새 탭으로 자동 반영
+            </div>
+            <div class="modal-actions">
+              <button class="modal-btn ghost">취소</button>
+              <button class="modal-btn primary">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- VIEW 5: DATA FLOW                                                           -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="view-panel" id="view-dataflow">
+  <div class="section-header mb-3">
+    <span class="section-num">5</span>
+    <div><div class="section-title">데이터 흐름</div><div class="section-sub">Firestore 컬렉션 구조 → 템플릿 적용 함수 → 프로젝트 체크리스트 생성</div></div>
+  </div>
+
+  <div class="flow-diagram mb-4">
+    <h4 style="font-size: .85rem; font-weight: 700; margin-bottom: 16px; color: var(--ink);">📊 템플릿 → 프로젝트 파이프라인</h4>
+
+    <!-- Row 1: DB Collections -->
+    <div class="flow-row">
+      <div class="flow-box db">
+        <div class="label">templateStages</div>
+        <div class="sub">6 phases (Firestore)</div>
+        <div style="font-size: .55rem; color: var(--ink-4); margin-top: 4px; font-family: var(--mono);">id, name, workStageName, gateStageName</div>
+      </div>
+      <span class="flow-arrow">＋</span>
+      <div class="flow-box db">
+        <div class="label">templateItems</div>
+        <div class="sub">193개 항목 (Firestore)</div>
+        <div style="font-size: .55rem; color: var(--ink-4); margin-top: 4px; font-family: var(--mono);">stageId, departmentId, content, isRequired, order</div>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div class="flow-row"><span class="flow-arrow">▼</span></div>
+
+    <!-- Row 2: Function -->
+    <div class="flow-row">
+      <div class="flow-box fn">
+        <div class="label">applyTemplateToProject()</div>
+        <div class="sub">projectId, projectType, changeScale?</div>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div class="flow-row"><span class="flow-arrow">▼</span></div>
+
+    <!-- Row 3: Output -->
+    <div class="flow-row">
+      <div class="flow-box out">
+        <div class="label">checklistItems</div>
+        <div class="sub">프로젝트별 실제 작업 항목 (Firestore)</div>
+        <div style="font-size: .55rem; color: var(--ink-4); margin-top: 4px; font-family: var(--mono);">projectId, stage, department, content, status, assignee, ...</div>
+      </div>
+    </div>
+
+    <!-- Rules -->
+    <h4 style="font-size: .78rem; font-weight: 700; margin-top: 24px; margin-bottom: 12px; color: var(--ink);">📋 프로젝트 유형별 필터링 규칙</h4>
+    <div class="flow-rules">
+      <div class="flow-rule">
+        <div class="rule-title"><span class="rule-badge" style="background: var(--accent-bg); color: var(--accent);">신규개발</span> 전체 적용</div>
+        <div class="rule-desc">193개 templateItems 전체를 checklistItems로 복사<br>연 5-6건 · 장기(1년) · 6 phase 전체 진행</div>
+      </div>
+      <div class="flow-rule">
+        <div class="rule-title"><span class="rule-badge" style="background: var(--green-bg); color: var(--green-fg);">설계변경 major</span> 전체 적용</div>
+        <div class="rule-desc">신규개발과 동일: 193개 전체<br>대규모 설계변경 · 6 phase 전체</div>
+      </div>
+      <div class="flow-rule">
+        <div class="rule-title"><span class="rule-badge" style="background: var(--yellow-bg); color: var(--yellow-fg);">설계변경 medium</span> 필수만</div>
+        <div class="rule-desc"><code>isRequired === true</code>만 필터링 · 전체 phase<br>약 140~150개 항목 생성</div>
+      </div>
+      <div class="flow-rule">
+        <div class="rule-title"><span class="rule-badge" style="background: var(--red-bg); color: var(--red-fg);">설계변경 minor</span> 최소</div>
+        <div class="rule-desc"><code>isRequired === true</code> + 3개 phase만<br>(발의 / Tx / 양산이관) · 약 50~60개</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firestore subscription info -->
+  <div class="annotations-box">
+    <h4>🔄 실시간 구독 구조</h4>
+    <div class="anno-grid">
+      <div class="anno-item"><span class="anno-num" style="background: var(--cyan);">S1</span> <code>subscribeTemplateItems(stageId, deptId)</code>: 트리 뷰에서 현재 선택한 단계+부서의 항목만 실시간 구독</div>
+      <div class="anno-item"><span class="anno-num" style="background: var(--cyan);">S2</span> <code>subscribeAllTemplateItems()</code>: 매트릭스/리스트 뷰에서 전체 193개 항목 실시간 구독 (셀 카운트 계산용)</div>
+      <div class="anno-item"><span class="anno-num" style="background: var(--purple);">R</span> 역할 권한: <strong>매니저</strong> = 자기 부서만 편집 가능, <strong>기획조정실</strong> = 전체 열람/편집 + 단계/부서 추가·삭제</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end container -->
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                                     -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  // Theme
+  var saved = localStorage.getItem('pc-theme');
+  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('pc-theme', 'light');
+      this.textContent = '☽';
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('pc-theme', 'dark');
+      this.textContent = '☀';
+    }
+  });
+
+  // Tab switching
+  var tabs = document.querySelectorAll('.topbar-tab');
+  var panels = document.querySelectorAll('.view-panel');
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      var viewId = 'view-' + this.getAttribute('data-view');
+      document.getElementById(viewId).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  // Matrix cell hover
+  document.querySelectorAll('.mx-cell').forEach(function(cell) {
+    cell.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      tabs[1].classList.add('active');
+      document.getElementById('view-tree').classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+})();
+</script>
+</body>
+</html>

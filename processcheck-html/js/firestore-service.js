@@ -5,7 +5,7 @@
 
 import {
   collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, deleteField,
-  query, where, Timestamp, writeBatch, onSnapshot, serverTimestamp,
+  query, where, orderBy, Timestamp, writeBatch, onSnapshot, serverTimestamp, setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
 
@@ -849,11 +849,14 @@ export async function updateChecklistItem(id, data) {
   await updateDoc(doc(db, "checklistItems", id), payload);
 }
 
+export async function deleteChecklistItem(id) {
+  await deleteDoc(doc(db, "checklistItems", id));
+}
+
 export async function updateChecklistItemStatus(itemId, newStatus) {
   const payload = { status: newStatus, updatedAt: serverTimestamp() };
   if (newStatus === "completed") {
     payload.completedDate = serverTimestamp();
-    payload.approvalStatus = "pending";
   }
   await updateDoc(doc(db, "checklistItems", itemId), payload);
 }
@@ -862,7 +865,6 @@ export async function createChecklistItem(data) {
   const payload = {
     ...data,
     status: data.status || "pending",
-    approvalStatus: null,
     comments: [],
     completedDate: null,
     createdAt: Timestamp.now(),
@@ -877,212 +879,37 @@ export async function completeTask(taskId) {
     await updateDoc(doc(db, "checklistItems", taskId), {
       status: "completed",
       completedDate: Timestamp.now(),
-      approvalStatus: "pending",
     });
   } catch (e) {
     throw new Error("작업 완료 처리에 실패했습니다: " + e.message);
   }
   try { await addActivityLog("complete_task", "", "", "", "task", taskId, { status: "completed" }); } catch(e) {}
 
-  // 자동 알림: 검토자에게 승인 요청 + 프로젝트 통계 재계산
+  // 프로젝트 통계 재계산
   try {
     const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
     if (taskSnap.exists()) {
       const t = taskSnap.data();
       if (t.projectId) await recalculateProjectStats(t.projectId);
-      // reviewer 사용자 찾기
-      if (t.reviewer) {
-        const uQ = query(collection(db, "users"), where("name", "==", t.reviewer));
-        const uSnap = await getDocs(uQ);
-        if (!uSnap.empty) {
-          await addDoc(collection(db, "notifications"), {
-            userId: uSnap.docs[0].id,
-            type: "approval_request",
-            title: "승인 대기",
-            message: `${t.assignee}님이 "${t.title}" 작업을 완료했습니다. 검토가 필요합니다.`,
-            link: `task.html?projectId=${t.projectId}&taskId=${taskId}`,
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-        }
-      }
     }
-  } catch (e) { console.error("알림 생성 실패:", e); }
+  } catch (e) { console.error("통계 재계산 실패:", e); }
 }
 
+// 승인 절차 제거됨 — 하위 호환용 stub
 export async function approveTask(taskId, reviewerName) {
-  try {
-    await updateDoc(doc(db, "checklistItems", taskId), {
-      approvedBy: reviewerName,
-      approvedAt: Timestamp.now(),
-      approvalStatus: "approved",
-    });
-  } catch (e) {
-    throw new Error("작업 승인 처리에 실패했습니다: " + e.message);
-  }
-  try { await addActivityLog("approve_task", "", reviewerName, "", "task", taskId, { approver: reviewerName }); } catch(e) {}
-
-  // 자동 알림: 담당자에게 승인 완료 + 프로젝트 통계 재계산 + 포털 알림
-  try {
-    const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
-    if (taskSnap.exists()) {
-      const t = taskSnap.data();
-      if (t.projectId) await recalculateProjectStats(t.projectId);
-      // 담당자에게 알림
-      if (t.assignee) {
-        const uQ = query(collection(db, "users"), where("name", "==", t.assignee));
-        const uSnap = await getDocs(uQ);
-        if (!uSnap.empty) {
-          await addDoc(collection(db, "notifications"), {
-            userId: uSnap.docs[0].id,
-            type: "approval_request",
-            title: "승인 완료",
-            message: `${reviewerName}님이 "${t.title}" 작업을 승인했습니다.`,
-            link: `task.html?projectId=${t.projectId}&taskId=${taskId}`,
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-        }
-      }
-      // Gate stage 승인 시 → 포털 알림 (고객에게)
-      const GATE_STAGES = ["발의승인", "기획승인", "WM승인회", "Tx승인회", "MSG승인회", "영업이관"];
-      if (t.stage && GATE_STAGES.includes(t.stage) && t.projectId) {
-        await _createPortalNotificationsForProject(t.projectId, "phase_completed",
-          `${t.stage} 완료`, `"${t.stage}" 단계가 승인 완료되었습니다.`);
-
-        // ── 워크플로우 자동화: Gate 승인 → 다음 Phase 자동 활성화 ──
-        const PHASE_ORDER = [
-          { gate: "발의승인", nextWork: "기획검토" },
-          { gate: "기획승인", nextWork: "WM제작" },
-          { gate: "WM승인회", nextWork: "Tx단계" },
-          { gate: "Tx승인회", nextWork: "MasterGatePilot" },
-          { gate: "MSG승인회", nextWork: "양산" },
-        ];
-        const nextPhase = PHASE_ORDER.find(p => p.gate === t.stage);
-        if (nextPhase) {
-          // 다음 phase의 pending 작업 → in_progress 자동 전환 + 담당자 알림
-          const nextQ = query(collection(db, "checklistItems"),
-            where("projectId", "==", t.projectId),
-            where("stage", "==", nextPhase.nextWork));
-          const nextSnap = await getDocs(nextQ);
-
-          // 자동 활성화: pending → in_progress
-          const activateBatch = writeBatch(db);
-          let activateCount = 0;
-          for (const taskDoc of nextSnap.docs) {
-            if (taskDoc.data().status === "pending") {
-              activateBatch.update(taskDoc.ref, { status: "in_progress" });
-              activateCount++;
-            }
-          }
-          if (activateCount > 0) await activateBatch.commit();
-
-          // 담당자들에게 알림
-          const notifiedUsers = new Set();
-          for (const taskDoc of nextSnap.docs) {
-            const td = taskDoc.data();
-            if (td.assignee && !notifiedUsers.has(td.assignee)) {
-              notifiedUsers.add(td.assignee);
-              const uQ2 = query(collection(db, "users"), where("name", "==", td.assignee));
-              const uSnap2 = await getDocs(uQ2);
-              if (!uSnap2.empty) {
-                await addDoc(collection(db, "notifications"), {
-                  userId: uSnap2.docs[0].id,
-                  type: "phase_activated",
-                  title: "새 단계 시작",
-                  message: `"${nextPhase.nextWork}" 단계가 활성화되었습니다. 작업을 시작해주세요.`,
-                  link: `project.html?id=${t.projectId}`,
-                  read: false,
-                  createdAt: Timestamp.now(),
-                });
-              }
-            }
-          }
-        }
-      }
-
-      // ── 워크플로우 자동화: Work stage 전체 완료 → Gate 승인 자동 요청 ──
-      const WORK_TO_GATE = {
-        "발의검토": "발의승인", "기획검토": "기획승인", "WM제작": "WM승인회",
-        "Tx단계": "Tx승인회", "MasterGatePilot": "MSG승인회", "양산": "영업이관",
-      };
-      if (t.stage && WORK_TO_GATE[t.stage] && t.projectId) {
-        const wQ = query(collection(db, "checklistItems"),
-          where("projectId", "==", t.projectId),
-          where("stage", "==", t.stage));
-        const wSnap = await getDocs(wQ);
-        const allApproved = wSnap.docs.every(d => d.data().approvalStatus === "approved");
-        if (allApproved) {
-          // 기획조정실(observer)에게 Gate 승인 요청 알림
-          const obsQ = query(collection(db, "users"), where("role", "==", "observer"));
-          const obsSnap = await getDocs(obsQ);
-          for (const obs of obsSnap.docs) {
-            await addDoc(collection(db, "notifications"), {
-              userId: obs.id,
-              type: "gate_review_request",
-              title: "위원회 승인 요청",
-              message: `"${t.stage}" 단계의 모든 작업이 승인 완료되었습니다. "${WORK_TO_GATE[t.stage]}" 승인을 진행해주세요.`,
-              link: `project.html?id=${t.projectId}`,
-              read: false,
-              createdAt: Timestamp.now(),
-            });
-          }
-        }
-      }
-    }
-  } catch (e) { console.error("알림 생성 실패:", e); }
+  console.warn("approveTask is deprecated — approval workflow removed");
 }
 
 export async function rejectTask(taskId, reviewerName, reason) {
-  try {
-    await updateDoc(doc(db, "checklistItems", taskId), {
-      status: "rejected",
-      approvalStatus: "rejected",
-      rejectedBy: reviewerName,
-      rejectedAt: Timestamp.now(),
-      rejectionReason: reason,
-    });
-  } catch (e) {
-    throw new Error("작업 반려 처리에 실패했습니다: " + e.message);
-  }
-  try { await addActivityLog("reject_task", "", reviewerName, "", "task", taskId, { rejector: reviewerName, reason }); } catch(e) {}
-
-  // 자동 알림: 담당자에게 반려 알림 + 프로젝트 통계 재계산
-  try {
-    const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
-    if (taskSnap.exists()) {
-      const t = taskSnap.data();
-      if (t.projectId) await recalculateProjectStats(t.projectId);
-      if (t.assignee) {
-        const uQ = query(collection(db, "users"), where("name", "==", t.assignee));
-        const uSnap = await getDocs(uQ);
-        if (!uSnap.empty) {
-          await addDoc(collection(db, "notifications"), {
-            userId: uSnap.docs[0].id,
-            type: "approval_request",
-            title: "작업 반려",
-            message: `${reviewerName}님이 "${t.title}" 작업을 반려했습니다. 사유: ${reason}`,
-            link: `task.html?projectId=${t.projectId}&taskId=${taskId}`,
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-        }
-      }
-    }
-  } catch (e) { console.error("알림 생성 실패:", e); }
+  console.warn("rejectTask is deprecated — approval workflow removed");
 }
 
 export async function restartTask(taskId) {
   const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
   await updateDoc(doc(db, "checklistItems", taskId), {
     status: "in_progress",
-    approvalStatus: deleteField(),
-    rejectedBy: deleteField(),
-    rejectedAt: deleteField(),
-    rejectionReason: deleteField(),
   });
   try { await addActivityLog("restart_task", "", "", "", "task", taskId, {}); } catch(e) {}
-  // 프로젝트 통계 재계산
   if (taskSnap.exists() && taskSnap.data().projectId) {
     await recalculateProjectStats(taskSnap.data().projectId);
   }
@@ -1096,16 +923,14 @@ export async function recalculateProjectStats(projectId) {
   const tasks = snap.docs.map(d => d.data());
   if (tasks.length === 0) return;
 
-  // Progress: completed+approved %
-  const completedOrApproved = tasks.filter(
-    t => t.status === "completed" || t.approvalStatus === "approved"
-  ).length;
-  const progress = Math.round((completedOrApproved / tasks.length) * 100);
+  // Progress: completed %
+  const completedCount = tasks.filter(t => t.status === "completed").length;
+  const progress = Math.round((completedCount / tasks.length) * 100);
 
   // Risk level: overdue ratio
   const now = new Date();
   const overdue = tasks.filter(
-    t => t.status !== "completed" && t.approvalStatus !== "approved" && toDate(t.dueDate) < now
+    t => t.status !== "completed" && toDate(t.dueDate) < now
   ).length;
   const overdueRatio = overdue / tasks.length;
   const riskLevel = overdueRatio > 0.3 ? "red" : overdueRatio > 0.1 ? "yellow" : "green";
@@ -1120,9 +945,7 @@ export async function recalculateProjectStats(projectId) {
   for (const stage of stageOrder) {
     const stageTasks = tasks.filter(t => t.stage === stage);
     if (stageTasks.length > 0) {
-      const allDone = stageTasks.every(
-        t => t.status === "completed" && (t.approvalStatus === "approved" || !t.approvalStatus)
-      );
+      const allDone = stageTasks.every(t => t.status === "completed");
       if (!allDone) { currentStage = stage; break; }
       currentStage = stage;
     }
@@ -1418,6 +1241,46 @@ export async function reorderTemplateItems(items) {
   await batch.commit();
 }
 
+// ─── Template Item Sub-Checklist ────────────────────────────────────────────
+
+export function subscribeTemplateSubChecklist(itemId, callback) {
+  const q = query(
+    collection(db, "templateItems", itemId, "subChecklist"),
+    orderBy("order", "asc")
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+  });
+}
+
+export async function addTemplateSubChecklistItem(itemId, data) {
+  const snap = await getDocs(collection(db, "templateItems", itemId, "subChecklist"));
+  const maxOrder = snap.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
+  const ref = await addDoc(collection(db, "templateItems", itemId, "subChecklist"), {
+    content: data.content,
+    order: maxOrder + 1,
+    createdBy: data.createdBy,
+    createdAt: Timestamp.now(),
+  });
+  return ref.id;
+}
+
+export async function updateTemplateSubChecklistItem(itemId, subId, data) {
+  await updateDoc(doc(db, "templateItems", itemId, "subChecklist", subId), data);
+}
+
+export async function deleteTemplateSubChecklistItem(itemId, subId) {
+  await deleteDoc(doc(db, "templateItems", itemId, "subChecklist", subId));
+}
+
+export async function reorderTemplateSubChecklist(itemId, items) {
+  const batch = writeBatch(db);
+  for (const item of items) {
+    batch.update(doc(db, "templateItems", itemId, "subChecklist", item.id), { order: item.order });
+  }
+  await batch.commit();
+}
+
 export async function addTemplateStage(data) {
   // data: { name, workStageName, gateStageName, createdBy }
   const stagesSnap = await getDocs(collection(db, "templateStages"));
@@ -1447,6 +1310,14 @@ export async function deleteTemplateStage(stageId) {
   snap.docs.forEach(d => batch.delete(d.ref));
   batch.delete(doc(db, "templateStages", stageId));
   await batch.commit();
+}
+
+export async function updateTemplateStage(stageId, data) {
+  await updateDoc(doc(db, "templateStages", stageId), data);
+}
+
+export async function updateTemplateDepartment(deptId, data) {
+  await updateDoc(doc(db, "templateDepartments", deptId), data);
 }
 
 export async function addTemplateDepartment(data) {
@@ -1484,19 +1355,13 @@ export async function deleteTemplateDepartment(deptId) {
  * @returns {Promise<number>} 생성된 체크리스트 항목 수
  */
 export async function applyTemplateToProject(projectId, projectType, changeScale) {
-  // 0) 중복 방지: 이미 적용된 항목 확인
+  // 0) 중복 방지: 이미 적용된 templateItemId 수집
   const existingSnap = await getDocs(
     query(collection(db, "checklistItems"), where("projectId", "==", projectId))
   );
-  if (!existingSnap.empty) {
-    const existingTemplateIds = new Set(
-      existingSnap.docs.map(d => d.data().templateItemId).filter(Boolean)
-    );
-    if (existingTemplateIds.size > 0) {
-      console.warn(`⚠️ 프로젝트 ${projectId}에 이미 ${existingTemplateIds.size}개 템플릿 항목 존재 — 중복 생성 건너뜀`);
-      return 0;
-    }
-  }
+  const existingTemplateIds = new Set(
+    existingSnap.docs.map(d => d.data().templateItemId).filter(Boolean)
+  );
 
   // 1) 템플릿 stages, departments, items 로드
   const stages = await getTemplateStages();
@@ -1523,6 +1388,13 @@ export async function applyTemplateToProject(projectId, projectType, changeScale
   } else {
     // 신규개발: 전체
     filteredItems = allItems;
+  }
+
+  // 2.5) 이미 적용된 템플릿 항목 제외
+  filteredItems = filteredItems.filter(ti => !existingTemplateIds.has(ti.id));
+  if (filteredItems.length === 0) {
+    console.warn(`⚠️ 프로젝트 ${projectId}: 새로 적용할 템플릿 항목 없음`);
+    return 0;
   }
 
   // 3) stage/dept lookup maps
@@ -2056,6 +1928,133 @@ export function subscribeAllActivityLogs(callback, limitCount = 50) {
   });
 }
 
+// ─── Gate Records (Phase 승인 기록 + 회의록) ─────────────────────────────────
+
+const PHASE_DESCRIPTIONS = {
+  "발의": "제품 컨셉 정의 및 기술 타당성을 검토하여 개발 착수 승인",
+  "기획": "상세 기획서 검토 및 개발 계획 승인",
+  "WM": "Working Model 제작 완료 검토 및 설계 승인",
+  "Tx": "Pilot 제품 완성도 검토 및 양산 준비 승인 (Product Readiness)",
+  "MSG": "시생산 완료 검토 및 양산 전환 승인 (Sales Readiness)",
+  "양산/이관": "양산 체제 확인 및 영업 이관 최종 승인",
+};
+
+export { PHASE_DESCRIPTIONS };
+
+/** 프로젝트의 gateRecords 실시간 구독 */
+export function subscribeGateRecords(projectId, callback) {
+  const q = query(collection(db, "gateRecords"), where("projectId", "==", projectId));
+  return onSnapshot(q, (snap) => {
+    const records = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        approvedAt: toDate(data.approvedAt),
+        meetingNotes: (data.meetingNotes || []).map(n => ({
+          ...n,
+          createdAt: toDate(n.createdAt),
+        })),
+      };
+    });
+    callback(records);
+  });
+}
+
+/** Phase별 gateRecord 가져오기 (없으면 null) */
+export async function getGateRecord(projectId, phaseId) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  const data = d.data();
+  return {
+    ...data,
+    id: d.id,
+    approvedAt: toDate(data.approvedAt),
+    meetingNotes: (data.meetingNotes || []).map(n => ({
+      ...n,
+      createdAt: toDate(n.createdAt),
+    })),
+  };
+}
+
+/** gateRecord 생성 또는 업데이트 (승인/반려) */
+export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus, approvedBy) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+
+  const data = {
+    projectId,
+    phaseId,
+    phaseName,
+    gateStatus,
+    approvedBy: gateStatus !== "pending" ? approvedBy : "",
+    approvedAt: gateStatus !== "pending" ? Timestamp.now() : null,
+    description: PHASE_DESCRIPTIONS[phaseName] || "",
+    updatedAt: Timestamp.now(),
+  };
+
+  if (snap.empty) {
+    // 새로 생성
+    await addDoc(collection(db, "gateRecords"), {
+      ...data,
+      meetingNotes: [],
+      createdAt: Timestamp.now(),
+    });
+  } else {
+    // 기존 업데이트 (meetingNotes는 건드리지 않음)
+    await updateDoc(snap.docs[0].ref, data);
+  }
+}
+
+/** gateRecord에 회의록 메모 추가 */
+export async function addGateMeetingNote(projectId, phaseId, phaseName, author, content) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+
+  const note = {
+    author,
+    content,
+    createdAt: Timestamp.now(),
+  };
+
+  if (snap.empty) {
+    // gateRecord가 아직 없으면 생성하면서 메모 추가
+    await addDoc(collection(db, "gateRecords"), {
+      projectId,
+      phaseId,
+      phaseName,
+      gateStatus: "pending",
+      approvedBy: "",
+      approvedAt: null,
+      description: PHASE_DESCRIPTIONS[phaseName] || "",
+      meetingNotes: [note],
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  } else {
+    const docRef = snap.docs[0].ref;
+    const existing = snap.docs[0].data().meetingNotes || [];
+    await updateDoc(docRef, {
+      meetingNotes: [...existing, note],
+      updatedAt: Timestamp.now(),
+    });
+  }
+}
+
 // ─── Bulk Operations ─────────────────────────────────────────────────────────
 
 export async function bulkApproveTasks(taskIds, reviewerName) {
@@ -2142,6 +2141,18 @@ export async function deactivateUser(userId) {
 
 export async function activateUser(userId) {
   await updateDoc(doc(db, "users", userId), { active: true });
+}
+
+// ─── Permissions / Settings ──────────────────────────────────────────────────
+
+export function subscribePermissions(callback) {
+  return onSnapshot(doc(db, "settings", "permissions"), (snap) => {
+    callback(snap.exists() ? snap.data() : null);
+  });
+}
+
+export async function updatePermissions(data) {
+  await setDoc(doc(db, "settings", "permissions"), data, { merge: true });
 }
 
 // ─── Comment Update/Delete ───────────────────────────────────────────────────

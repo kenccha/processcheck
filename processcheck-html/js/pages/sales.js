@@ -14,6 +14,7 @@ import {
   completeLaunchChecklist,
   updateLaunchChecklist,
   confirmLaunchChecklist,
+  applyLaunchChecklistToProject,
   LAUNCH_CATEGORY_LABELS,
 } from "../firestore-service.js";
 import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName } from "../utils.js";
@@ -643,8 +644,23 @@ function render() {
   // Still loading
   if (!dataLoaded.items) return;
 
-  // Empty data guidance
+  // Empty data guidance — show project list with generate buttons
   if (allItems.length === 0) {
+    const activeProjects = projects.filter(p => p.status === "active");
+    const projectRows = activeProjects.length > 0
+      ? activeProjects.map(p => `
+          <tr>
+            <td><a href="project.html?id=${p.id}" style="color:var(--primary-400);text-decoration:none;">${escapeHtml(p.name)}</a></td>
+            <td class="text-sm">${escapeHtml(p.projectType || "")}</td>
+            <td class="text-sm">${p.endDate ? formatDate(p.endDate) : "—"}</td>
+            <td>
+              <button class="btn btn-sm btn-primary generate-launch-btn" data-project-id="${p.id}" data-project-type="${p.projectType || "신규개발"}" data-change-scale="${p.changeScale || "major"}" data-end-date="${p.endDate ? p.endDate.toISOString() : ""}" style="font-size:11px;padding:4px 10px;">
+                출시 준비 생성
+              </button>
+            </td>
+          </tr>`).join("")
+      : `<tr><td colspan="4" class="text-sm text-soft" style="text-align:center;padding:1.5rem;">등록된 프로젝트가 없습니다. <a href="projects.html" style="color:var(--primary-400);">프로젝트 등록</a>을 먼저 해주세요.</td></tr>`;
+
     app.innerHTML = `
       <div class="container animate-fade-in">
         <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
@@ -653,24 +669,50 @@ function render() {
             <p class="text-sm text-soft mt-1">전체 프로젝트의 영업 관련 출시 체크리스트를 한 눈에 확인</p>
           </div>
         </div>
-        <div class="card" style="padding: 3rem; text-align: center;">
-          <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--slate-400); margin: 0 auto 1rem;">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
-          <h2 class="text-lg font-semibold mb-2" style="color: var(--slate-300)">출시 준비 체크리스트가 없습니다</h2>
-          <p class="text-sm text-soft mb-4">
-            프로젝트 상세 페이지에서 체크리스트를 생성해주세요.
-          </p>
-          <div class="card" style="padding: 1rem; background: var(--surface-1); text-align: left; max-width: 400px; margin: 0 auto;">
-            <p class="text-sm" style="color: var(--slate-400); line-height: 1.6;">
-              <strong>1.</strong> <a href="projects.html" style="color: var(--primary-400)">프로젝트 목록</a>에서 프로젝트 선택<br>
-              <strong>2.</strong> 개요 탭에서 <strong>"출시 준비 적용"</strong> 버튼 클릭<br>
-              <strong>3.</strong> 이 페이지로 돌아오면 체크리스트가 표시됩니다
-            </p>
+        <div class="card" style="padding: 2rem;">
+          <h2 class="text-lg font-semibold mb-2" style="color: var(--slate-200)">출시 준비 체크리스트가 없습니다</h2>
+          <p class="text-sm text-soft mb-4">아래 프로젝트 목록에서 출시 준비 체크리스트를 생성할 수 있습니다.</p>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>프로젝트</th><th>유형</th><th>종료일</th><th>작업</th></tr></thead>
+              <tbody>${projectRows}</tbody>
+            </table>
           </div>
         </div>
       </div>
     `;
+
+    // Bind generate buttons
+    app.querySelectorAll(".generate-launch-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const el = e.currentTarget;
+        const pId = el.dataset.projectId;
+        const pType = el.dataset.projectType;
+        const cScale = el.dataset.changeScale;
+        const endDateStr = el.dataset.endDate;
+        const endDate = endDateStr ? new Date(endDateStr) : new Date();
+        el.disabled = true;
+        el.textContent = "생성 중...";
+        try {
+          const count = await applyLaunchChecklistToProject(pId, pType, cScale, endDate);
+          if (count > 0) {
+            showToast("success", `${getProjectName(pId)}: ${count}개 출시 준비 체크리스트 생성 완료`);
+            el.textContent = "완료";
+            el.classList.remove("btn-primary");
+            el.classList.add("btn-secondary");
+          } else {
+            showToast("warning", "생성할 항목이 없습니다.");
+            el.disabled = false;
+            el.textContent = "출시 준비 생성";
+          }
+        } catch (err) {
+          console.error("출시 준비 생성 오류:", err);
+          showToast("error", "생성 실패: " + err.message);
+          el.disabled = false;
+          el.textContent = "출시 준비 생성";
+        }
+      });
+    });
     return;
   }
 

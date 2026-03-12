@@ -38,7 +38,6 @@ export function buildNavActions() {
     { id: 'nav-checklist', title: '체크리스트 관리', icon: '📋', section: '페이지', handler: () => { window.location.href = 'admin-checklists.html'; } },
     { id: 'nav-sales', title: '영업 출시 준비', icon: '📊', section: '페이지', handler: () => { window.location.href = 'sales.html'; } },
     { id: 'nav-customers', title: '고객 관리', icon: '👥', section: '페이지', handler: () => { window.location.href = 'customers.html'; } },
-    { id: 'nav-approvals', title: '승인 대기', icon: '✅', section: '페이지', handler: () => { window.location.href = 'approvals.html'; } },
     { id: 'nav-reports', title: '리포트', icon: '📈', section: '페이지', handler: () => { window.location.href = 'reports.html'; } },
     { id: 'nav-activity', title: '활동 로그', icon: '📝', section: '페이지', handler: () => { window.location.href = 'activity.html'; } },
     { id: 'nav-manual', title: '매뉴얼', icon: '📖', section: '페이지', handler: () => { window.location.href = 'manual.html'; } },

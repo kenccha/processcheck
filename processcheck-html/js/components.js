@@ -5,7 +5,6 @@
 import { getUser, logout, startSessionWatcher } from "./auth.js";
 import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
 import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
-import { ReviewPanel } from "./review-system.js";
 
 // ─── Theme Management ────────────────────────────────────────────────────────
 
@@ -79,11 +78,6 @@ const BASE_NAV_LINKS = [
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`,
   },
   {
-    href: "projects.html?type=설계변경",
-    label: "설계변경",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`,
-  },
-  {
     href: "admin-checklists.html",
     label: "체크리스트",
     icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
@@ -100,20 +94,6 @@ const BASE_NAV_LINKS = [
       { href: "manual.html", label: "매뉴얼" },
     ],
   },
-  {
-    href: "sales.html",
-    label: "영업",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>`,
-  },
-  {
-    href: "#",
-    label: "다른 사이트",
-    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
-    isSeparated: true,
-    children: [
-      { href: "customers.html", label: "고객 관리", external: true },
-    ],
-  },
 ];
 
 const ADMIN_USER_LINK = {
@@ -124,12 +104,11 @@ const ADMIN_USER_LINK = {
 
 function getNavLinks(userRole) {
   const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
-  // Add 사용자 관리 to 리뷰 dropdown for observer
-  if (userRole === "observer") {
-    const reviewMenu = links.find((l) => l.label === "리뷰");
-    if (reviewMenu && reviewMenu.children) {
-      reviewMenu.children.push({ href: "admin-users.html", label: "사용자 관리" });
-    }
+  // 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가 (모든 역할)
+  const reviewMenu = links.find((l) => l.label === "리뷰");
+  if (reviewMenu && reviewMenu.children) {
+    reviewMenu.children.push({ href: "admin-users.html", label: "사용자 관리" });
+    reviewMenu.children.push({ href: "admin-permissions.html", label: "권한 설정" });
   }
   return links;
 }
@@ -160,7 +139,7 @@ export function renderNav(container) {
     <nav class="nav">
       <div class="nav-inner">
         <div class="flex items-center gap-8">
-          <button class="nav-logo" data-nav="home.html">
+          <button class="nav-logo" data-nav="dashboard.html">
             <div class="nav-logo-icon"><span>PC</span></div>
             <span class="nav-logo-text">Process<span class="accent">Check</span></span>
           </button>
@@ -189,11 +168,8 @@ export function renderNav(container) {
           <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
             ${getThemeIcon()}
           </button>
-          <button class="nav-review-btn" id="nav-review-btn" title="리뷰">
-            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
-            </svg>
-            <span class="nav-review-dot hidden" id="nav-review-dot"></span>
+          <button class="nav-icon-btn" id="nav-home-btn" data-nav="home.html" title="홈">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
           </button>
           <button class="nav-bell" id="nav-bell-btn">
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,7 +180,6 @@ export function renderNav(container) {
           <div class="nav-user">
             <div class="nav-user-info">
               <div class="nav-user-name">${escapeHtml(user.name)}</div>
-              <div class="nav-user-role">${getRoleName(user.role)}</div>
             </div>
             <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +212,6 @@ export function renderNav(container) {
       </div>
     </nav>
     <div id="notif-panel-root"></div>
-    <div id="review-panel-root"></div>
   `;
 
   // Bind navigation
@@ -338,42 +312,6 @@ export function renderNav(container) {
     }
   });
 
-  // ─── Review Panel ──────────────────────────────────────────────────────────
-  const reviewBtn = container.querySelector("#nav-review-btn");
-  const reviewRoot = container.querySelector("#review-panel-root");
-  const reviewDot = container.querySelector("#nav-review-dot");
-  const reviewPanel = new ReviewPanel(reviewRoot);
-  reviewPanel.init();
-
-  // Show dot when there are open reviews
-  const reviewUnsub = reviewPanel.unsubscribe;
-  // The panel auto-updates via its internal subscription; update the dot badge
-  const origRender = reviewPanel.render.bind(reviewPanel);
-  const origPanelInit = reviewPanel.init.bind(reviewPanel);
-  // Patch: track open count for dot
-  const _origSub = reviewPanel.unsubscribe;
-  reviewPanel.destroy();
-  reviewPanel.unsubscribe = null;
-  // Re-init with dot callback
-  import("./review-system.js").then(({ subscribeReviews }) => {
-    const pageId = (window.location.pathname.split("/").pop() || "index.html").replace(".html", "");
-    reviewPanel.unsubscribe = subscribeReviews(pageId, (reviews) => {
-      reviewPanel.reviews = reviews;
-      const openCount = reviews.filter(r => r.status === "open").length;
-      reviewDot.classList.toggle("hidden", openCount === 0);
-      if (reviewPanel.isOpen) reviewPanel.render();
-    });
-  });
-
-  reviewBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    // Close notif panel if open
-    if (notifPanelOpen) {
-      notifPanelOpen = false;
-      renderNotifPanel();
-    }
-    reviewPanel.toggle();
-  });
 
   // ─── Global Feedback Widget ─────────────────────────────────────────────────
   import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
@@ -393,7 +331,6 @@ export function renderNav(container) {
   // Return unsubscribe for cleanup
   return () => {
     unsub();
-    reviewPanel.destroy();
   };
 }
 
@@ -419,7 +356,6 @@ export function renderHomeNav(container) {
           <div class="nav-user">
             <div class="nav-user-info">
               <div class="nav-user-name">${escapeHtml(user.name)}</div>
-              <div class="nav-user-role">${getRoleName(user.role)}</div>
             </div>
             <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -7,6 +7,10 @@
   const SIDEBAR_W = 210;
   const NAV_H = 52;
 
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem("pc_user")); } catch {}
+  const ROLES = { worker: "실무자", manager: "매니저", observer: "기획조정실" };
+
   const SUB_PAGES = [
     { href: "wireframes.html", label: "전체 화면 설계", icon: "📱" },
     { href: "user-flows.html", label: "업무 흐름", icon: "🔀" },
@@ -14,25 +18,14 @@
     { href: "feedback.html", label: "피드백 모아보기", icon: "💬", isFeedback: true },
   ];
 
-  const EXTERNAL_LINKS = [
-    { href: "sales.html", label: "영업 출시 준비", external: true },
-    { href: "customers.html", label: "고객 관리", external: true },
-  ];
-
   const MAIN_NAV = [
     { href: "projects.html?type=신규개발", label: "출시위원회" },
-    { href: "projects.html?type=설계변경", label: "설계변경" },
     { href: "admin-checklists.html", label: "체크리스트" },
-    { href: null, label: "리뷰", isDropdown: true, children: [...SUB_PAGES, { href: "manual.html", label: "매뉴얼", icon: "📖 " }, ...(user && user.role === "observer" ? [{ href: "admin-users.html", label: "사용자 관리", icon: "👥" }] : [])] },
-    { href: null, label: "다른 사이트", isDropdown: true, children: EXTERNAL_LINKS, isExternal: true, isSeparated: true },
+    { href: null, label: "리뷰", isDropdown: true, children: [...SUB_PAGES, { href: "manual.html", label: "매뉴얼", icon: "📖 " }, { href: "admin-users.html", label: "사용자 관리", icon: "👥" }, { href: "admin-permissions.html", label: "권한 설정", icon: "🔐" }] },
   ];
 
   const currentFile = location.pathname.split("/").pop();
   const isFeedbackPage = currentFile === "feedback.html";
-
-  let user = null;
-  try { user = JSON.parse(localStorage.getItem("pc_user")); } catch {}
-  const ROLES = { worker: "실무자", manager: "매니저", observer: "기획조정실" };
 
   // ── Load html2canvas ──
   const h2cScript = document.createElement("script");
@@ -518,7 +511,7 @@
       const vh = window.innerHeight;
       html2canvas(document.body, {
         useCORS: true,
-        scale: window.devicePixelRatio > 1 ? 1.5 : 1,
+        scale: window.devicePixelRatio || 2,
         logging: false,
         x: window.scrollX,
         y: window.scrollY,

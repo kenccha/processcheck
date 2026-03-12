@@ -88,6 +88,13 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    // ─── Gate Records ─────────────────────────────────────────────────────
+    // Phase별 승인 기록 + 회의록
+    match /gateRecords/{recordId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     // ─── Feedbacks ────────────────────────────────────────────────────────
     // Written by docs/deliverables/js/feedback-system.js
     match /feedbacks/{feedbackId} {

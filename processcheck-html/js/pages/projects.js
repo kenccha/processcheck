@@ -7,9 +7,9 @@ import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
-import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject, getTemplateStages } from "../firestore-service.js";
+import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject, getTemplateStages, getTemplateDepartments } from "../firestore-service.js";
 import {
-  departments,
+  departments as defaultDepartments,
   projectStages,
   PHASE_GROUPS,
   GATE_STAGES,
@@ -57,6 +57,7 @@ let sortDir = (_savedProj && _savedProj.sortDir) || "desc";
 
 // -- Dynamic phase groups (Firestore templateStages 우선, 없으면 하드코딩 PHASE_GROUPS 폴백)
 let dynamicPhaseGroups = [];
+let departments = [...defaultDepartments];
 function getActivePhaseGroups() {
   return dynamicPhaseGroups.length > 0 ? dynamicPhaseGroups : PHASE_GROUPS;
 }
@@ -65,6 +66,12 @@ getTemplateStages().then((stages) => {
     id: s.id, name: s.name, workStage: s.workStageName, gateStage: s.gateStageName,
   }));
   render();
+}).catch(() => {});
+getTemplateDepartments().then((depts) => {
+  if (depts.length > 0) {
+    departments = depts.map(d => d.name);
+    render();
+  }
 }).catch(() => {});
 
 // -- Initial skeleton --
@@ -362,10 +369,7 @@ function render() {
                 <input type="date" class="input-field" id="cp-end" />
               </div>
             </div>
-            <div>
-              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">PM (프로젝트 매니저)</label>
-              <input type="text" class="input-field" id="cp-pm" value="${escapeHtml(user.name || "")}" />
-            </div>
+            <!-- PM 필드 제거됨 -->
           </div>
         </div>
         <div class="modal-footer">
@@ -445,7 +449,7 @@ function renderChangeTable(filtered) {
               <td><span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span></td>
               <td><span class="badge ${getChangeScaleBadge(p.changeScale)}">${getChangeScaleLabel(p.changeScale)}</span></td>
               <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
-              <td>${escapeHtml(p.pm || "-")}</td>
+              <!-- PM 제거됨 -->
               <td><span class="risk-dot ${p.riskLevel || ""}"></span> ${getRiskLabel(p.riskLevel)}</td>
               <td>
                 <div class="flex items-center gap-2">
@@ -497,7 +501,6 @@ function renderChangeKanban(filtered) {
                     <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
                     <span class="badge ${getChangeScaleBadge(p.changeScale)}" style="font-size:0.625rem">${getChangeScaleLabel(p.changeScale)}</span>
                   </div>
-                  <div class="text-xs text-soft mb-2">PM: ${escapeHtml(p.pm || "-")}</div>
                   <div class="progress-bar mb-1">
                     <div class="progress-fill" style="width:${p.progress || 0}%"></div>
                   </div>
@@ -514,55 +517,56 @@ function renderChangeKanban(filtered) {
 // 1) Cards view
 // =============================================================================
 
+function getPhaseDotsForProject(projectId) {
+  const phases = getActivePhaseGroups();
+  const tasks = getProjectTasks(projectId);
+  return phases.map(ph => {
+    const phaseTasks = tasks.filter(t => t.stage === ph.workStage || t.stage === ph.gateStage);
+    if (phaseTasks.length === 0) return "empty";
+    const allDone = phaseTasks.every(t => t.status === "completed");
+    const someStarted = phaseTasks.some(t => t.status === "in_progress" || t.status === "completed");
+    if (allDone) return "done";
+    if (someStarted) return "active";
+    return "pending";
+  });
+}
+
+function getProgressColor(progress) {
+  if (progress >= 70) return "var(--success-400)";
+  if (progress >= 40) return "var(--warning-400)";
+  return "var(--danger-400)";
+}
+
 function renderCards(filtered) {
   if (filtered.length === 0) return renderEmpty();
 
   return `
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="proj-card-grid">
       ${filtered
         .map((p) => {
           const stats = getTaskStats(p.id);
-          const riskClass = getRiskClass(p.riskLevel);
           const progress = p.progress || 0;
+          const dots = getPhaseDotsForProject(p.id);
+          const progressColor = getProgressColor(progress);
+          const riskBadge = p.riskLevel === "red" ? `<span class="badge badge-danger" style="font-size:0.6rem;padding:0.1rem 0.375rem;">긴급</span>`
+            : p.riskLevel === "yellow" ? `<span class="badge badge-warning" style="font-size:0.6rem;padding:0.1rem 0.375rem;">중요</span>`
+            : `<span class="badge" style="font-size:0.6rem;padding:0.1rem 0.375rem;background:var(--surface-3);color:var(--text-secondary);">보통</span>`;
           return `
-          <div class="card-hover p-5 cursor-pointer animate-fade-in" data-project-id="${p.id}">
-            <div class="flex items-center justify-between mb-3">
-              <span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span>
-              <span class="risk-dot ${p.riskLevel || ""}" title="중요도: ${getRiskLabel(p.riskLevel)}"></span>
+          <div class="proj-card cursor-pointer animate-fade-in" data-project-id="${p.id}">
+            <div class="proj-card-top">
+              <span class="proj-card-name">${escapeHtml(p.name)}</span>
+              <span class="proj-card-pct" style="color:${progressColor}">${progress}%</span>
             </div>
-            <h3 class="font-semibold mb-1" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
-            <p class="text-xs text-soft mb-3">${escapeHtml(p.productType || "")}</p>
-            <div class="text-xs text-soft mb-1">PM: ${escapeHtml(p.pm || "-")}</div>
-            <div class="text-xs text-soft mb-3">${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</div>
-            <div class="text-xs text-soft mb-1">현재 단계: <span style="color:var(--primary-300)">${formatStageName(p.currentStage)}</span></div>
-            <div class="progress-bar mt-3 mb-2">
-              <div class="progress-fill ${riskClass === "danger" ? "danger" : riskClass === "warning" ? "warning" : "success"}" style="width:${progress}%"></div>
+            <div class="proj-card-meta">
+              <span class="proj-card-type">${escapeHtml(p.productType || "")}</span>
+              <!-- PM 제거됨 -->
+              ${riskBadge}
             </div>
-            <div class="flex items-center justify-between text-xs text-soft">
-              <span>${progress}%</span>
-              <span>완료 ${stats.completed}/${stats.total}</span>
+            <div class="progress-bar" style="margin:0.5rem 0 0.375rem;">
+              <div class="progress-fill" style="width:${progress}%;background:${progressColor};"></div>
             </div>
-            <div class="flex gap-3 mt-3">
-              <div class="text-xs">
-                <span class="stat-value" style="font-size:0.875rem;color:var(--slate-200)">${stats.total}</span>
-                <span class="text-soft"> 전체</span>
-              </div>
-              <div class="text-xs">
-                <span style="font-size:0.875rem;font-weight:700;color:var(--success-400)">${stats.completed}</span>
-                <span class="text-soft"> 완료</span>
-              </div>
-              <div class="text-xs">
-                <span style="font-size:0.875rem;font-weight:700;color:var(--primary-400)">${stats.inProgress}</span>
-                <span class="text-soft"> 진행</span>
-              </div>
-              ${
-                stats.delayed > 0
-                  ? `<div class="text-xs">
-                      <span style="font-size:0.875rem;font-weight:700;color:var(--danger-400)">${stats.delayed}</span>
-                      <span class="text-soft"> 지연</span>
-                    </div>`
-                  : ""
-              }
+            <div class="proj-card-dots">
+              ${dots.map(d => `<span class="proj-phase-dot proj-dot-${d}"></span>`).join("")}
             </div>
           </div>`;
         })
@@ -588,7 +592,7 @@ function applySorting(list) {
     switch (sortField) {
       case "name": va = (a.name || "").toLowerCase(); vb = (b.name || "").toLowerCase(); break;
       case "status": va = a.status || ""; vb = b.status || ""; break;
-      case "pm": va = (a.pm || "").toLowerCase(); vb = (b.pm || "").toLowerCase(); break;
+      // PM 정렬 제거됨
       case "progress": va = a.progress || 0; vb = b.progress || 0; break;
       case "startDate": va = new Date(a.startDate).getTime(); vb = new Date(b.startDate).getTime(); break;
       case "dday": va = daysUntil(a.endDate) ?? 9999; vb = daysUntil(b.endDate) ?? 9999; break;
@@ -612,7 +616,7 @@ function renderTable(filtered) {
             <th class="sortable-th" data-sort="name" style="cursor:pointer;user-select:none;">프로젝트명 ${sortArrow("name")}</th>
             <th>제품유형</th>
             <th class="sortable-th" data-sort="status" style="cursor:pointer;user-select:none;">상태 ${sortArrow("status")}</th>
-            <th class="sortable-th" data-sort="pm" style="cursor:pointer;user-select:none;">PM ${sortArrow("pm")}</th>
+            <!-- PM 열 제거됨 -->
             <th>현재단계</th>
             <th>중요도</th>
             <th class="sortable-th" data-sort="dday" style="cursor:pointer;user-select:none;">D-Day ${sortArrow("dday")}</th>
@@ -630,7 +634,7 @@ function renderTable(filtered) {
               </td>
               <td>${escapeHtml(p.productType || "-")}</td>
               <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
-              <td>${escapeHtml(p.pm || "-")}</td>
+              <!-- PM 제거됨 -->
               <td class="text-xs">${formatStageName(p.currentStage)}</td>
               <td><span class="risk-dot ${p.riskLevel || ""}"></span></td>
               <td class="text-xs font-mono font-semibold whitespace-nowrap" style="color: ${(() => { const dd = daysUntil(p.endDate); if (dd === null) return "var(--slate-400)"; if (dd < 0) return "var(--danger-400)"; if (dd <= 3) return "var(--warning-400)"; if (dd <= 7) return "var(--primary-400)"; return "var(--success-400)"; })()}">${(() => { const dd = daysUntil(p.endDate); if (dd === null) return "-"; if (dd < 0) return "D+" + Math.abs(dd); if (dd === 0) return "D-Day"; return "D-" + dd; })()}</td>
@@ -756,8 +760,7 @@ function renderKanban(filtered) {
                             <span class="risk-dot ${p.riskLevel || ""}"></span>
                           </div>
                           <div class="text-xs text-soft mb-2">${escapeHtml(p.productType || "")}</div>
-                          <div class="text-xs text-soft mb-2">PM: ${escapeHtml(p.pm || "-")}</div>
-                          <div class="text-xs text-soft mb-2">단계: ${formatStageName(p.currentStage)}</div>
+                                  <div class="text-xs text-soft mb-2">단계: ${formatStageName(p.currentStage)}</div>
                           <div class="progress-bar mb-1">
                             <div class="progress-fill" style="width:${p.progress || 0}%"></div>
                           </div>
@@ -808,7 +811,7 @@ function renderTimeline(filtered) {
                   <span class="text-xs text-soft">${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}</span>
                 </div>
                 <h3 class="font-semibold mb-1" style="color:var(--slate-100)">${escapeHtml(p.name)}</h3>
-                <p class="text-xs text-soft mb-2">${escapeHtml(p.productType || "")} | PM: ${escapeHtml(p.pm || "-")}</p>
+                <p class="text-xs text-soft mb-2">${escapeHtml(p.productType || "")}</p>
                 <div class="text-xs text-soft mb-2">현재 단계: <span style="color:var(--primary-300)">${formatStageName(p.currentStage)}</span></div>
                 <div class="progress-bar mb-1">
                   <div class="progress-fill" style="width:${p.progress || 0}%"></div>
@@ -973,15 +976,8 @@ function renderMatrix(filtered) {
       if (t.stage === phase.gateStage) {
         // Gate tasks — determine status
         const gateData = matrix[dept][phase.name].gate;
-        if (t.approvalStatus === "rejected" || t.status === "rejected") {
-          gateData.status = "rejected";
-        } else if (t.approvalStatus === "approved") {
+        if (t.status === "completed") {
           if (gateData.status !== "rejected") gateData.status = "approved";
-        } else if (t.status === "completed") {
-          if (gateData.status === "none") gateData.status = "pending";
-        } else if (t.status === "in_progress" || t.status === "pending") {
-          // task not yet completed, gate not yet ready
-          if (gateData.status === "none") gateData.status = "none";
         }
         break;
       }
@@ -1029,18 +1025,9 @@ function renderMatrix(filtered) {
                 const hasWork = work.total > 0;
                 const hasBg = work.delayed > 0 ? "background:rgba(239,68,68,0.06)" : work.inProgress > 0 ? "background:rgba(6,182,212,0.06)" : (work.completed === work.total && work.total > 0) ? "background:rgba(34,197,94,0.06)" : "";
 
-                return `<td class="matrix-cell" style="${hasBg};padding:0.5rem 0.375rem" title="${dept} | ${phase.name}: 작업 ${work.completed}/${work.total}, 승인 ${gate.status}">
-                  <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem">
-                    <!-- Work circle -->
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
-                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${hasWork ? "rgba(0,0,0,0.15)" : "var(--surface-3)"};border:2px solid ${workColor};font-size:0.6rem;color:${workColor};font-weight:700;font-family:'JetBrains Mono',monospace">${hasWork ? `${work.completed}/${work.total}` : "-"}</span>
-                      <span style="font-size:0.5rem;color:var(--slate-400)">작업</span>
-                    </div>
-                    <!-- Gate circle -->
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.125rem">
-                      <span style="display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:${gateInfo.bg};font-size:0.7rem;color:${gateInfo.color};font-weight:700">${gateInfo.symbol}</span>
-                      <span style="font-size:0.5rem;color:var(--slate-400)">승인</span>
-                    </div>
+                return `<td class="matrix-cell" style="${hasBg};padding:0.5rem 0.375rem" title="${dept} | ${phase.name}: ${work.completed}/${work.total}">
+                  <div style="display:flex;align-items:center;justify-content:center">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:50%;background:${hasWork ? "rgba(0,0,0,0.15)" : "var(--surface-3)"};border:2px solid ${workColor};font-size:0.6rem;color:${workColor};font-weight:700;font-family:'JetBrains Mono',monospace">${hasWork ? `${work.completed}/${work.total}` : "-"}</span>
                   </div>
                 </td>`;
               }).join("")}
@@ -1050,14 +1037,10 @@ function renderMatrix(filtered) {
 
       <!-- Legend -->
       <div class="flex items-center gap-4 p-4 text-xs text-soft flex-wrap" style="border-top:1px solid var(--surface-3)">
-        <span style="font-weight:600;color:var(--slate-300)">작업:</span>
         <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--success-400)"></span> 완료</span>
         <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--primary-400)"></span> 진행 중</span>
         <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--danger-400)"></span> 지연</span>
-        <span style="margin-left:0.5rem;font-weight:600;color:var(--slate-300)">승인:</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(34,197,94,0.15)"></span> ✓승인</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(245,158,11,0.15)"></span> ⏳대기</span>
-        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(239,68,68,0.15)"></span> ✗반려</span>
+        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--slate-500)"></span> 대기</span>
       </div>
     </div>
   `;
@@ -1232,7 +1215,7 @@ function bindControls() {
       const filtered = getFilteredProjects();
       const headers = ["이름", "유형", "PM", "상태", "진행률", "시작일", "종료일", "현재 단계"];
       const data = filtered.map((p) => [
-        p.name, p.projectType || "", p.pm || "", getProjectStatusLabel(p.status),
+        p.name, p.projectType || "", getProjectStatusLabel(p.status),
         (p.progress || 0) + "%", formatDate(p.startDate), formatDate(p.endDate),
         formatStageName(p.currentStage),
       ]);

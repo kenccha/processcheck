@@ -12,7 +12,11 @@ import {
   getTemplateStages, getTemplateDepartments, subscribeTemplateItems,
   subscribeAllTemplateItems,
   addTemplateItem, updateTemplateItem, deleteTemplateItem, reorderTemplateItems,
-  addTemplateStage, deleteTemplateStage, addTemplateDepartment, deleteTemplateDepartment
+  addTemplateStage, deleteTemplateStage, updateTemplateStage,
+  addTemplateDepartment, deleteTemplateDepartment, updateTemplateDepartment,
+  subscribeTemplateSubChecklist,
+  addTemplateSubChecklistItem, updateTemplateSubChecklistItem,
+  deleteTemplateSubChecklistItem,
 } from "../firestore-service.js";
 import { escapeHtml } from "../utils.js";
 
@@ -37,6 +41,13 @@ let activeItemUnsub = null;
 let allItemsUnsub = null;
 let modal = null; // null | {type, data}
 let dragState = { draggedId: null, overId: null };
+
+// Detail panel state
+let detailPanel = null; // null | { item }
+let detailSubItems = [];
+let detailSubUnsub = null;
+let detailEditingField = null; // null | field name being inline-edited
+let detailSubEditingId = null; // null | subItem id being edited
 
 // View mode: "matrix" | "tree" | "list" (기본값 matrix)
 let viewMode = "matrix";
@@ -144,6 +155,460 @@ function navigateToTreeCell(stageId, deptId) {
   subscribeToItems();
 }
 
+// --- Detail Panel Management -------------------------------------------------
+
+function openDetailPanel(item) {
+  if (detailSubUnsub) {
+    detailSubUnsub();
+    detailSubUnsub = null;
+  }
+  detailPanel = { item };
+  detailSubItems = [];
+  detailEditingField = null;
+  detailSubEditingId = null;
+
+  detailSubUnsub = subscribeTemplateSubChecklist(item.id, (subItems) => {
+    detailSubItems = subItems;
+    renderDetailPanel();
+  });
+
+  renderDetailPanel();
+}
+
+function closeDetailPanel() {
+  if (detailSubUnsub) {
+    detailSubUnsub();
+    detailSubUnsub = null;
+  }
+  detailPanel = null;
+  detailSubItems = [];
+  detailEditingField = null;
+  detailSubEditingId = null;
+
+  const panelEl = document.getElementById("detail-panel");
+  const overlayEl = document.getElementById("detail-overlay");
+  if (panelEl) panelEl.classList.remove("open");
+  if (overlayEl) overlayEl.classList.remove("visible");
+
+  setTimeout(() => {
+    const container = document.getElementById("detail-panel-container");
+    if (container) container.innerHTML = "";
+  }, 300);
+}
+
+function renderDetailPanel() {
+  let container = document.getElementById("detail-panel-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "detail-panel-container";
+    document.body.appendChild(container);
+  }
+
+  if (!detailPanel) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const { item } = detailPanel;
+  const stageName = getStageName(item.stageId);
+  const deptName = getDeptName(item.departmentId);
+
+  container.innerHTML = `
+    <div class="detail-overlay" id="detail-overlay"></div>
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-panel-header">
+        <div style="flex: 1; min-width: 0;">
+          <div class="flex items-center gap-2" style="margin-bottom: 0.25rem;">
+            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">${escapeHtml(stageName)}</span>
+            <span style="font-size: 0.6875rem; font-family: monospace; color: var(--slate-300); background: var(--surface-3); padding: 0.125rem 0.5rem; border-radius: 0.25rem;">${escapeHtml(deptName)}</span>
+            ${item.isRequired
+              ? `<span class="badge badge-primary" style="font-size: 0.625rem; padding: 0.0625rem 0.375rem;">필수</span>`
+              : `<span class="badge badge-neutral" style="font-size: 0.625rem; padding: 0.0625rem 0.375rem;">선택</span>`}
+          </div>
+          <h2 class="detail-panel-title" id="detail-content-display">${escapeHtml(item.content)}</h2>
+        </div>
+        <button class="detail-panel-close" id="detail-close-btn">${ICON_CLOSE}</button>
+      </div>
+
+      <div class="detail-panel-body">
+
+        <!-- 항목 내용 편집 -->
+        <div class="detail-section">
+          <div class="detail-section-label">항목 내용</div>
+          ${detailEditingField === "content"
+            ? `<div class="flex flex-col gap-2">
+                <textarea class="input-field detail-inline-textarea" id="detail-content-input" rows="2">${escapeHtml(item.content)}</textarea>
+                <div class="flex gap-2">
+                  <button class="btn-primary btn-xs" id="detail-content-save">저장</button>
+                  <button class="btn-secondary btn-xs" id="detail-content-cancel">취소</button>
+                </div>
+              </div>`
+            : `<div class="detail-editable-field" id="detail-content-edit-trigger">
+                <span style="color: var(--slate-200); font-size: 0.875rem;">${escapeHtml(item.content)}</span>
+                <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+              </div>`
+          }
+        </div>
+
+        <!-- 필수 여부 -->
+        <div class="detail-section">
+          <div class="detail-section-label">필수 항목</div>
+          <label class="flex items-center gap-2" style="cursor: pointer;">
+            <input type="checkbox" id="detail-required-toggle" ${item.isRequired ? "checked" : ""}
+                   style="accent-color: var(--primary-500); width: 1rem; height: 1rem; cursor: pointer;">
+            <span class="text-sm" style="color: var(--slate-300);">${item.isRequired ? "필수 항목입니다" : "선택 항목입니다"}</span>
+          </label>
+        </div>
+
+        <!-- 설명 -->
+        <div class="detail-section">
+          <div class="detail-section-label">설명 / 지침</div>
+          ${detailEditingField === "description"
+            ? `<div class="flex flex-col gap-2">
+                <textarea class="input-field detail-inline-textarea" id="detail-description-input" rows="4" placeholder="이 항목을 어떻게 수행할지 설명...">${escapeHtml(item.description || "")}</textarea>
+                <div class="flex gap-2">
+                  <button class="btn-primary btn-xs" id="detail-description-save">저장</button>
+                  <button class="btn-secondary btn-xs" id="detail-description-cancel">취소</button>
+                </div>
+              </div>`
+            : `<div class="detail-editable-field" id="detail-description-edit-trigger">
+                ${item.description
+                  ? `<span style="color: var(--slate-200); font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(item.description)}</span>`
+                  : `<span style="color: var(--slate-400); font-size: 0.875rem; font-style: italic;">설명 없음 — 클릭하여 추가</span>`
+                }
+                <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+              </div>`
+          }
+        </div>
+
+        <!-- 참고 문서 -->
+        <div class="detail-section">
+          <div class="detail-section-label">참고 문서 / 링크</div>
+          ${detailEditingField === "reference"
+            ? `<div class="flex flex-col gap-2">
+                <input type="text" class="input-field" id="detail-reference-input" placeholder="관련 표준, 규정, 문서 링크..." value="${escapeHtml(item.reference || "")}">
+                <div class="flex gap-2">
+                  <button class="btn-primary btn-xs" id="detail-reference-save">저장</button>
+                  <button class="btn-secondary btn-xs" id="detail-reference-cancel">취소</button>
+                </div>
+              </div>`
+            : `<div class="detail-editable-field" id="detail-reference-edit-trigger">
+                ${item.reference
+                  ? `<span style="color: var(--primary-400); font-size: 0.875rem;">${escapeHtml(item.reference)}</span>`
+                  : `<span style="color: var(--slate-400); font-size: 0.875rem; font-style: italic;">없음 — 클릭하여 추가</span>`
+                }
+                <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+              </div>`
+          }
+        </div>
+
+        <!-- 예상 소요일 + 산출물 유형 -->
+        <div class="flex gap-4">
+          <div class="detail-section" style="flex: 1;">
+            <div class="detail-section-label">예상 소요일</div>
+            ${detailEditingField === "estimatedDays"
+              ? `<div class="flex flex-col gap-2">
+                  <input type="number" class="input-field" id="detail-estimatedDays-input" min="0" placeholder="일수" value="${item.estimatedDays ?? ""}">
+                  <div class="flex gap-2">
+                    <button class="btn-primary btn-xs" id="detail-estimatedDays-save">저장</button>
+                    <button class="btn-secondary btn-xs" id="detail-estimatedDays-cancel">취소</button>
+                  </div>
+                </div>`
+              : `<div class="detail-editable-field" id="detail-estimatedDays-edit-trigger">
+                  ${item.estimatedDays != null
+                    ? `<span style="color: var(--slate-200); font-size: 0.875rem;">${item.estimatedDays}일</span>`
+                    : `<span style="color: var(--slate-400); font-size: 0.875rem; font-style: italic;">미설정</span>`
+                  }
+                  <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+                </div>`
+            }
+          </div>
+
+          <div class="detail-section" style="flex: 1;">
+            <div class="detail-section-label">산출물 유형</div>
+            ${detailEditingField === "outputType"
+              ? `<div class="flex flex-col gap-2">
+                  <input type="text" class="input-field" id="detail-outputType-input" placeholder="예: 보고서, 파일, 승인서..." value="${escapeHtml(item.outputType || "")}">
+                  <div class="flex gap-2">
+                    <button class="btn-primary btn-xs" id="detail-outputType-save">저장</button>
+                    <button class="btn-secondary btn-xs" id="detail-outputType-cancel">취소</button>
+                  </div>
+                </div>`
+              : `<div class="detail-editable-field" id="detail-outputType-edit-trigger">
+                  ${item.outputType
+                    ? `<span style="color: var(--slate-200); font-size: 0.875rem;">${escapeHtml(item.outputType)}</span>`
+                    : `<span style="color: var(--slate-400); font-size: 0.875rem; font-style: italic;">미설정</span>`
+                  }
+                  <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+                </div>`
+            }
+          </div>
+        </div>
+
+        <!-- 메모 -->
+        <div class="detail-section">
+          <div class="detail-section-label">메모 / 비고</div>
+          ${detailEditingField === "notes"
+            ? `<div class="flex flex-col gap-2">
+                <textarea class="input-field detail-inline-textarea" id="detail-notes-input" rows="3" placeholder="자유 형식 메모...">${escapeHtml(item.notes || "")}</textarea>
+                <div class="flex gap-2">
+                  <button class="btn-primary btn-xs" id="detail-notes-save">저장</button>
+                  <button class="btn-secondary btn-xs" id="detail-notes-cancel">취소</button>
+                </div>
+              </div>`
+            : `<div class="detail-editable-field" id="detail-notes-edit-trigger">
+                ${item.notes
+                  ? `<span style="color: var(--slate-200); font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(item.notes)}</span>`
+                  : `<span style="color: var(--slate-400); font-size: 0.875rem; font-style: italic;">없음 — 클릭하여 추가</span>`
+                }
+                <button class="detail-field-edit-btn">${ICON_EDIT}</button>
+              </div>`
+          }
+        </div>
+
+        <!-- 하위 체크리스트 -->
+        <div class="detail-section">
+          <div class="flex items-center justify-between" style="margin-bottom: 0.5rem;">
+            <div class="detail-section-label" style="margin-bottom: 0;">세부 체크리스트</div>
+            <button class="btn-ghost btn-xs" id="detail-sub-add-btn" style="color: var(--primary-400);">
+              ${ICON_PLUS} <span>항목 추가</span>
+            </button>
+          </div>
+
+          <div id="detail-sub-list" class="flex flex-col gap-1">
+            ${detailSubItems.length === 0
+              ? `<p style="color: var(--slate-400); font-size: 0.8125rem; font-style: italic; padding: 0.5rem 0;">세부 항목 없음</p>`
+              : detailSubItems.map(sub => `
+                  <div class="detail-sub-item" data-sub-id="${sub.id}">
+                    ${detailSubEditingId === sub.id
+                      ? `<div class="flex flex-col gap-2" style="flex: 1;">
+                          <input type="text" class="input-field" id="detail-sub-edit-input-${sub.id}" value="${escapeHtml(sub.content)}" style="font-size: 0.8125rem;">
+                          <div class="flex gap-2">
+                            <button class="btn-primary btn-xs detail-sub-edit-save" data-sub-id="${sub.id}">저장</button>
+                            <button class="btn-secondary btn-xs detail-sub-edit-cancel">취소</button>
+                          </div>
+                        </div>`
+                      : `<div class="flex items-center gap-2" style="flex: 1; min-width: 0;">
+                          <span style="color: var(--slate-300); flex-shrink: 0; line-height: 1;">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                          </span>
+                          <span style="color: var(--slate-200); font-size: 0.8125rem; flex: 1;">${escapeHtml(sub.content)}</span>
+                        </div>
+                        <div class="flex gap-1 detail-sub-actions">
+                          <button class="btn-ghost btn-xs detail-sub-edit-btn" data-sub-id="${sub.id}" style="padding: 0.125rem;">${ICON_EDIT}</button>
+                          <button class="btn-ghost btn-xs detail-sub-delete-btn" data-sub-id="${sub.id}" style="padding: 0.125rem; color: var(--danger-400);">${ICON_DELETE}</button>
+                        </div>`
+                    }
+                  </div>
+                `).join("")
+            }
+          </div>
+
+          <!-- 새 항목 추가 인라인 폼 -->
+          <div id="detail-sub-add-form" style="display: none; margin-top: 0.5rem;">
+            <div class="flex flex-col gap-2">
+              <input type="text" class="input-field" id="detail-sub-new-input" placeholder="세부 항목 내용..." style="font-size: 0.8125rem;">
+              <div class="flex gap-2">
+                <button class="btn-primary btn-xs" id="detail-sub-new-save">추가</button>
+                <button class="btn-secondary btn-xs" id="detail-sub-new-cancel">취소</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => {
+    const panelEl = document.getElementById("detail-panel");
+    const overlayEl = document.getElementById("detail-overlay");
+    if (panelEl) panelEl.classList.add("open");
+    if (overlayEl) overlayEl.classList.add("visible");
+    bindDetailPanelEvents();
+  });
+}
+
+function bindDetailPanelEvents() {
+  const closeBtn = document.getElementById("detail-close-btn");
+  if (closeBtn) closeBtn.addEventListener("click", closeDetailPanel);
+
+  const overlay = document.getElementById("detail-overlay");
+  if (overlay) overlay.addEventListener("click", closeDetailPanel);
+
+  // Required toggle
+  const requiredToggle = document.getElementById("detail-required-toggle");
+  if (requiredToggle) {
+    requiredToggle.addEventListener("change", async () => {
+      const newVal = requiredToggle.checked;
+      try {
+        await updateTemplateItem(detailPanel.item.id, { isRequired: newVal, lastModifiedBy: user.name });
+        detailPanel = { item: { ...detailPanel.item, isRequired: newVal } };
+        renderDetailPanel();
+      } catch (err) {
+        console.error("Update required error:", err);
+        showToast("error", "수정 중 오류가 발생했습니다.");
+      }
+    });
+  }
+
+  // Field edit triggers
+  const fieldEditTriggers = ["content", "description", "reference", "estimatedDays", "outputType", "notes"];
+  for (const field of fieldEditTriggers) {
+    const trigger = document.getElementById(`detail-${field}-edit-trigger`);
+    if (trigger) {
+      trigger.addEventListener("click", (e) => {
+        if (e.target.closest(".detail-field-edit-btn") || e.target === trigger || trigger.contains(e.target)) {
+          detailEditingField = field;
+          renderDetailPanel();
+          requestAnimationFrame(() => {
+            const input = document.getElementById(`detail-${field}-input`);
+            if (input) { input.focus(); if (input.select) input.select(); }
+          });
+        }
+      });
+    }
+
+    const saveBtn = document.getElementById(`detail-${field}-save`);
+    if (saveBtn) {
+      saveBtn.addEventListener("click", async () => {
+        const inputEl = document.getElementById(`detail-${field}-input`);
+        if (!inputEl) return;
+        const raw = inputEl.value;
+        const val = field === "estimatedDays" ? (raw === "" ? null : parseInt(raw, 10)) : raw.trim();
+        try {
+          await updateTemplateItem(detailPanel.item.id, { [field]: val, lastModifiedBy: user.name });
+          detailPanel = { item: { ...detailPanel.item, [field]: val } };
+          detailEditingField = null;
+          renderDetailPanel();
+        } catch (err) {
+          console.error(`Update ${field} error:`, err);
+          showToast("error", "수정 중 오류가 발생했습니다.");
+        }
+      });
+    }
+
+    const cancelBtn = document.getElementById(`detail-${field}-cancel`);
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", () => {
+        detailEditingField = null;
+        renderDetailPanel();
+      });
+    }
+  }
+
+  // Sub-checklist: show add form
+  const subAddBtn = document.getElementById("detail-sub-add-btn");
+  if (subAddBtn) {
+    subAddBtn.addEventListener("click", () => {
+      const form = document.getElementById("detail-sub-add-form");
+      if (form) {
+        form.style.display = "block";
+        const input = document.getElementById("detail-sub-new-input");
+        if (input) input.focus();
+      }
+    });
+  }
+
+  // Sub-checklist: save new item
+  const subNewSave = document.getElementById("detail-sub-new-save");
+  if (subNewSave) {
+    subNewSave.addEventListener("click", async () => {
+      const input = document.getElementById("detail-sub-new-input");
+      const content = input ? input.value.trim() : "";
+      if (!content) return;
+      try {
+        await addTemplateSubChecklistItem(detailPanel.item.id, { content, createdBy: user.name });
+        if (input) input.value = "";
+        const form = document.getElementById("detail-sub-add-form");
+        if (form) form.style.display = "none";
+      } catch (err) {
+        console.error("Add sub item error:", err);
+        showToast("error", "항목 추가 중 오류가 발생했습니다.");
+      }
+    });
+  }
+
+  // Sub-checklist: cancel new item
+  const subNewCancel = document.getElementById("detail-sub-new-cancel");
+  if (subNewCancel) {
+    subNewCancel.addEventListener("click", () => {
+      const form = document.getElementById("detail-sub-add-form");
+      if (form) form.style.display = "none";
+      const input = document.getElementById("detail-sub-new-input");
+      if (input) input.value = "";
+    });
+  }
+
+  // Sub-checklist: enter key on new input
+  const subNewInput = document.getElementById("detail-sub-new-input");
+  if (subNewInput) {
+    subNewInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); subNewSave && subNewSave.click(); }
+      if (e.key === "Escape") { subNewCancel && subNewCancel.click(); }
+    });
+  }
+
+  // Sub-checklist: edit buttons
+  document.querySelectorAll(".detail-sub-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      detailSubEditingId = btn.dataset.subId;
+      renderDetailPanel();
+      requestAnimationFrame(() => {
+        const input = document.getElementById(`detail-sub-edit-input-${detailSubEditingId}`);
+        if (input) { input.focus(); input.select(); }
+      });
+    });
+  });
+
+  // Sub-checklist: save edit
+  document.querySelectorAll(".detail-sub-edit-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const subId = btn.dataset.subId;
+      const input = document.getElementById(`detail-sub-edit-input-${subId}`);
+      const content = input ? input.value.trim() : "";
+      if (!content) return;
+      try {
+        await updateTemplateSubChecklistItem(detailPanel.item.id, subId, { content });
+        detailSubEditingId = null;
+      } catch (err) {
+        console.error("Update sub item error:", err);
+        showToast("error", "수정 중 오류가 발생했습니다.");
+      }
+    });
+  });
+
+  // Sub-checklist: cancel edit
+  document.querySelectorAll(".detail-sub-edit-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      detailSubEditingId = null;
+      renderDetailPanel();
+    });
+  });
+
+  // Sub-checklist: delete buttons
+  document.querySelectorAll(".detail-sub-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const subId = btn.dataset.subId;
+      try {
+        await deleteTemplateSubChecklistItem(detailPanel.item.id, subId);
+      } catch (err) {
+        console.error("Delete sub item error:", err);
+        showToast("error", "삭제 중 오류가 발생했습니다.");
+      }
+    });
+  });
+
+  // Escape to close panel
+  const escHandler = (e) => {
+    if (e.key === "Escape" && detailPanel) {
+      closeDetailPanel();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+}
+
 // --- Modal Management --------------------------------------------------------
 
 function openModal(type, data = {}) {
@@ -208,13 +673,14 @@ async function handleDeleteItem(itemId) {
   }
 }
 
-async function handleAddStage(name, workStageName, gateStageName) {
+async function handleAddStage(name) {
   if (!name.trim()) return;
+  const trimmed = name.trim();
   try {
     await addTemplateStage({
-      name: name.trim(),
-      workStageName: workStageName.trim(),
-      gateStageName: gateStageName.trim(),
+      name: trimmed,
+      workStageName: `${trimmed}검토`,
+      gateStageName: `${trimmed}승인`,
       createdBy: user.name,
     });
     stages = await getTemplateStages();
@@ -240,6 +706,37 @@ async function handleDeleteStage(stageId) {
   } catch (err) {
     console.error("Delete stage error:", err);
     showToast('error', "단계 삭제 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleEditStage(stageId, name) {
+  if (!name.trim()) return;
+  const trimmed = name.trim();
+  try {
+    await updateTemplateStage(stageId, {
+      name: trimmed,
+      workStageName: `${trimmed}검토`,
+      gateStageName: `${trimmed}승인`,
+    });
+    stages = await getTemplateStages();
+    closeModal();
+    showToast('success', '단계 이름이 수정되었습니다.');
+  } catch (err) {
+    console.error("Edit stage error:", err);
+    showToast('error', "단계 수정 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleEditDept(deptId, name) {
+  if (!name.trim()) return;
+  try {
+    await updateTemplateDepartment(deptId, { name: name.trim() });
+    departments = await getTemplateDepartments();
+    closeModal();
+    showToast('success', '부서 이름이 수정되었습니다.');
+  } catch (err) {
+    console.error("Edit dept error:", err);
+    showToast('error', "부서 수정 중 오류가 발생했습니다.");
   }
 }
 
@@ -532,6 +1029,10 @@ function renderTreeView(selectedStage, selectedDept) {
                         ${escapeHtml(stage.workStageName || "")} / ${escapeHtml(stage.gateStageName || "")}
                       </div>
                     </div>
+                    <button class="btn-ghost btn-xs stage-edit-btn" data-stage-edit-id="${stage.id}" title="단계 편집"
+                            style="padding: 0.25rem; color: var(--slate-400); flex-shrink: 0;">
+                      ${ICON_EDIT}
+                    </button>
                     <button class="btn-ghost btn-xs stage-delete-btn" data-stage-delete-id="${stage.id}" title="단계 삭제"
                             style="padding: 0.25rem; color: var(--slate-400); flex-shrink: 0;">
                       ${ICON_DELETE}
@@ -561,6 +1062,10 @@ function renderTreeView(selectedStage, selectedDept) {
                 <span>부서 추가</span>
               </button>
               ${selectedDeptId ? `
+                <button class="btn-ghost btn-xs" id="btn-edit-dept" data-dept-edit-id="${selectedDeptId}"
+                        title="현재 부서 편집" style="color: var(--primary-400);">
+                  ${ICON_EDIT}
+                </button>
                 <button class="btn-ghost btn-xs" id="btn-delete-dept" data-dept-delete-id="${selectedDeptId}"
                         title="현재 부서 삭제" style="color: var(--danger-400);">
                   ${ICON_DELETE}
@@ -610,7 +1115,7 @@ function renderTreeView(selectedStage, selectedDept) {
                     <span class="drag-handle" title="드래그하여 순서 변경">
                       ${ICON_DRAG}
                     </span>
-                    <div style="flex: 1; min-width: 0;">
+                    <div class="item-content-trigger" data-open-detail-id="${item.id}" style="flex: 1; min-width: 0; cursor: pointer;">
                       <div class="flex items-center gap-2">
                         <span class="text-sm" style="color: var(--slate-200);">${escapeHtml(item.content)}</span>
                         ${item.isRequired
@@ -618,12 +1123,14 @@ function renderTreeView(selectedStage, selectedDept) {
                           : `<span class="badge badge-neutral" style="font-size: 0.625rem; padding: 0.0625rem 0.375rem;">선택</span>`
                         }
                       </div>
+                      ${(item.description || item.subCount > 0)
+                        ? `<div class="text-xs text-dim" style="margin-top: 0.125rem;">
+                            ${item.description ? `<span>${escapeHtml(item.description.slice(0, 60))}${item.description.length > 60 ? "…" : ""}</span>` : ""}
+                          </div>`
+                        : ""
+                      }
                     </div>
                     <div class="flex items-center gap-1" style="flex-shrink: 0;">
-                      <button class="btn-ghost btn-xs item-edit-btn" data-edit-item-id="${item.id}" title="항목 수정"
-                              style="padding: 0.25rem;">
-                        ${ICON_EDIT}
-                      </button>
                       <button class="btn-ghost btn-xs item-delete-btn" data-delete-item-id="${item.id}" title="항목 삭제"
                               style="padding: 0.25rem; color: var(--danger-400);">
                         ${ICON_DELETE}
@@ -853,8 +1360,12 @@ function renderModal() {
       return renderItemModal("항목 수정", modal.data.content || "", modal.data.isRequired || false, modal.data.id);
     case "addStage":
       return renderStageModal();
+    case "editStage":
+      return renderStageModal(modal.data);
     case "addDept":
       return renderDeptModal();
+    case "editDept":
+      return renderDeptModal(modal.data);
     default:
       return "";
   }
@@ -890,56 +1401,49 @@ function renderItemModal(title, content, isRequired, itemId = null) {
   `;
 }
 
-function renderStageModal() {
+function renderStageModal(editStage) {
+  const isEdit = !!editStage;
   return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">페이즈 추가</span>
+          <span class="modal-title">${isEdit ? "페이즈 편집" : "페이즈 추가"}</span>
           <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
         </div>
         <div class="modal-body">
-          <div class="flex flex-col gap-4">
-            <div>
-              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">페이즈 이름</label>
-              <input type="text" class="input-field" id="modal-stage-name" placeholder="예: 사후관리">
-            </div>
-            <div>
-              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">작업 단계명</label>
-              <input type="text" class="input-field" id="modal-stage-work-name" placeholder="예: 사후관리검토">
-            </div>
-            <div>
-              <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">승인 단계명</label>
-              <input type="text" class="input-field" id="modal-stage-gate-name" placeholder="예: 사후관리승인">
-            </div>
+          <div>
+            <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">페이즈 이름</label>
+            <input type="text" class="input-field" id="modal-stage-name" placeholder="예: 사후관리" value="${isEdit ? escapeHtml(editStage.name) : ""}">
+            <p class="text-xs text-dim" style="margin-top: 0.375rem;">작업 단계명: <strong>[이름]검토</strong>, 승인 단계명: <strong>[이름]승인</strong> 자동 생성</p>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
-          <button class="btn-primary btn-sm" id="modal-save-stage-btn">저장</button>
+          <button class="btn-primary btn-sm" id="modal-save-stage-btn" data-stage-edit-id="${isEdit ? editStage.id : ""}">저장</button>
         </div>
       </div>
     </div>
   `;
 }
 
-function renderDeptModal() {
+function renderDeptModal(editDept) {
+  const isEdit = !!editDept;
   return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">부서 추가</span>
+          <span class="modal-title">${isEdit ? "부서 편집" : "부서 추가"}</span>
           <button class="modal-close" id="modal-close-btn">${ICON_CLOSE}</button>
         </div>
         <div class="modal-body">
           <div>
             <label class="text-sm font-medium" style="color: var(--slate-300); display: block; margin-bottom: 0.375rem;">부서 이름</label>
-            <input type="text" class="input-field" id="modal-dept-name" placeholder="예: 마케팅팀">
+            <input type="text" class="input-field" id="modal-dept-name" placeholder="예: 마케팅팀" value="${isEdit ? escapeHtml(editDept.name) : ""}">
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary btn-sm" id="modal-cancel-btn">취소</button>
-          <button class="btn-primary btn-sm" id="modal-save-dept-btn">저장</button>
+          <button class="btn-primary btn-sm" id="modal-save-dept-btn" data-dept-edit-id="${isEdit ? editDept.id : ""}">저장</button>
         </div>
       </div>
     </div>
@@ -980,7 +1484,7 @@ function bindTreeEvents() {
   app.querySelectorAll(".stage-item").forEach(el => {
     el.addEventListener("click", (e) => {
       // Don't select stage when clicking delete button
-      if (e.target.closest(".stage-delete-btn")) return;
+      if (e.target.closest(".stage-delete-btn") || e.target.closest(".stage-edit-btn")) return;
       selectStage(el.dataset.stageId);
     });
     el.addEventListener("mouseenter", () => {
@@ -992,6 +1496,15 @@ function bindTreeEvents() {
       if (el.dataset.stageId !== selectedStageId) {
         el.style.background = "";
       }
+    });
+  });
+
+  // Stage edit buttons
+  app.querySelectorAll(".stage-edit-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const stage = stages.find(s => s.id === btn.dataset.stageEditId);
+      if (stage) openModal("editStage", stage);
     });
   });
 
@@ -1022,6 +1535,15 @@ function bindTreeEvents() {
     addDeptBtn.addEventListener("click", () => openModal("addDept"));
   }
 
+  // Edit dept button
+  const editDeptBtn = app.querySelector("#btn-edit-dept");
+  if (editDeptBtn) {
+    editDeptBtn.addEventListener("click", () => {
+      const dept = departments.find(d => d.id === editDeptBtn.dataset.deptEditId);
+      if (dept) openModal("editDept", dept);
+    });
+  }
+
   // Delete dept button
   const deleteDeptBtn = app.querySelector("#btn-delete-dept");
   if (deleteDeptBtn) {
@@ -1036,13 +1558,13 @@ function bindTreeEvents() {
     addItemBtn.addEventListener("click", () => openModal("addItem"));
   }
 
-  // Item edit buttons
-  app.querySelectorAll(".item-edit-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
+  // Item content click → open detail panel
+  app.querySelectorAll(".item-content-trigger").forEach(el => {
+    el.addEventListener("click", (e) => {
       e.stopPropagation();
-      const itemId = btn.dataset.editItemId;
+      const itemId = el.dataset.openDetailId;
       const item = items.find(it => it.id === itemId);
-      if (item) openModal("editItem", item);
+      if (item) openDetailPanel(item);
     });
   });
 
@@ -1245,45 +1767,47 @@ function bindModalEvents() {
     });
   }
 
-  // Save stage button
+  // Save stage button (add or edit)
   const saveStageBtn = app.querySelector("#modal-save-stage-btn");
   if (saveStageBtn) {
     saveStageBtn.addEventListener("click", () => {
       const nameEl = app.querySelector("#modal-stage-name");
-      const workNameEl = app.querySelector("#modal-stage-work-name");
-      const gateNameEl = app.querySelector("#modal-stage-gate-name");
       const name = nameEl ? nameEl.value : "";
-      const workStageName = workNameEl ? workNameEl.value : "";
-      const gateStageName = gateNameEl ? gateNameEl.value : "";
-      handleAddStage(name, workStageName, gateStageName);
+      const editId = saveStageBtn.dataset.stageEditId;
+      if (editId) {
+        handleEditStage(editId, name);
+      } else {
+        handleAddStage(name);
+      }
     });
   }
 
-  // Save dept button
+  // Save dept button (add or edit)
   const saveDeptBtn = app.querySelector("#modal-save-dept-btn");
   if (saveDeptBtn) {
     saveDeptBtn.addEventListener("click", () => {
       const nameEl = app.querySelector("#modal-dept-name");
       const name = nameEl ? nameEl.value : "";
-      handleAddDept(name);
+      const editId = saveDeptBtn.dataset.deptEditId;
+      if (editId) {
+        handleEditDept(editId, name);
+      } else {
+        handleAddDept(name);
+      }
     });
   }
 
   // Enter key handlers for modal inputs
   const stageNameInput = app.querySelector("#modal-stage-name");
-  const stageWorkNameInput = app.querySelector("#modal-stage-work-name");
-  const stageGateNameInput = app.querySelector("#modal-stage-gate-name");
-  [stageNameInput, stageWorkNameInput, stageGateNameInput].forEach(input => {
-    if (input) {
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          const btn = app.querySelector("#modal-save-stage-btn");
-          if (btn) btn.click();
-        }
-      });
-    }
-  });
+  if (stageNameInput) {
+    stageNameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = app.querySelector("#modal-save-stage-btn");
+        if (btn) btn.click();
+      }
+    });
+  }
 
   const deptNameInput = app.querySelector("#modal-dept-name");
   if (deptNameInput) {
@@ -1313,6 +1837,7 @@ function bindModalEvents() {
 window.addEventListener("beforeunload", () => {
   if (activeItemUnsub) activeItemUnsub();
   if (allItemsUnsub) allItemsUnsub();
+  if (detailSubUnsub) detailSubUnsub();
   unsubscribers.forEach(fn => typeof fn === "function" && fn());
 });
 

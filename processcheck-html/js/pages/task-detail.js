@@ -148,12 +148,7 @@ function handleFileUpload(files) {
 }
 
 function getApprovalBadge(t) {
-  if (!t) return "";
-  if (t.approvalStatus === "approved") return `<span class="badge badge-success">승인됨</span>`;
-  if (t.approvalStatus === "rejected") return `<span class="badge badge-danger">반려됨</span>`;
-  if (t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")) {
-    return `<span class="badge badge-warning">승인 대기</span>`;
-  }
+  // 승인 절차 제거됨
   return "";
 }
 
@@ -166,16 +161,12 @@ function isGateStage(stageName) {
 }
 
 function canApprove() {
-  if (!task || task.status !== "completed" || (task.approvalStatus && task.approvalStatus !== "pending")) {
-    return false;
-  }
-  // 모든 승인은 기획조정실(observer)만 수행
-  // 매니저는 작업 배분만 담당
-  return user.role === "observer";
+  // 승인 절차 제거됨
+  return false;
 }
 
 function canRestart() {
-  return user.role === "worker" && task && task.status === "rejected";
+  return false;
 }
 
 function allRequiredChecked() {
@@ -269,16 +260,6 @@ function render() {
           </div>
         </div>
 
-        ${task.approvalStatus === "rejected" && task.rejectionReason ? `
-          <div style="margin-top:1.25rem;padding:1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-lg)">
-            <div class="flex items-center gap-2 mb-2">
-              <span style="color:var(--danger-400)">${ICONS.x}</span>
-              <span class="text-sm font-semibold" style="color:var(--danger-400)">반려 사유</span>
-            </div>
-            <p class="text-sm" style="color:var(--danger-300);line-height:1.5">${escapeHtml(task.rejectionReason)}</p>
-            ${task.rejectedBy ? `<p class="text-xs text-dim mt-2">반려자: ${escapeHtml(task.rejectedBy)}</p>` : ""}
-          </div>
-        ` : ""}
       </div>
 
       <!-- Two-Column Layout -->
@@ -457,60 +438,14 @@ function renderActionSection() {
     `;
   }
 
-  // Manager: approve / reject
-  if (_canApprove) {
-    return `
-      <button class="btn-primary w-full" id="approve-task-btn" ${actionLoading ? "disabled" : ""}>
-        ${actionLoading ? ICONS.spinner : ICONS.checkCircle}
-        <span>승인</span>
-      </button>
-      <textarea class="input-field" id="rejection-reason-input" placeholder="반려 사유를 입력하세요..." rows="2"></textarea>
-      <button class="btn-danger w-full" id="reject-task-btn" ${actionLoading ? "disabled" : ""}>
-        ${ICONS.x}
-        <span>반려</span>
-      </button>
-    `;
-  }
-
-  // Approved state
-  if (task.approvalStatus === "approved") {
+  // Completed state
+  if (task.status === "completed") {
     return `
       <div class="flex items-center justify-center gap-2 p-4" style="color:var(--success-400)">
         ${ICONS.checkCircle}
-        <span class="text-sm font-semibold">승인 완료</span>
+        <span class="text-sm font-semibold">처리 완료</span>
       </div>
-      ${task.approvedBy ? `<p class="text-xs text-dim text-center">승인자: ${escapeHtml(task.approvedBy)}</p>` : ""}
-    `;
-  }
-
-  // Waiting for approval
-  if (task.status === "completed" && (!task.approvalStatus || task.approvalStatus === "pending")) {
-    return `
-      <div class="flex items-center justify-center gap-2 p-4" style="color:var(--warning-400)">
-        ${ICONS.spinner}
-        <span class="text-sm font-semibold">승인 대기 중</span>
-      </div>
-      <div class="text-xs text-dim text-center" style="margin-top:0.25rem">
-        ${task.reviewer ? `검토자: ${escapeHtml(task.reviewer)}` : ""}
-        ${task.completedDate ? ` · 완료일: ${formatDate(task.completedDate)}` : ""}
-      </div>
-    `;
-  }
-
-  // Rejected — worker can restart
-  if (task.approvalStatus === "rejected") {
-    return `
-      <div class="flex items-center justify-center gap-2 p-4" style="color:var(--danger-400)">
-        ${ICONS.x}
-        <span class="text-sm font-semibold">반려됨</span>
-      </div>
-      ${task.rejectedBy ? `<p class="text-xs text-dim text-center">반려자: ${escapeHtml(task.rejectedBy)}</p>` : ""}
-      ${canRestart() ? `
-        <button class="btn-primary w-full mt-3" id="restart-task-btn" ${actionLoading ? "disabled" : ""}>
-          ${actionLoading ? ICONS.spinner : ICONS.checkCircle}
-          <span>재작업 시작</span>
-        </button>
-      ` : ""}
+      ${task.completedDate ? `<p class="text-xs text-dim text-center">완료일: ${formatDate(task.completedDate)}</p>` : ""}
     `;
   }
 
@@ -550,19 +485,6 @@ function renderTimeline() {
       date: task.completedDate || null,
       active: task.status === "completed" || task.status === "rejected",
       completed: task.status === "completed" || task.status === "rejected",
-    },
-    {
-      label: task.approvalStatus === "approved" ? `승인 완료${task.approvedBy ? ` (${task.approvedBy})` : ""}` : "승인 완료",
-      date: task.approvedAt || null,
-      active: task.approvalStatus === "approved",
-      completed: task.approvalStatus === "approved",
-    },
-    {
-      label: task.approvalStatus === "rejected" ? `반려됨${task.rejectedBy ? ` (${task.rejectedBy})` : ""}` : "반려됨",
-      date: task.rejectedAt || null,
-      active: task.approvalStatus === "rejected",
-      completed: false,
-      isDanger: true,
     },
   ];
 

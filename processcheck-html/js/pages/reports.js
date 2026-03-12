@@ -119,7 +119,7 @@ function getPhaseStages(phaseName) {
 }
 
 function isOverdue(task) {
-  if (task.status === "completed" && task.approvalStatus === "approved") return false;
+  if (task.status === "completed") return false;
   if (!task.dueDate) return false;
   const d = task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate);
   const now = new Date();
@@ -129,7 +129,7 @@ function isOverdue(task) {
 }
 
 function isCompleted(task) {
-  return task.status === "completed" || task.approvalStatus === "approved";
+  return task.status === "completed";
 }
 
 function getWeekLabel(weekStart, weekEnd) {
@@ -144,7 +144,6 @@ function computeProjectProgress() {
     .map((p) => ({
       id: p.id,
       name: p.name,
-      pm: p.pm || "-",
       progress: p.progress || 0,
       riskLevel: p.riskLevel || "green",
       currentStage: p.currentStage || "-",
@@ -156,9 +155,9 @@ function computeProjectProgress() {
 
 function exportProjectProgressCSV() {
   const data = computeProjectProgress();
-  const header = toCSVRow(["프로젝트명", "PM", "진행률(%)", "중요도", "현재 단계", "시작일", "종료일"]);
+  const header = toCSVRow(["프로젝트명", "진행률(%)", "중요도", "현재 단계", "시작일", "종료일"]);
   const rows = data.map((d) =>
-    toCSVRow([d.name, d.pm, d.progress, getRiskLabel(d.riskLevel), d.currentStage, formatDate(d.startDate), formatDate(d.endDate)])
+    toCSVRow([d.name, d.progress, getRiskLabel(d.riskLevel), d.currentStage, formatDate(d.startDate), formatDate(d.endDate)])
   );
   downloadCSV([header, ...rows].join("\n"), "프로젝트현황_" + new Date().toISOString().slice(0, 10) + ".csv");
 }
@@ -533,7 +532,7 @@ function renderCharts(trendMode) {
               afterBody: (items) => {
                 const idx = items[0].dataIndex;
                 const p = projectData[idx];
-                return [`PM: ${p.pm}`, `중요도: ${getRiskLabel(p.riskLevel)}`, `단계: ${p.currentStage}`];
+                return [`중요도: ${getRiskLabel(p.riskLevel)}`, `단계: ${p.currentStage}`];
               },
             },
           },
