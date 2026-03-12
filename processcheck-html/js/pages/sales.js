@@ -4,7 +4,7 @@
 // + 오늘의 브리핑, 담당자별 워크로드, 일괄 상태 변경, 완료 예측, 거래처 응답 강화
 // =============================================================================
 
-import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
+import { initTheme, renderNav, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
 import { guardPage, getUser, logout } from "../auth.js";
 import { showToast } from "../ui/toast.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
@@ -141,7 +141,7 @@ let unsubItems = null;
 let unsubCustomers = null;
 
 function init() {
-  renderSalesNav(navRoot);
+  renderNav(navRoot);
   app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
   unsubProjects = subscribeProjects((data) => {
