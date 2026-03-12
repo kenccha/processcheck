@@ -20,8 +20,10 @@
 
   const MAIN_NAV = [
     { href: "projects.html?type=신규개발", label: "출시위원회" },
+    { href: "projects.html?type=설계변경", label: "설계변경" },
     { href: "admin-checklists.html", label: "체크리스트" },
     { href: null, label: "리뷰", isDropdown: true, children: [...SUB_PAGES, { href: "manual.html", label: "매뉴얼", icon: "📖 " }, { href: "admin-users.html", label: "사용자 관리", icon: "👥" }, { href: "admin-permissions.html", label: "권한 설정", icon: "🔐" }] },
+    { href: null, label: "다른 사이트", isDropdown: true, isExternal: true, isSeparated: true, children: [{ href: "sales.html", label: "영업 출시 준비", icon: "📊" }, { href: "customers.html", label: "고객 관리", icon: "👥" }] },
   ];
 
   const currentFile = location.pathname.split("/").pop();

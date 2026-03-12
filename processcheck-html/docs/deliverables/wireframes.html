@@ -426,8 +426,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         </div>
         <div class="w-nav-links">
           <span class="w-nav-link">출시위원회</span>
+          <span class="w-nav-link">설계변경</span>
           <span class="w-nav-link">체크리스트</span>
           <span class="w-nav-link">리뷰 ▾</span>
+          <span class="w-nav-separator"></span>
+          <span class="w-nav-link w-nav-link-secondary">다른 사이트 ▾</span>
         </div>
         <div class="w-nav-right">
           <div class="w-theme-btn" title="다크모드 토글">&#9789;</div>
@@ -548,10 +551,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
   <div class="annotations">
     <h4>어노테이션</h4>
     <div class="annotation-list">
-      <div class="annotation-item"><span class="annotation-num">1</span> <code>components.js:renderNavigation()</code> — 글로벌 네비게이션 바: PC 로고(클릭→대시보드), 3개 메뉴(출시위원회/체크리스트/리뷰▾ 드롭다운), 다크모드 토글(☾), 홈 아이콘(🏠), 알림 벨(🔔+미읽음 빨간 점), 사용자 이름, 로그아웃. 리뷰 드롭다운: 전체 화면 설계/업무 흐름/시스템 구조/피드백 모아보기/매뉴얼/사용자 관리(observer만)</div>
+      <div class="annotation-item"><span class="annotation-num">1</span> <code>components.js:renderNavigation()</code> — 글로벌 네비게이션 바: PC 로고(클릭→대시보드), 5개 메뉴(출시위원회/설계변경/체크리스트/리뷰▾ 드롭다운 | 다른 사이트▾ 드롭다운), 다크모드 토글(☾), 홈 아이콘(🏠), 알림 벨(🔔+미읽음 빨간 점), 사용자 이름, 로그아웃. 리뷰 드롭다운: 전체 화면 설계/업무 흐름/시스템 구조/피드백 모아보기/매뉴얼/사용자 관리. 다른 사이트 드롭다운: 영업 출시 준비(↗)/고객 관리(↗)</div>
       <div class="annotation-item"><span class="annotation-num">2</span> <code>dashboard.js:renderGreeting()</code> — 인사 헤더: "이름님" + 역할 배지 + 부서명. 우측에 마감 초과/오늘/이번주 카운트</div>
       <div class="annotation-item"><span class="annotation-num">3</span> <code>.stat-card</code> — 통계 카드 5개 (모두 클릭→해당 탭 전환): 작업대기/승인대기/마감초과/프로젝트(외부→projects.html)/알림</div>
-      <div class="annotation-item"><span class="annotation-num">4</span> <code>.tab-btn[data-tab]</code> — 4개 탭: 프로젝트(기본) / 작업(카운트) / 승인 대기(카운트) / 알림(미읽음 카운트)</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> <code>.tab-btn[data-tab]</code> — 3개 탭: 프로젝트(기본) / 작업(카운트) / 알림(미읽음 카운트)</div>
       <div class="annotation-item"><span class="annotation-num">5</span> <code>.dash-project-card</code> — 프로젝트 카드: D-Day(큰 글씨) + 현재Phase 뱃지 + 지연 사유 1줄 요약. <code>getActivePhaseGroups()</code>로 동적 Phase</div>
       <div class="annotation-item"><span class="annotation-num">6</span> <code>.task-row</code> — 작업 행: 마감 상태 도트(빨강=초과/노랑=임박/회색=여유) + 작업명 + 상태 배지 + 부서 + D-day. 클릭→<code>task.html?id=</code></div>
       <div class="annotation-item"><span class="annotation-num">7</span> "더 보기" 버튼 (10건 단위 페이징)</div>
@@ -580,7 +583,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="w-nav">
         <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
         <div class="w-nav-links">
-          <span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span>
+          <span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span><span class="w-nav-separator"></span><span class="w-nav-link w-nav-link-secondary">다른 사이트 ▾</span>
         </div>
         <div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
       </div>
@@ -804,7 +807,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="browser-url">processcheck.example.com/project.html?id=proj-001</div>
     </div>
     <div class="browser-content">
-      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">이영희</span><span class="w-logout">로그아웃</span></div></div>
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span><span class="w-nav-separator"></span><span class="w-nav-link w-nav-link-secondary">다른 사이트 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">이영희</span><span class="w-logout">로그아웃</span></div></div>
 
       <div class="w-body">
         <!-- Project Header -->
@@ -946,7 +949,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="browser-url">processcheck.example.com/task.html?projectId=proj-001&amp;taskId=task-042</div>
     </div>
     <div class="browser-content">
-      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span><span class="w-nav-separator"></span><span class="w-nav-link w-nav-link-secondary">다른 사이트 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
 
       <div class="w-body">
         <!-- Breadcrumb -->
@@ -1222,7 +1225,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <!-- Nav (logged in or minimal) -->
       <div class="w-nav">
         <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
-        <div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link active">리뷰 ▾</span></div>
+        <div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link active">리뷰 ▾</span><span class="w-nav-separator"></span><span class="w-nav-link w-nav-link-secondary">다른 사이트 ▾</span></div>
         <div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
       </div>
 
