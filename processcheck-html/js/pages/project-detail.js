@@ -18,6 +18,7 @@ import {
   updateChecklistItemStatus,
   getTemplateStages,
   getTemplateDepartments,
+  applyTemplateToProject,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { renderSkeletonCards, renderSkeletonStats } from "../ui/skeleton.js";
@@ -711,11 +712,19 @@ function renderListView() {
 }
 
 function renderEmptyState() {
+  const hasAnyTasks = checklistItems.length > 0;
+  const applyBtn = !hasAnyTasks ? `
+    <button id="apply-template-btn" class="btn btn-primary" style="margin-top:1rem">
+      📋 템플릿에서 체크리스트 생성
+    </button>
+    <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--slate-400)">체크리스트 관리에서 등록한 템플릿 항목을 이 프로젝트에 적용합니다</p>
+  ` : "";
   return `
     <div class="card">
       <div class="empty-state" style="padding:3rem;">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        <span class="empty-state-text">해당하는 작업이 없습니다</span>
+        <span class="empty-state-text">${hasAnyTasks ? "해당하는 작업이 없습니다" : "체크리스트 항목이 없습니다"}</span>
+        ${applyBtn}
       </div>
     </div>
   `;
@@ -1092,6 +1101,10 @@ function bindEvents() {
   const openModalBtn = app.querySelector("#open-add-modal-btn");
   if (openModalBtn) openModalBtn.addEventListener("click", showAddTaskModal);
 
+  // Apply template button
+  const applyTemplateBtn = app.querySelector("#apply-template-btn");
+  if (applyTemplateBtn) applyTemplateBtn.addEventListener("click", handleApplyTemplate);
+
   // Clear filter
   const clearBtn = app.querySelector("#clear-filter-btn");
   if (clearBtn) clearBtn.addEventListener("click", () => {
@@ -1438,6 +1451,26 @@ function getSmartAssigneeSuggestions(department) {
     const overdue = tasks.filter(t => { if (t.status === "completed") return false; const d = daysUntil(t.dueDate); return d !== null && d < 0; }).length;
     return { name: u.name, active, overdue, score: active + overdue * 2 };
   }).sort((a, b) => a.score - b.score);
+}
+
+async function handleApplyTemplate() {
+  if (!await confirmModal("템플릿 항목을 이 프로젝트의 체크리스트로 생성하시겠습니까?")) return;
+  const btn = app.querySelector("#apply-template-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "생성 중..."; }
+  try {
+    const projectType = project?.projectType || "신규개발";
+    const changeScale = project?.changeScale || "major";
+    const count = await applyTemplateToProject(projectId, projectType, changeScale);
+    if (count > 0) {
+      showToast("success", `${count}개 체크리스트 항목이 생성되었습니다.`);
+    } else {
+      showToast("warning", "생성할 템플릿 항목이 없거나 이미 적용되었습니다.");
+    }
+  } catch (err) {
+    console.error("템플릿 적용 오류:", err);
+    showToast("error", "템플릿 적용 실패: " + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = "📋 템플릿에서 체크리스트 생성"; }
+  }
 }
 
 async function handleQuickAdd() {
