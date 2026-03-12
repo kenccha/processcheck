@@ -40,3 +40,10 @@ next-env.d.ts
 
 # backup
 *.backup
+
+# IDE
+.vscode/
+
+# Firebase
+firebase-debug.log
+processcheck-html/.firebase/
