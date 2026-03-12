@@ -19,6 +19,7 @@ import {
   fallbackLoadNotifications,
   loadDashboardActiveTasks,
   loadDashboardPendingApprovals,
+  getTemplateStages,
 } from "../firestore-service.js";
 import {
   getStatusLabel,
@@ -52,6 +53,17 @@ const navUnsub = renderNav(document.getElementById("nav-root"));
 let allProjects = [];
 let allTasks = [];
 let notifications = [];
+
+// Dynamic phase groups
+let dynamicPhaseGroups = [];
+function getActivePhaseGroups() {
+  return dynamicPhaseGroups.length > 0 ? dynamicPhaseGroups : PHASE_GROUPS;
+}
+getTemplateStages().then((stages) => {
+  dynamicPhaseGroups = stages.map(s => ({
+    id: s.id, name: s.name, workStage: s.workStageName, gateStage: s.gateStageName,
+  }));
+}).catch(() => {});
 
 // Derived state
 let projectCards = []; // enriched project data
@@ -221,7 +233,7 @@ function computeDerived() {
 
     // Current phase: first phase with incomplete tasks
     let currentPhase = null;
-    for (const pg of PHASE_GROUPS) {
+    for (const pg of getActivePhaseGroups()) {
       const phaseTasks = projectTasks.filter(
         (t) => t.stage === pg.workStage || t.stage === pg.gateStage
       );

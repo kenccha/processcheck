@@ -16,6 +16,8 @@ import {
   getUsers,
   createChecklistItem,
   updateChecklistItemStatus,
+  getTemplateStages,
+  getTemplateDepartments,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { renderSkeletonCards, renderSkeletonStats } from "../ui/skeleton.js";
@@ -66,6 +68,7 @@ let selectedTaskIds = new Set();
 let allUsers = [];
 let activityLogs = [];
 let checklistView = "phase"; // phase | timeline | department | board | list
+let dynamicPhaseGroups = []; // Firestore templateStages 기반 동적 phase
 
 // --- Render nav ---
 if (navRoot) renderNav(navRoot, "project.html", user);
@@ -73,8 +76,17 @@ if (navRoot) renderNav(navRoot, "project.html", user);
 // --- Loading ---
 if (app) app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
-// --- Load users ---
+// --- Load users + template stages ---
 getUsers().then((u) => { allUsers = u; }).catch(() => {});
+getTemplateStages().then((stages) => {
+  dynamicPhaseGroups = stages.map(s => ({
+    id: s.id,
+    name: s.name,
+    workStage: s.workStageName,
+    gateStage: s.gateStageName,
+  }));
+  render();
+}).catch(() => {});
 
 // --- Subscribe ---
 let unsubProject = null;
@@ -100,6 +112,16 @@ subscribeActivityLogs("project", projectId, (logs) => {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+// 동적 phase groups (Firestore templateStages 우선, 없으면 하드코딩 PHASE_GROUPS 폴백)
+function getActivePhaseGroups() {
+  return dynamicPhaseGroups.length > 0 ? dynamicPhaseGroups : PHASE_GROUPS;
+}
+
+// 해당 phase의 gate stage 목록 (동적)
+function getActiveGateStages() {
+  return getActivePhaseGroups().map(p => p.gateStage);
+}
 
 const WORK_TO_GATE_MAP = {
   "발의검토": "발의승인", "기획검토": "기획승인", "WM제작": "WM승인회",
@@ -132,7 +154,7 @@ function getMatrixCellData(stageName, dept) {
 }
 
 function getPhaseGateStatus(phaseName) {
-  const phase = PHASE_GROUPS.find(p => p.name === phaseName);
+  const phase = getActivePhaseGroups().find(p => p.name === phaseName);
   if (!phase) return "none";
   const gateTasks = checklistItems.filter(t => t.stage === phase.gateStage);
   if (gateTasks.length === 0) return "none";
@@ -143,7 +165,7 @@ function getPhaseGateStatus(phaseName) {
 }
 
 function getPhaseWorkProgress(phaseName) {
-  const phase = PHASE_GROUPS.find(p => p.name === phaseName);
+  const phase = getActivePhaseGroups().find(p => p.name === phaseName);
   if (!phase) return { total: 0, completed: 0, inProgress: 0, pending: 0, overdue: 0 };
   const tasks = checklistItems.filter(t => t.stage === phase.workStage);
   return {
@@ -178,7 +200,8 @@ function render() {
   }
 
   // Phase 완료 상태를 체크리스트 데이터에서 직접 계산
-  const phaseStatuses = PHASE_GROUPS.map(ph => {
+  const activePhases = getActivePhaseGroups();
+  const phaseStatuses = activePhases.map(ph => {
     const phaseTasks = checklistItems.filter(
       t => t.stage === ph.workStage || t.stage === ph.gateStage
     );
@@ -196,7 +219,7 @@ function render() {
 
   // phaseIndex = 첫 번째 미완료 phase (기존 로직과 호환)
   let phaseIndex = phaseStatuses.findIndex(s => s !== "completed");
-  if (phaseIndex === -1) phaseIndex = PHASE_GROUPS.length; // 전부 완료
+  if (phaseIndex === -1) phaseIndex = activePhases.length; // 전부 완료
 
   // Compute stats
   const totalTasks = checklistItems.length;
@@ -246,7 +269,8 @@ function render() {
 
 function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks, approvalPending) {
   const p = project;
-  const currentPhaseName = phaseIndex >= 0 ? PHASE_GROUPS[phaseIndex].name : formatStageName(p.currentStage);
+  const activePhases = getActivePhaseGroups();
+  const currentPhaseName = phaseIndex >= 0 && phaseIndex < activePhases.length ? activePhases[phaseIndex].name : formatStageName(p.currentStage);
 
   // D-day
   const endDate = p.endDate ? new Date(p.endDate) : null;
@@ -304,7 +328,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
 
           <!-- Phase pipeline (체크리스트 데이터 기반) -->
           <div style="display:flex;align-items:center;gap:0.25rem;flex-wrap:wrap;margin-top:0.375rem;">
-            ${PHASE_GROUPS.map((ph, idx) => {
+            ${activePhases.map((ph, idx) => {
               const st = phaseStatuses[idx];
               const phaseTasks = checklistItems.filter(t => t.stage === ph.workStage || t.stage === ph.gateStage);
               const doneTasks = phaseTasks.filter(t => t.status === "completed" && t.approvalStatus === "approved").length;
@@ -316,7 +340,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
               const countLabel = totalPh > 0 ? ` ${doneTasks}/${totalPh}` : "";
               return `<div style="display:flex;align-items:center;gap:0.2rem;">
                 <span style="padding:0.2rem 0.5rem;border-radius:var(--radius-lg);background:${bg};color:${tc};font-size:0.65rem;font-weight:600;white-space:nowrap;cursor:pointer;" data-phase-click="${idx}">${isCompleted ? "✔ " : isCurrent ? "▶ " : ""}${ph.name}${countLabel}</span>
-                ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-400);font-size:0.6rem;">→</span>' : ""}
+                ${idx < activePhases.length - 1 ? '<span style="color:var(--slate-400);font-size:0.6rem;">→</span>' : ""}
               </div>`;
             }).join("")}
           </div>
@@ -373,7 +397,7 @@ function renderWorkTab() {
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
       <select class="input-field" style="width:auto;min-width:140px;font-size:0.8rem;" id="filter-stage">
         <option value="">전체 단계</option>
-        ${PHASE_GROUPS.map(phase => `<option value="${phase.name}" ${selectedStage === phase.name ? "selected" : ""}>${phase.name}</option>`).join("")}
+        ${getActivePhaseGroups().map(phase => `<option value="${phase.name}" ${selectedStage === phase.name ? "selected" : ""}>${phase.name}</option>`).join("")}
       </select>
       <select class="input-field" style="width:auto;min-width:130px;font-size:0.8rem;" id="filter-dept">
         <option value="">전체 부서</option>
@@ -427,7 +451,7 @@ function renderChecklist() {
 function getFilteredTasks() {
   let filtered = [...checklistItems];
   if (selectedStage) {
-    const phase = PHASE_GROUPS.find(p => p.name === selectedStage);
+    const phase = getActivePhaseGroups().find(p => p.name === selectedStage);
     if (phase) {
       filtered = filtered.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
     }
@@ -486,13 +510,14 @@ function renderPhaseView() {
   if (filtered.length === 0) return renderEmptyState();
 
   // Find the first phase with incomplete tasks (active phase)
-  const activePhaseIdx = PHASE_GROUPS.findIndex(phase => {
+  const phases = getActivePhaseGroups();
+  const activePhaseIdx = phases.findIndex(phase => {
     const phaseTasks = checklistItems.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
     if (phaseTasks.length === 0) return false;
     return phaseTasks.some(t => t.status !== "completed" || (t.approvalStatus && t.approvalStatus !== "approved"));
   });
 
-  return PHASE_GROUPS.map((phase, idx) => {
+  return phases.map((phase, idx) => {
     const phaseTasks = filtered.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
     if (phaseTasks.length === 0) return "";
 
@@ -507,7 +532,7 @@ function renderPhaseView() {
     };
     const banner = gateBannerMap[gateStatus];
 
-    const workTasks = phaseTasks.filter(t => !GATE_STAGES.includes(t.stage));
+    const workTasks = phaseTasks.filter(t => !getActiveGateStages().includes(t.stage));
     const completed = workTasks.filter(t => t.status === "completed").length;
     const isActive = idx === activePhaseIdx;
 
@@ -790,7 +815,7 @@ function renderScheduleTab() {
 
       <!-- Gantt rows -->
       <div style="position:relative;">
-        ${PHASE_GROUPS.map((phase, idx) => {
+        ${getActivePhaseGroups().map((phase, idx) => {
           const progress = getPhaseWorkProgress(phase.name);
           const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
           const startPct = (idx * phaseDuration / totalDays) * 100;
@@ -857,7 +882,7 @@ function renderScheduleTab() {
             </tr>
           </thead>
           <tbody>
-            ${PHASE_GROUPS.map(phase => {
+            ${getActivePhaseGroups().map(phase => {
               const prog = getPhaseWorkProgress(phase.name);
               const gs = getPhaseGateStatus(phase.name);
               const gsLabel = { approved: "✓ 승인", rejected: "✗ 반려", pending: "⏳ 대기", not_reached: "— 미도달", none: "-" }[gs];
@@ -888,7 +913,7 @@ function renderScheduleTab() {
 function renderBottleneckTab() {
   // Phase × Department heatmap data
   const heatmapData = {};
-  for (const phase of PHASE_GROUPS) {
+  for (const phase of getActivePhaseGroups()) {
     heatmapData[phase.name] = {};
     for (const dept of departments) {
       const tasks = checklistItems.filter(t =>
@@ -929,17 +954,17 @@ function renderBottleneckTab() {
           <thead>
             <tr>
               <th style="min-width:80px;">부서</th>
-              ${PHASE_GROUPS.map(p => `<th style="min-width:60px;text-align:center;">${p.name}</th>`).join("")}
+              ${getActivePhaseGroups().map(p => `<th style="min-width:60px;text-align:center;">${p.name}</th>`).join("")}
             </tr>
           </thead>
           <tbody>
             ${departments.map(dept => {
-              const hasAnyTasks = PHASE_GROUPS.some(p => heatmapData[p.name][dept].total > 0);
+              const hasAnyTasks = getActivePhaseGroups().some(p => heatmapData[p.name][dept].total > 0);
               if (!hasAnyTasks) return "";
               return `
                 <tr>
                   <td style="font-weight:500;color:var(--slate-300);white-space:nowrap;">${escapeHtml(dept)}</td>
-                  ${PHASE_GROUPS.map(p => {
+                  ${getActivePhaseGroups().map(p => {
                     const cell = heatmapData[p.name][dept];
                     if (cell.total === 0) return `<td style="text-align:center;color:var(--slate-400);">—</td>`;
                     const bg = cell.overdue > 0 ? "rgba(239,68,68,0.2)" :
@@ -964,10 +989,10 @@ function renderBottleneckTab() {
     <div class="card p-5 mb-4">
       <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin-bottom:0.75rem;">Phase 파이프라인</h3>
       <div style="display:flex;gap:0.375rem;align-items:flex-end;height:120px;">
-        ${PHASE_GROUPS.map(phase => {
+        ${getActivePhaseGroups().map(phase => {
           const prog = getPhaseWorkProgress(phase.name);
           const pct = prog.total > 0 ? Math.round(prog.completed / prog.total * 100) : 0;
-          const barHeight = Math.max(20, (prog.total / Math.max(1, ...PHASE_GROUPS.map(p => getPhaseWorkProgress(p.name).total))) * 100);
+          const barHeight = Math.max(20, (prog.total / Math.max(1, ...getActivePhaseGroups().map(p => getPhaseWorkProgress(p.name).total))) * 100);
           const fillColor = prog.overdue > 0 ? "var(--danger-400)" : pct === 100 ? "var(--success-400)" : "var(--primary-400)";
           return `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
@@ -1042,7 +1067,7 @@ function bindEvents() {
   app.querySelectorAll("[data-phase-click]").forEach(span => {
     span.addEventListener("click", () => {
       const idx = parseInt(span.dataset.phaseClick);
-      const pg = PHASE_GROUPS[idx];
+      const pg = getActivePhaseGroups()[idx];
       if (pg) {
         activeTab = "work";
         selectedStage = pg.name;
@@ -1245,7 +1270,7 @@ function bindEvents() {
       }).length;
       const approvalPending = checklistItems.filter(t => t.status === "completed" && (!t.approvalStatus || t.approvalStatus === "pending")).length;
 
-      const phaseRows = PHASE_GROUPS.map(pg => {
+      const phaseRows = getActivePhaseGroups().map(pg => {
         const pTasks = checklistItems.filter(t => t.stage === pg.workStage || t.stage === pg.gateStage);
         const pDone = pTasks.filter(t => t.status === "completed" && t.approvalStatus === "approved").length;
         return `<tr><td>${escapeHtml(pg.name)}</td><td>${pDone}</td><td>${pTasks.length}</td><td>${pTasks.length > 0 ? Math.round(pDone / pTasks.length * 100) : 0}%</td></tr>`;
@@ -1369,7 +1394,8 @@ function updateBulkBar() {
 // ─── Quick Add Task (NLP Parsing + Smart Assignee) ──────────────────────────
 
 function parseQuickInput(text) {
-  const result = { title: "", assignee: "", department: "", importance: "green", dueDate: null, stage: PHASE_GROUPS[0].workStage };
+  const phases = getActivePhaseGroups();
+  const result = { title: "", assignee: "", department: "", importance: "green", dueDate: null, stage: phases.length > 0 ? phases[0].workStage : "" };
   let remaining = text;
 
   const mentionMatch = remaining.match(/@([\uAC00-\uD7A3a-zA-Z]{2,10})/);
@@ -1396,7 +1422,7 @@ function parseQuickInput(text) {
 
   const stageKeywords = { "발의": 0, "기획": 1, "WM": 2, "wm": 2, "Tx": 3, "tx": 3, "MSG": 4, "msg": 4, "양산": 5, "이관": 5 };
   for (const [kw, idx] of Object.entries(stageKeywords)) {
-    if (remaining.includes(kw)) { result.stage = PHASE_GROUPS[idx].workStage; break; }
+    if (remaining.includes(kw) && phases[idx]) { result.stage = phases[idx].workStage; break; }
   }
 
   result.title = remaining.trim();
@@ -1459,7 +1485,7 @@ function showAddTaskModal() {
           <div>
             <label class="form-label">단계</label>
             <select id="modal-task-stage" class="input-field">
-              ${PHASE_GROUPS.map(p => `<option value="${p.workStage}">${p.name} (작업)</option><option value="${p.gateStage}">${p.name} (승인)</option>`).join("")}
+              ${getActivePhaseGroups().map(p => `<option value="${p.workStage}">${p.name} (작업)</option><option value="${p.gateStage}">${p.name} (승인)</option>`).join("")}
             </select>
           </div>
           <div>

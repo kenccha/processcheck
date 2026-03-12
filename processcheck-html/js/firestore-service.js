@@ -1421,6 +1421,11 @@ export async function reorderTemplateItems(items) {
 export async function addTemplateStage(data) {
   // data: { name, workStageName, gateStageName, createdBy }
   const stagesSnap = await getDocs(collection(db, "templateStages"));
+  // 중복 이름 체크
+  const exists = stagesSnap.docs.some(d => d.data().name === data.name);
+  if (exists) {
+    throw new Error(`이미 존재하는 단계입니다: "${data.name}"`);
+  }
   const maxOrder = stagesSnap.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
   const ref = await addDoc(collection(db, "templateStages"), {
     name: data.name,
@@ -1446,6 +1451,11 @@ export async function deleteTemplateStage(stageId) {
 
 export async function addTemplateDepartment(data) {
   const deptsSnap = await getDocs(collection(db, "templateDepartments"));
+  // 중복 이름 체크
+  const exists = deptsSnap.docs.some(d => d.data().name === data.name);
+  if (exists) {
+    throw new Error(`이미 존재하는 부서입니다: "${data.name}"`);
+  }
   const maxOrder = deptsSnap.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
   const ref = await addDoc(collection(db, "templateDepartments"), {
     ...data,
@@ -1495,12 +1505,15 @@ export async function applyTemplateToProject(projectId, projectType, changeScale
   const allItems = allItemsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
 
   // 2) 설계변경 시 허용 phase 필터
-  const MINOR_PHASES = ["phase0", "phase3", "phase5"]; // 발의, Tx, 양산/이관
+  // minor: 첫 번째, 4번째, 6번째 단계만 (발의, Tx, 양산/이관 해당)
+  const minorStageIds = stages.length >= 6
+    ? [stages[0]?.id, stages[3]?.id, stages[5]?.id].filter(Boolean)
+    : stages.map(s => s.id); // 6개 미만이면 전부 허용
 
   let filteredItems;
   if (projectType === "설계변경") {
     if (changeScale === "minor") {
-      filteredItems = allItems.filter(ti => ti.isRequired && MINOR_PHASES.includes(ti.stageId));
+      filteredItems = allItems.filter(ti => ti.isRequired && minorStageIds.includes(ti.stageId));
     } else if (changeScale === "medium") {
       filteredItems = allItems.filter(ti => ti.isRequired);
     } else {
@@ -1508,7 +1521,7 @@ export async function applyTemplateToProject(projectId, projectType, changeScale
       filteredItems = allItems;
     }
   } else {
-    // 신규개발: 전체 193개
+    // 신규개발: 전체
     filteredItems = allItems;
   }
 

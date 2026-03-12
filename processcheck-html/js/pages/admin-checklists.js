@@ -221,7 +221,7 @@ async function handleAddStage(name, workStageName, gateStageName) {
     closeModal();
   } catch (err) {
     console.error("Add stage error:", err);
-    showToast('error', "단계 추가 중 오류가 발생했습니다.");
+    showToast('error', err.message?.includes('이미 존재') ? err.message : "단계 추가 중 오류가 발생했습니다.");
   }
 }
 
@@ -251,7 +251,7 @@ async function handleAddDept(name) {
     closeModal();
   } catch (err) {
     console.error("Add dept error:", err);
-    showToast('error', "부서 추가 중 오류가 발생했습니다.");
+    showToast('error', err.message?.includes('이미 존재') ? err.message : "부서 추가 중 오류가 발생했습니다.");
   }
 }
 

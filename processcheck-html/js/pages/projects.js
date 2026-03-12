@@ -7,7 +7,7 @@ import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
 initTheme();
-import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject } from "../firestore-service.js";
+import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject, getTemplateStages } from "../firestore-service.js";
 import {
   departments,
   projectStages,
@@ -54,6 +54,18 @@ let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth(); // 0-based
 let sortField = (_savedProj && _savedProj.sortField) || "startDate";
 let sortDir = (_savedProj && _savedProj.sortDir) || "desc";
+
+// -- Dynamic phase groups (Firestore templateStages 우선, 없으면 하드코딩 PHASE_GROUPS 폴백)
+let dynamicPhaseGroups = [];
+function getActivePhaseGroups() {
+  return dynamicPhaseGroups.length > 0 ? dynamicPhaseGroups : PHASE_GROUPS;
+}
+getTemplateStages().then((stages) => {
+  dynamicPhaseGroups = stages.map(s => ({
+    id: s.id, name: s.name, workStage: s.workStageName, gateStage: s.gateStageName,
+  }));
+  render();
+}).catch(() => {});
 
 // -- Initial skeleton --
 if (app) app.innerHTML = `<div class="container">${renderSkeletonTable(8, 5)}</div>`;
@@ -937,7 +949,7 @@ function renderMatrix(filtered) {
   const matrix = {};
   for (const dept of departments) {
     matrix[dept] = {};
-    for (const phase of PHASE_GROUPS) {
+    for (const phase of getActivePhaseGroups()) {
       matrix[dept][phase.name] = {
         work: { total: 0, completed: 0, inProgress: 0, delayed: 0 },
         gate: { status: "none" }, // none | pending | approved | rejected
@@ -949,7 +961,7 @@ function renderMatrix(filtered) {
     const dept = t.department;
     if (!matrix[dept]) continue;
     // Find which phase this task belongs to
-    for (const phase of PHASE_GROUPS) {
+    for (const phase of getActivePhaseGroups()) {
       if (t.stage === phase.workStage) {
         matrix[dept][phase.name].work.total++;
         if (t.status === "completed") matrix[dept][phase.name].work.completed++;
@@ -1001,14 +1013,14 @@ function renderMatrix(filtered) {
         <thead>
           <tr>
             <th style="min-width:100px">부서 / 페이즈</th>
-            ${PHASE_GROUPS.map(phase => `<th style="min-width:100px">${phase.name}</th>`).join("")}
+            ${getActivePhaseGroups().map(phase => `<th style="min-width:100px">${phase.name}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
           ${departments.map(dept => `
             <tr>
               <td>${escapeHtml(dept)}</td>
-              ${PHASE_GROUPS.map(phase => {
+              ${getActivePhaseGroups().map(phase => {
                 const cell = matrix[dept][phase.name];
                 const work = cell.work;
                 const gate = cell.gate;
