@@ -175,9 +175,26 @@ function render() {
     return;
   }
 
-  const phaseIndex = PHASE_GROUPS.findIndex(
-    (ph) => ph.workStage === project.currentStage || ph.gateStage === project.currentStage
-  );
+  // Phase 완료 상태를 체크리스트 데이터에서 직접 계산
+  const phaseStatuses = PHASE_GROUPS.map(ph => {
+    const phaseTasks = checklistItems.filter(
+      t => t.stage === ph.workStage || t.stage === ph.gateStage
+    );
+    if (phaseTasks.length === 0) return "empty";
+    const allDone = phaseTasks.every(
+      t => t.status === "completed" && t.approvalStatus === "approved"
+    );
+    if (allDone) return "completed";
+    const anyActive = phaseTasks.some(
+      t => t.status === "in_progress" || t.status === "completed"
+    );
+    if (anyActive) return "active";
+    return "pending";
+  });
+
+  // phaseIndex = 첫 번째 미완료 phase (기존 로직과 호환)
+  let phaseIndex = phaseStatuses.findIndex(s => s !== "completed");
+  if (phaseIndex === -1) phaseIndex = PHASE_GROUPS.length; // 전부 완료
 
   // Compute stats
   const totalTasks = checklistItems.length;
@@ -283,15 +300,20 @@ function renderProjectHeader(phaseIndex, totalTasks, overdueTasks, approvalPendi
             </div>
           `}
 
-          <!-- Phase pipeline -->
+          <!-- Phase pipeline (체크리스트 데이터 기반) -->
           <div style="display:flex;align-items:center;gap:0.25rem;flex-wrap:wrap;margin-top:0.375rem;">
             ${PHASE_GROUPS.map((ph, idx) => {
-              const isCompleted = idx < phaseIndex;
-              const isCurrent = idx === phaseIndex;
+              const st = phaseStatuses[idx];
+              const phaseTasks = checklistItems.filter(t => t.stage === ph.workStage || t.stage === ph.gateStage);
+              const doneTasks = phaseTasks.filter(t => t.status === "completed" && t.approvalStatus === "approved").length;
+              const totalPh = phaseTasks.length;
+              const isCompleted = st === "completed";
+              const isCurrent = st === "active";
               const bg = isCompleted ? "var(--success-500)" : isCurrent ? "var(--primary-500)" : "var(--surface-4)";
               const tc = isCompleted || isCurrent ? "white" : "var(--slate-400)";
+              const countLabel = totalPh > 0 ? ` ${doneTasks}/${totalPh}` : "";
               return `<div style="display:flex;align-items:center;gap:0.2rem;">
-                <span style="padding:0.2rem 0.5rem;border-radius:var(--radius-lg);background:${bg};color:${tc};font-size:0.65rem;font-weight:600;white-space:nowrap;">${isCompleted ? "✔ " : isCurrent ? "▶ " : ""}${ph.name}</span>
+                <span style="padding:0.2rem 0.5rem;border-radius:var(--radius-lg);background:${bg};color:${tc};font-size:0.65rem;font-weight:600;white-space:nowrap;cursor:pointer;" data-phase-click="${idx}">${isCompleted ? "✔ " : isCurrent ? "▶ " : ""}${ph.name}${countLabel}</span>
                 ${idx < PHASE_GROUPS.length - 1 ? '<span style="color:var(--slate-400);font-size:0.6rem;">→</span>' : ""}
               </div>`;
             }).join("")}
@@ -977,6 +999,19 @@ function bindEvents() {
       activeTab = btn.dataset.tab;
       checklistFilter = "";
       render();
+    });
+  });
+
+  // Phase pipeline click → filter to that phase
+  app.querySelectorAll("[data-phase-click]").forEach(span => {
+    span.addEventListener("click", () => {
+      const idx = parseInt(span.dataset.phaseClick);
+      const pg = PHASE_GROUPS[idx];
+      if (pg) {
+        activeTab = "work";
+        selectedStage = pg.name;
+        render();
+      }
     });
   });
 
