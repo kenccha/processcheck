@@ -18,6 +18,8 @@ import {
   updateChecklistItemStatus,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
+import { renderSkeletonCards, renderSkeletonStats } from "../ui/skeleton.js";
+import { initSortable, guardRender } from "../ui/dnd.js";
 import {
   departments,
   projectStages,
@@ -69,7 +71,7 @@ let checklistView = "phase"; // phase | timeline | department | board | list
 if (navRoot) renderNav(navRoot, "project.html", user);
 
 // --- Loading ---
-if (app) app.innerHTML = renderSpinner();
+if (app) app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
 // --- Load users ---
 getUsers().then((u) => { allUsers = u; }).catch(() => {});
@@ -606,27 +608,61 @@ function renderBoardView() {
     { key: "completed", label: "완료", color: "var(--success-400)" },
   ];
 
+  // Get unique departments for swimlanes
+  const deptSet = new Set(filtered.map(t => t.department).filter(Boolean));
+  const deptList = [...deptSet].sort();
+
+  function sortByUrgency(tasks) {
+    return tasks.slice().sort((a, b) => {
+      const aUrgent = a.importance === "red" ? 0 : a.importance === "yellow" ? 1 : 2;
+      const bUrgent = b.importance === "red" ? 0 : b.importance === "yellow" ? 1 : 2;
+      return aUrgent - bUrgent;
+    });
+  }
+
+  function renderKanbanCard(t) {
+    const isUrgent = t.importance === "red";
+    const urgentBorder = isUrgent ? "border-left:3px solid var(--danger-400);" : "";
+    return `
+      <div class="card-hover pd-task-row kanban-card" data-task-id="${t.id}" data-status="${t.status}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;${urgentBorder}">
+        ${isUrgent ? '<span style="font-size:0.55rem;color:var(--danger-400);font-weight:700;">긴급</span>' : ''}
+        <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);margin-bottom:0.25rem;">${escapeHtml(t.title)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.6rem;color:var(--slate-400);">${escapeHtml(t.assignee || "미배정")}</span>
+          <select class="inline-status-select kanban-status-select" data-task-id="${t.id}" style="font-size:0.6rem;padding:0.1rem 0.25rem;border-radius:var(--radius-md);background:var(--surface-3);color:var(--text-secondary);border:1px solid var(--surface-4);cursor:pointer;">
+            <option value="pending" ${t.status === "pending" ? "selected" : ""}>대기</option>
+            <option value="in_progress" ${t.status === "in_progress" ? "selected" : ""}>진행</option>
+            <option value="completed" ${t.status === "completed" ? "selected" : ""}>완료</option>
+          </select>
+        </div>
+      </div>`;
+  }
+
   return `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;">
-      ${cols.map(col => {
-        const tasks = filtered.filter(t => t.status === col.key);
+    <div>
+      ${deptList.map(dept => {
+        const deptTasks = filtered.filter(t => t.department === dept);
+        if (deptTasks.length === 0) return "";
         return `
-          <div class="card" style="min-height:200px;">
-            <div style="padding:0.5rem 0.75rem;border-bottom:2px solid ${col.color};display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:0.75rem;font-weight:600;color:${col.color};">${col.label}</span>
-              <span style="font-size:0.65rem;color:var(--slate-400);">${tasks.length}</span>
+          <div style="margin-bottom:1rem;">
+            <div style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);padding:0.375rem 0;border-bottom:1px solid var(--surface-3);margin-bottom:0.5rem;">${escapeHtml(dept)} (${deptTasks.length})</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;">
+              ${cols.map(col => {
+                const tasks = sortByUrgency(deptTasks.filter(t => t.status === col.key));
+                return `
+                  <div class="card" style="min-height:80px;">
+                    <div style="padding:0.375rem 0.5rem;border-bottom:2px solid ${col.color};display:flex;justify-content:space-between;align-items:center;">
+                      <span style="font-size:0.65rem;font-weight:600;color:${col.color};">${col.label}</span>
+                      <span style="font-size:0.6rem;color:var(--slate-400);">${tasks.length}</span>
+                    </div>
+                    <div class="kanban-col" data-kanban-status="${col.key}" data-kanban-dept="${dept}" style="max-height:40vh;overflow-y:auto;min-height:40px;">
+                      ${tasks.length === 0 ? '<div style="padding:1rem;text-align:center;font-size:0.6rem;color:var(--slate-400);">—</div>' :
+                        tasks.map(t => renderKanbanCard(t)).join("")}
+                    </div>
+                  </div>`;
+              }).join("")}
             </div>
-            <div style="max-height:50vh;overflow-y:auto;">
-              ${tasks.length === 0 ? '<div style="padding:2rem;text-align:center;font-size:0.7rem;color:var(--slate-400);">없음</div>' :
-                tasks.map(t => `
-                  <div class="card-hover pd-task-row" data-task-id="${t.id}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;">
-                    <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);margin-bottom:0.25rem;">${escapeHtml(t.title)}</div>
-                    <div style="font-size:0.6rem;color:var(--slate-400);">${escapeHtml(t.department)} · ${escapeHtml(t.assignee || "-")}</div>
-                  </div>
-                `).join("")}
-            </div>
-          </div>
-        `;
+          </div>`;
       }).join("")}
     </div>
   `;
@@ -1062,6 +1098,44 @@ function bindEvents() {
       }
     });
   });
+
+  // Kanban inline status change
+  app.querySelectorAll(".kanban-status-select").forEach(sel => {
+    sel.addEventListener("change", async (e) => {
+      e.stopPropagation();
+      const itemId = sel.dataset.taskId;
+      const newStatus = sel.value;
+      try {
+        await updateChecklistItemStatus(itemId, newStatus);
+        showToast("success", `상태가 변경되었습니다.`);
+      } catch (err) {
+        showToast("error", "상태 변경에 실패했습니다.");
+      }
+    });
+    sel.addEventListener("click", (e) => e.stopPropagation());
+  });
+
+  // Initialize SortableJS on kanban columns
+  if (checklistView === "board") {
+    app.querySelectorAll(".kanban-col").forEach(col => {
+      initSortable(col, {
+        group: "kanban",
+        onEnd: async (evt) => {
+          const taskId = evt.item?.dataset?.taskId;
+          const newStatus = evt.to?.dataset?.kanbanStatus;
+          if (taskId && newStatus) {
+            try {
+              await updateChecklistItemStatus(taskId, newStatus);
+              showToast("success", "상태가 변경되었습니다.");
+            } catch (err) {
+              showToast("error", "상태 변경에 실패했습니다.");
+              render();
+            }
+          }
+        },
+      });
+    });
+  }
 
   // Task click → peek panel (UXA-05) on middle area, full navigate on chevron
   app.querySelectorAll("[data-task-id]").forEach(el => {

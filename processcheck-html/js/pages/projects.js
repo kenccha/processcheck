@@ -24,6 +24,7 @@ import {
   exportToCSV,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
+import { renderSkeletonTable } from "../ui/skeleton.js";
 
 // -- Guard --
 const user = guardPage();
@@ -53,6 +54,9 @@ let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth(); // 0-based
 let sortField = (_savedProj && _savedProj.sortField) || "startDate";
 let sortDir = (_savedProj && _savedProj.sortDir) || "desc";
+
+// -- Initial skeleton --
+if (app) app.innerHTML = `<div class="container">${renderSkeletonTable(8, 5)}</div>`;
 
 // -- Subscriptions --
 const unsubProjects = subscribeProjects((data) => {

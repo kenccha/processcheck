@@ -7,6 +7,7 @@
 import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
 import { guardPage, getUser, logout } from "../auth.js";
 import { showToast } from "../ui/toast.js";
+import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
 import {
   subscribeAllLaunchChecklists,
   subscribeProjects,
@@ -137,7 +138,7 @@ let unsubItems = null;
 
 function init() {
   renderSalesNav(navRoot);
-  app.innerHTML = renderSpinner("출시 준비 데이터 로딩 중...");
+  app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
   unsubProjects = subscribeProjects((data) => {
     console.log("[Sales] projects received:", data.length);

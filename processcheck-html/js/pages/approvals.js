@@ -5,12 +5,14 @@ initTheme();
 import { subscribeAllChecklistItems, subscribeProjects, approveTask, rejectTask } from '../firestore-service.js';
 import { escapeHtml, formatDate, formatStageName } from '../utils.js';
 import { showToast } from '../ui/toast.js';
+import { renderSkeletonTable } from '../ui/skeleton.js';
 
 const user = guardPage();
 if (!user) throw new Error('Not authenticated');
 
 renderNav(document.getElementById('nav-root'));
 const app = document.getElementById('app');
+if (app) app.innerHTML = `<div class="container">${renderSkeletonTable(6, 4)}</div>`;
 
 let allTasks = [];
 let allProjects = [];

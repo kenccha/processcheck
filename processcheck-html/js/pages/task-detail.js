@@ -5,6 +5,7 @@
 import { guardPage, getUser } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
 import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderSkeletonCards } from "../ui/skeleton.js";
 initTheme();
 import {
   subscribeProjects,
@@ -62,6 +63,9 @@ let feedbackTimer = null;
 let allUsers = [];
 let showMentionDropdown = false;
 let mentionQuery = "";
+
+// ── Initial skeleton ─────────────────────────────────────────────────────────
+if (app) app.innerHTML = `<div class="container">${renderSkeletonCards(2)}</div>`;
 
 // ── Subscriptions ────────────────────────────────────────────────────────────
 const unsubscribers = [];

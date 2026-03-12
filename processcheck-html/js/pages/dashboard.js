@@ -36,6 +36,7 @@ import {
   GATE_STAGES,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
+import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
 
 // ─── Auth Guard ─────────────────────────────────────────────────────────────
 
@@ -121,6 +122,9 @@ if (cached) {
   notifications = cached.notifs;
   computeDerived();
   render();
+} else {
+  // Show skeleton before data arrives
+  if (app) app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(4)}</div>`;
 }
 
 // ─── Phase 1 + 2: Fast targeted queries → background subscriptions ──────────
