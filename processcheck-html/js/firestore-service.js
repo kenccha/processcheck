@@ -19,7 +19,20 @@ function toDate(val) {
 }
 
 function docToProject(id, data) {
-  return { ...data, id, startDate: toDate(data.startDate), endDate: toDate(data.endDate) };
+  const proj = { ...data, id, startDate: toDate(data.startDate), endDate: toDate(data.endDate) };
+  // phaseSchedules 내 Timestamp → Date 변환
+  if (data.phaseSchedules) {
+    proj.phaseSchedules = {};
+    for (const [key, val] of Object.entries(data.phaseSchedules)) {
+      proj.phaseSchedules[key] = {
+        plannedStart: val.plannedStart ? toDate(val.plannedStart) : null,
+        plannedEnd: val.plannedEnd ? toDate(val.plannedEnd) : null,
+        actualStart: val.actualStart ? toDate(val.actualStart) : null,
+        actualEnd: val.actualEnd ? toDate(val.actualEnd) : null,
+      };
+    }
+  }
+  return proj;
 }
 
 function docToChecklistItem(id, data) {
@@ -28,14 +41,6 @@ function docToChecklistItem(id, data) {
     dueDate: toDate(data.dueDate),
     completedDate: data.completedDate ? toDate(data.completedDate) : undefined,
     comments: (data.comments || []).map(c => ({ ...c, createdAt: toDate(c.createdAt) })),
-  };
-}
-
-function docToChangeRequest(id, data) {
-  return {
-    ...data, id,
-    requestedAt: toDate(data.requestedAt),
-    customerRequestDate: data.customerRequestDate ? toDate(data.customerRequestDate) : undefined,
   };
 }
 
@@ -87,14 +92,8 @@ function getMockData() {
     { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", projectType: "신규개발", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), pm: "박민수", riskLevel: "yellow", currentStage: "WM제작" },
     { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", projectType: "신규개발", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), pm: "박민수", riskLevel: "green", currentStage: "Tx단계" },
     { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", projectType: "신규개발", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), pm: "박민수", riskLevel: "green", currentStage: "기획검토" },
-    { id: "proj4", name: "신장계 긴급 설계 변경", productType: "신장계", projectType: "설계변경", changeScale: "major", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
+    { id: "proj4", name: "신장계 신규 모델", productType: "신장계", projectType: "신규개발", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
     { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", projectType: "신규개발", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
-    // 설계변경 프로젝트
-    { id: "proj6", name: "센서 교체 (혈압계)", productType: "혈압계", projectType: "설계변경", changeScale: "minor", status: "completed", progress: 100, startDate: new Date("2026-01-10"), endDate: new Date("2026-01-25"), pm: "이영희", riskLevel: "green", currentStage: "영업이관" },
-    { id: "proj7", name: "배터리 규격 변경", productType: "체성분 분석기", projectType: "설계변경", changeScale: "major", status: "active", progress: 20, startDate: new Date("2026-01-15"), endDate: new Date("2026-06-30"), pm: "박민수", riskLevel: "yellow", currentStage: "발의검토" },
-    { id: "proj8", name: "LCD 크기 조정", productType: "혈압계", projectType: "설계변경", changeScale: "medium", status: "active", progress: 40, startDate: new Date("2026-02-01"), endDate: new Date("2026-04-30"), pm: "이영희", riskLevel: "green", currentStage: "기획검토" },
-    { id: "proj9", name: "펌웨어 버전 업데이트", productType: "FRA", projectType: "설계변경", changeScale: "minor", status: "active", progress: 50, startDate: new Date("2026-02-10"), endDate: new Date("2026-03-15"), pm: "이영희", riskLevel: "green", currentStage: "발의검토" },
-    { id: "proj10", name: "외관 재질 변경", productType: "신장계", projectType: "설계변경", changeScale: "medium", status: "completed", progress: 100, startDate: new Date("2025-12-01"), endDate: new Date("2026-02-10"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
   ];
 
   // checklistItems are now generated from templates via applyTemplateToProject()
@@ -102,16 +101,11 @@ function getMockData() {
 
   const now = new Date();
   const h = (offset) => new Date(now.getTime() + offset * 3600000);
-  const mockChangeRequests = [
-    { id: "change1", projectId: "proj4", title: "배터리 규격 변경", description: "기존 AA 배터리에서 리튬이온 배터리로 변경", requestedBy: "영업팀", requestedAt: new Date("2026-01-27"), affectedDepartments: ["개발팀", "제조팀", "구매팀", "인증팀"], scale: "major", status: "in_review", readBy: { "개발팀": true, "제조팀": true, "구매팀": false, "인증팀": false } },
-    { id: "change2", projectId: "proj1", title: "LCD 화면 크기 조정", description: "3.5인치에서 4.0인치로 확대", requestedBy: "품질팀", requestedAt: new Date("2026-01-25"), affectedDepartments: ["개발팀", "디자인연구소", "제조팀"], scale: "medium", status: "approved", readBy: { "개발팀": true, "디자인연구소": true, "제조팀": true } },
-  ];
 
   const mockNotifications = [
     { id: "notif1", userId: "user1", type: "deadline_approaching", title: "⚠️ 마감일이 오늘입니다", message: "[신규 체성분 분석기] eBOM 작성 - 오늘 마감", link: "/projects/proj1/tasks/task2", read: false, createdAt: h(-1) },
     { id: "notif2", userId: "user1", type: "task_assigned", title: "새 작업이 배정되었습니다", message: "[신규 체성분 분석기] 스펙 정리 및 분석 완료", link: "/projects/proj1/tasks/task1", read: false, createdAt: h(-2) },
     { id: "notif3", userId: "user1", type: "deadline_approaching", title: "마감일이 1일 남았습니다", message: "[신장계] 최종 도면 승인 - 이미 마감일 지남 (긴급)", link: "/projects/proj4/tasks/task14", read: false, createdAt: h(-3) },
-    { id: "notif4", userId: "user1", type: "change_request", title: "설계 변경 요청 확인 필요", message: "[신장계] 배터리 규격 변경 - 영향도 검토 요청", link: "/projects/proj4", read: true, createdAt: h(-24) },
     { id: "notif5", userId: "user1", type: "approval_request", title: "승인 완료", message: "이영희님이 NABC 분석 완료 작업을 승인했습니다", link: "/projects/proj1/tasks/task4", read: true, createdAt: h(-48) },
     { id: "notif6", userId: "user4", type: "deadline_approaching", title: "마감일이 내일입니다", message: "[가정용 혈압계] 낙하 테스트 실시 - 내일 마감", link: "/projects/proj2/tasks/task7", read: false, createdAt: h(-2) },
     { id: "notif7", userId: "user5", type: "deadline_approaching", title: "⚠️ 마감일이 오늘입니다", message: "[신장계] 양산 라인 셋업 - 오늘 마감", link: "/projects/proj4/tasks/task8", read: false, createdAt: h(-1) },
@@ -126,13 +120,7 @@ function getMockData() {
     { id: "cust6", name: "대전메디서플라이", type: "dealer", region: "대전/충남", contactName: "최영수", contactEmail: "choi@djmed.co.kr", contactPhone: "042-111-2222", salesRep: "이상민", contractStatus: "active", products: ["proj2", "proj4"], notes: "중부 지역 대리점", portalEnabled: true, portalLoginEmail: "portal@djmed.co.kr", portalAccessLevel: "basic" },
   ];
 
-  // 고객 요청 기반 변경요청 추가
-  const mockChangeRequestsExt = [
-    { id: "change3", projectId: "proj2", title: "LCD 화면 글자 크기 확대", description: "고령 사용자를 위해 글자 크기 20% 확대 요청", requestedBy: "영업팀", requestedAt: new Date("2026-02-10"), affectedDepartments: ["개발팀", "디자인연구소"], scale: "minor", status: "in_review", readBy: { "개발팀": true, "디자인연구소": false }, requestSource: "customer", customerId: "cust1", customerName: "서울메디칼", customerContactName: "김대현", customerRequestDate: new Date("2026-02-08"), customerRequestDetail: "고령자 사용 시 글씨가 작아서 읽기 어렵다는 피드백이 다수 접수되고 있습니다." },
-    { id: "change4", projectId: "proj1", title: "배터리 용량 증대", description: "연속 사용 시간 8시간 → 12시간 요구", requestedBy: "영업팀", requestedAt: new Date("2026-01-15"), affectedDepartments: ["개발팀", "구매팀", "제조팀"], scale: "medium", status: "approved", readBy: { "개발팀": true, "구매팀": true, "제조팀": true }, requestSource: "customer", customerId: "cust3", customerName: "일본법인 (JP)", customerContactName: "田中太郎", customerRequestDate: new Date("2026-01-10"), customerRequestDetail: "일본 병원에서 하루 연속 사용이 필요하다는 요청이 지속적으로 들어옵니다." },
-  ];
-
-  return { mockUsers, mockProjects, mockChangeRequests: [...mockChangeRequests, ...mockChangeRequestsExt], mockNotifications, mockCustomers };
+  return { mockUsers, mockProjects, mockNotifications, mockCustomers };
 }
 
 // ─── Seed Templates Only (separated from demo data) ──────────────────────────
@@ -408,7 +396,7 @@ export async function seedDatabaseIfEmpty() {
       return false;
     }
 
-    const { mockUsers, mockProjects, mockChangeRequests, mockNotifications, mockCustomers } = getMockData();
+    const { mockUsers, mockProjects, mockNotifications, mockCustomers } = getMockData();
     const batch = writeBatch(db);
 
     for (const user of mockUsers) {
@@ -421,17 +409,6 @@ export async function seedDatabaseIfEmpty() {
         startDate: Timestamp.fromDate(project.startDate),
         endDate: Timestamp.fromDate(project.endDate),
       });
-    }
-
-    for (const cr of mockChangeRequests) {
-      const crData = {
-        ...cr,
-        requestedAt: Timestamp.fromDate(cr.requestedAt),
-      };
-      if (cr.customerRequestDate) {
-        crData.customerRequestDate = Timestamp.fromDate(cr.customerRequestDate);
-      }
-      batch.set(doc(db, "changeRequests", cr.id), crData);
     }
 
     for (const notif of mockNotifications) {
@@ -501,18 +478,7 @@ export async function seedDatabaseIfEmpty() {
     // 모든 프로젝트의 체크리스트를 한꺼번에 생성
     const allChecklistItems = [];
     for (const proj of mockProjects) {
-      let filtered;
-      if (proj.projectType === "설계변경") {
-        if (proj.changeScale === "minor") {
-          filtered = tItems.filter(ti => ti.isRequired && MINOR_PHASES.includes(ti.stageId));
-        } else if (proj.changeScale === "medium") {
-          filtered = tItems.filter(ti => ti.isRequired);
-        } else {
-          filtered = tItems;
-        }
-      } else {
-        filtered = tItems;
-      }
+      const filtered = tItems;
 
       for (const ti of filtered) {
         const stage = stageMap[ti.stageId];
@@ -564,15 +530,6 @@ export async function seedDatabaseIfEmpty() {
         console.log(`  → ${proj.name}: ${lCount}개 출시 준비 체크리스트`);
       }
     }
-    for (const proj of mockProjects) {
-      if (proj.projectType === "설계변경" && proj.changeScale === "major" && proj.status === "active") {
-        const lCount = await applyLaunchChecklistToProject(
-          proj.id, proj.projectType, proj.changeScale, proj.endDate, customerObjs.slice(0, 2)
-        );
-        console.log(`  → ${proj.name}: ${lCount}개 설계변경 출시 체크리스트`);
-      }
-    }
-
     // 출시 준비 체크리스트 상태 시드
     await _seedLaunchChecklistStatuses();
 
@@ -814,6 +771,43 @@ export async function updateProject(id, data) {
   await updateDoc(doc(db, "projects", id), payload);
 }
 
+// Phase 일정 일괄 업데이트 (프로젝트 phaseSchedules + 개별 task dueDate 동시)
+export async function batchUpdatePhaseSchedule(projectId, phaseKey, scheduleData, taskUpdates) {
+  const batch = writeBatch(db);
+  // 1. 프로젝트 phaseSchedules 업데이트
+  const projRef = doc(db, "projects", projectId);
+  const updatePayload = {};
+  if (scheduleData.plannedStart) updatePayload[`phaseSchedules.${phaseKey}.plannedStart`] = Timestamp.fromDate(scheduleData.plannedStart);
+  if (scheduleData.plannedEnd) updatePayload[`phaseSchedules.${phaseKey}.plannedEnd`] = Timestamp.fromDate(scheduleData.plannedEnd);
+  if (scheduleData.actualStart) updatePayload[`phaseSchedules.${phaseKey}.actualStart`] = Timestamp.fromDate(scheduleData.actualStart);
+  if (scheduleData.actualEnd) updatePayload[`phaseSchedules.${phaseKey}.actualEnd`] = Timestamp.fromDate(scheduleData.actualEnd);
+  batch.update(projRef, updatePayload);
+  // 2. 개별 task dueDate 업데이트
+  for (const { id, dueDate } of taskUpdates) {
+    batch.update(doc(db, "checklistItems", id), { dueDate: Timestamp.fromDate(dueDate) });
+  }
+  await batch.commit();
+}
+
+// 여러 Phase 일정 일괄 업데이트 (cascade 포함)
+export async function batchUpdateMultiPhaseSchedule(projectId, phaseUpdates) {
+  const batch = writeBatch(db);
+  const projRef = doc(db, "projects", projectId);
+  const projPayload = {};
+  for (const pu of phaseUpdates) {
+    const key = pu.phaseKey;
+    if (pu.plannedStart) projPayload[`phaseSchedules.${key}.plannedStart`] = Timestamp.fromDate(pu.plannedStart);
+    if (pu.plannedEnd) projPayload[`phaseSchedules.${key}.plannedEnd`] = Timestamp.fromDate(pu.plannedEnd);
+    if (pu.actualStart) projPayload[`phaseSchedules.${key}.actualStart`] = Timestamp.fromDate(pu.actualStart);
+    if (pu.actualEnd) projPayload[`phaseSchedules.${key}.actualEnd`] = Timestamp.fromDate(pu.actualEnd);
+    for (const { id, dueDate } of (pu.taskUpdates || [])) {
+      batch.update(doc(db, "checklistItems", id), { dueDate: Timestamp.fromDate(dueDate) });
+    }
+  }
+  if (Object.keys(projPayload).length > 0) batch.update(projRef, projPayload);
+  await batch.commit();
+}
+
 // ─── Checklist Items ────────────────────────────────────────────────────────
 
 export function subscribeChecklistItems(projectId, callback) {
@@ -883,14 +877,16 @@ export async function completeTask(taskId) {
   } catch (e) {
     throw new Error("작업 완료 처리에 실패했습니다: " + e.message);
   }
-  try { await addActivityLog("complete_task", "", "", "", "task", taskId, { status: "completed" }); } catch(e) {}
-
-  // 프로젝트 통계 재계산
+  // 프로젝트 통계 재계산 + 활동 로그
   try {
     const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
     if (taskSnap.exists()) {
       const t = taskSnap.data();
-      if (t.projectId) await recalculateProjectStats(t.projectId);
+      // Project-level activity log (project detail page에서 표시됨)
+      if (t.projectId) {
+        try { await addActivityLog("complete_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch(e) {}
+        await recalculateProjectStats(t.projectId);
+      }
     }
   } catch (e) { console.error("통계 재계산 실패:", e); }
 }
@@ -909,9 +905,12 @@ export async function restartTask(taskId) {
   await updateDoc(doc(db, "checklistItems", taskId), {
     status: "in_progress",
   });
-  try { await addActivityLog("restart_task", "", "", "", "task", taskId, {}); } catch(e) {}
-  if (taskSnap.exists() && taskSnap.data().projectId) {
-    await recalculateProjectStats(taskSnap.data().projectId);
+  if (taskSnap.exists()) {
+    const t = taskSnap.data();
+    if (t.projectId) {
+      try { await addActivityLog("restart_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch(e) {}
+      await recalculateProjectStats(t.projectId);
+    }
   }
 }
 
@@ -1020,62 +1019,6 @@ export async function addComment(taskId, userId, userName, content) {
   } catch (e) { console.error("멘션 알림 생성 실패:", e); }
 }
 
-// ─── Change Requests ────────────────────────────────────────────────────────
-
-export function subscribeChangeRequests(projectId, callback) {
-  const q = query(collection(db, "changeRequests"), where("projectId", "==", projectId));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => docToChangeRequest(d.id, d.data())));
-  });
-}
-
-export function subscribeAllChangeRequests(callback) {
-  return onSnapshot(collection(db, "changeRequests"), (snap) => {
-    callback(snap.docs.map(d => docToChangeRequest(d.id, d.data())));
-  });
-}
-
-export async function createChangeRequest(data) {
-  const payload = {
-    ...data,
-    requestedAt: Timestamp.fromDate(data.requestedAt),
-  };
-  if (data.customerRequestDate) {
-    payload.customerRequestDate = Timestamp.fromDate(data.customerRequestDate);
-  }
-  const ref = await addDoc(collection(db, "changeRequests"), payload);
-  return ref.id;
-}
-
-export async function updateChangeRequest(id, data) {
-  const payload = { ...data };
-  if (data.requestedAt) payload.requestedAt = Timestamp.fromDate(data.requestedAt);
-  if (data.customerRequestDate) payload.customerRequestDate = Timestamp.fromDate(data.customerRequestDate);
-  await updateDoc(doc(db, "changeRequests", id), payload);
-
-  // 고객 출처 변경요청 승인/반려 시 → 포털 알림 자동 생성
-  if (data.status === "approved" || data.status === "rejected") {
-    try {
-      const crSnap = await getDoc(doc(db, "changeRequests", id));
-      if (crSnap.exists()) {
-        const cr = crSnap.data();
-        if (cr.requestSource === "customer" && cr.customerId) {
-          const statusLabel = data.status === "approved" ? "승인" : "반려";
-          await addDoc(collection(db, "portalNotifications"), {
-            customerId: cr.customerId,
-            projectId: cr.projectId || "",
-            type: "request_resolved",
-            title: `설계변경 ${statusLabel}`,
-            message: `요청하신 "${cr.title}" 건이 ${statusLabel}되었습니다.`,
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-        }
-      }
-    } catch (e) { console.error("포털 알림 생성 실패:", e); }
-  }
-}
-
 // ─── Notifications ──────────────────────────────────────────────────────────
 
 export function subscribeNotifications(userId, callback) {
@@ -1158,6 +1101,26 @@ export async function createNotification(data) {
   await addDoc(collection(db, "notifications"), {
     ...data,
     createdAt: Timestamp.fromDate(data.createdAt),
+  });
+}
+
+// ─── Email Queue (Firebase Trigger Email Extension) ─────────────────────────
+// mail 컬렉션에 문서를 추가하면 Firebase "Trigger Email from Firestore" 확장이
+// 자동으로 SMTP를 통해 이메일을 발송합니다.
+// 확장 설치: Firebase Console → Extensions → "Trigger Email from Firestore"
+
+export async function queueEmail({ to, subject, html, text }) {
+  if (!to) return;
+  const toList = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
+  if (toList.length === 0) return;
+  await addDoc(collection(db, "mail"), {
+    to: toList,
+    message: {
+      subject: subject || "(ProcessCheck 알림)",
+      html: html || "",
+      text: text || "",
+    },
+    createdAt: Timestamp.now(),
   });
 }
 
@@ -1350,11 +1313,10 @@ export async function deleteTemplateDepartment(deptId) {
 /**
  * 템플릿 항목을 실제 프로젝트 체크리스트로 변환하여 생성한다.
  * @param {string} projectId - 프로젝트 ID
- * @param {string} projectType - "신규개발" | "설계변경"
- * @param {string} [changeScale] - "minor" | "medium" | "major" (설계변경일 때)
+ * @param {string} projectType - "신규개발"
  * @returns {Promise<number>} 생성된 체크리스트 항목 수
  */
-export async function applyTemplateToProject(projectId, projectType, changeScale) {
+export async function applyTemplateToProject(projectId, projectType) {
   // 0) 중복 방지: 이미 적용된 templateItemId 수집
   const existingSnap = await getDocs(
     query(collection(db, "checklistItems"), where("projectId", "==", projectId))
@@ -1369,26 +1331,8 @@ export async function applyTemplateToProject(projectId, projectType, changeScale
   const allItemsSnap = await getDocs(collection(db, "templateItems"));
   const allItems = allItemsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
 
-  // 2) 설계변경 시 허용 phase 필터
-  // minor: 첫 번째, 4번째, 6번째 단계만 (발의, Tx, 양산/이관 해당)
-  const minorStageIds = stages.length >= 6
-    ? [stages[0]?.id, stages[3]?.id, stages[5]?.id].filter(Boolean)
-    : stages.map(s => s.id); // 6개 미만이면 전부 허용
-
-  let filteredItems;
-  if (projectType === "설계변경") {
-    if (changeScale === "minor") {
-      filteredItems = allItems.filter(ti => ti.isRequired && minorStageIds.includes(ti.stageId));
-    } else if (changeScale === "medium") {
-      filteredItems = allItems.filter(ti => ti.isRequired);
-    } else {
-      // major: 전체 항목 (신규개발과 동일)
-      filteredItems = allItems;
-    }
-  } else {
-    // 신규개발: 전체
-    filteredItems = allItems;
-  }
+  // 2) 전체 항목 사용
+  let filteredItems = allItems;
 
   // 2.5) 이미 적용된 템플릿 항목 제외
   filteredItems = filteredItems.filter(ti => !existingTemplateIds.has(ti.id));
@@ -1531,22 +1475,11 @@ export async function confirmLaunchChecklist(id, checkedBy, note = "") {
  * 프로젝트의 출시 준비 체크리스트를 생성한다 (177개 기본 항목).
  * 거래처별 항목은 customers 배열 [{id, name}]로 곱해진다.
  */
-export async function applyLaunchChecklistToProject(projectId, projectType, changeScale, endDate, customers = []) {
+export async function applyLaunchChecklistToProject(projectId, projectType, endDate, customers = []) {
   const LAUNCH_ITEMS = getLaunchTemplateItems();
 
-  let filtered;
-  if (projectType === "설계변경") {
-    // 설계변경 시: K 카테고리만 + 스케일 필터
-    filtered = LAUNCH_ITEMS.filter(item => {
-      if (item.category !== "design_change") return false;
-      if (changeScale === "minor") return item.scaleFilter?.includes("minor");
-      if (changeScale === "medium") return item.scaleFilter?.includes("medium") || item.scaleFilter?.includes("minor");
-      return true; // major: 전체
-    });
-  } else {
-    // 신규개발: K(설계변경) 카테고리 제외 전체
-    filtered = LAUNCH_ITEMS.filter(item => item.category !== "design_change");
-  }
+  // design_change 카테고리 제외
+  const filtered = LAUNCH_ITEMS.filter(item => item.category !== "design_change");
 
   // Normalize customers: accept [{id, name}] or [id] (backward compat)
   const custList = customers.map(c => typeof c === "string" ? { id: c, name: "" } : c);
@@ -1824,13 +1757,6 @@ function getLaunchTemplateItems() {
     { code: "J-06", category: "launch_event", title: "SNS 런칭 캠페인 실행", department: "마케팅", dDayOffset: 0, durationDays: 7, isRequired: true },
     { code: "J-07", category: "launch_event", title: "출시 후 초기 반응 모니터링", department: "마케팅", dDayOffset: 1, durationDays: 14, isRequired: true },
     { code: "J-08", category: "launch_event", title: "출시 후 2주 리뷰 미팅 (전 부서)", department: "경영+전체", dDayOffset: 14, durationDays: 1, isRequired: true },
-    // K: 설계변경 영업 (6)
-    { code: "K-01", category: "design_change", title: "가격 변경 영향 검토", department: "영업+경영", dDayOffset: -60, durationDays: 5, isRequired: true, scaleFilter: ["medium", "major"] },
-    { code: "K-02", category: "design_change", title: "거래처 변경 통보", department: "영업", dDayOffset: -30, durationDays: 1, isRequired: true, perCustomer: true, scaleFilter: ["minor", "medium", "major"] },
-    { code: "K-03", category: "design_change", title: "카탈로그/데이터시트 업데이트", department: "마케팅", dDayOffset: -30, durationDays: 5, isRequired: true, scaleFilter: ["medium", "major"] },
-    { code: "K-04", category: "design_change", title: "웹사이트 제품 페이지 업데이트", department: "마케팅", dDayOffset: -21, durationDays: 3, isRequired: false, scaleFilter: ["medium", "major"] },
-    { code: "K-05", category: "design_change", title: "영업/CS 교육 (변경사항)", department: "영업+CS", dDayOffset: -14, durationDays: 2, isRequired: false, scaleFilter: ["medium", "major"] },
-    { code: "K-06", category: "design_change", title: "사진/영상 재촬영", department: "마케팅", dDayOffset: -45, durationDays: 7, isRequired: true, scaleFilter: ["major"] },
     // L: KOL/학회/임상 마케팅 (10)
     { code: "L-01", category: "kol", title: "KOL 후보 리스트 작성 (전문 분야별 3~5명)", department: "임상+영업", dDayOffset: -180, durationDays: 7, isRequired: true },
     { code: "L-02", category: "kol", title: "KOL 섭외 및 자문 계약 체결", department: "임상+영업", dDayOffset: -160, durationDays: 14, isRequired: true },
@@ -1877,7 +1803,6 @@ export const LAUNCH_CATEGORY_LABELS = {
   regulatory: "규제/인허가/등록",
   logistics: "물류/재고/출하",
   launch_event: "런칭 이벤트/PR",
-  design_change: "설계변경 영업",
   kol: "KOL/학회/임상",
   insurance: "보험급여/조달",
   post_launch: "출시 후 모니터링",
@@ -2014,10 +1939,35 @@ export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus
     // 기존 업데이트 (meetingNotes는 건드리지 않음)
     await updateDoc(snap.docs[0].ref, data);
   }
+
+  // 활동 로그 기록
+  const actionLabel = gateStatus === "approved" ? "gate_approved" : gateStatus === "rejected" ? "gate_rejected" : "gate_reset";
+  try {
+    await addActivityLog(actionLabel, "", approvedBy, "", "project", projectId, {
+      phaseId,
+      phaseName,
+      gateStatus,
+    });
+  } catch (e) {}
+}
+
+/** gateRecord 승인 날짜 수정 */
+export async function updateGateApprovedAt(projectId, phaseId, newDate) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+  await updateDoc(snap.docs[0].ref, {
+    approvedAt: Timestamp.fromDate(new Date(newDate)),
+    updatedAt: Timestamp.now(),
+  });
 }
 
 /** gateRecord에 회의록 메모 추가 */
-export async function addGateMeetingNote(projectId, phaseId, phaseName, author, content) {
+export async function addGateMeetingNote(projectId, phaseId, phaseName, author, content, files = []) {
   const q = query(
     collection(db, "gateRecords"),
     where("projectId", "==", projectId),
@@ -2028,6 +1978,7 @@ export async function addGateMeetingNote(projectId, phaseId, phaseName, author, 
   const note = {
     author,
     content,
+    files,
     createdAt: Timestamp.now(),
   };
 

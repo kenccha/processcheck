@@ -100,20 +100,54 @@ export function getRoleName(role) {
   return map[role] || role;
 }
 
-// 날짜 포맷
+// 날짜 포맷 — 사용자 설정 기반 (기본: YY/MM/DD)
+// 설정은 localStorage("pc-date-format")에 저장
+// 지원 형식: "YY/MM/DD", "YYYY/MM/DD", "YYYY-MM-DD", "MM/DD/YYYY", "YYYY.MM.DD"
+export function getDateFormat() {
+  return localStorage.getItem("pc-date-format") || "YY/MM/DD";
+}
+export function setDateFormat(fmt) {
+  localStorage.setItem("pc-date-format", fmt);
+}
+
+function applyDateFormat(d, fmt) {
+  const yyyy = d.getFullYear();
+  const yy = String(yyyy).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  switch (fmt) {
+    case "YYYY/MM/DD": return `${yyyy}/${mm}/${dd}`;
+    case "YYYY-MM-DD": return `${yyyy}-${mm}-${dd}`;
+    case "MM/DD/YYYY": return `${mm}/${dd}/${yyyy}`;
+    case "YYYY.MM.DD": return `${yyyy}.${mm}.${dd}`;
+    default: return `${yy}/${mm}/${dd}`;
+  }
+}
+
 export function formatDate(date) {
   if (!date) return "-";
   const d = date instanceof Date ? date : new Date(date);
-  return d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+  if (isNaN(d.getTime())) return "-";
+  return applyDateFormat(d, getDateFormat());
 }
 
 export function formatDateTime(date) {
   if (!date) return "-";
   const d = date instanceof Date ? date : new Date(date);
-  return d.toLocaleDateString("ko-KR", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
-  });
+  if (isNaN(d.getTime())) return "-";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${applyDateFormat(d, getDateFormat())} ${hh}:${mi}`;
+}
+
+// Short date (for inline use like phase headers)
+export function formatDateShort(date) {
+  if (!date) return "-";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "-";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}`;
 }
 
 // 상대 시간
@@ -259,7 +293,7 @@ export function exportToPDF(title, content) {
     </style></head><body>
     <h1>${escapeHtml(title)}</h1>
     ${content}
-    <div class="footer">ProcessCheck — ${new Date().toLocaleDateString("ko-KR")} 생성</div>
+    <div class="footer">ProcessCheck — ${formatDate(new Date())} 생성</div>
     </body></html>
   `);
   printWindow.document.close();

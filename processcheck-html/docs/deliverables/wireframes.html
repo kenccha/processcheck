@@ -336,7 +336,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
             <div class="w-user-avatar avatar-yellow">M</div>
             <div class="w-user-info">
               <div><span class="w-user-role">매니저</span><span class="w-user-name">이영희</span></div>
-              <div class="w-user-desc">부서 작업 검토 &middot; 승인/반려</div>
+              <div class="w-user-desc">부서 작업 배분 &middot; 재배분</div>
               <div class="w-user-dept">개발팀</div>
             </div>
             <span class="w-user-arrow">&rsaquo;</span>
@@ -408,7 +408,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
     <span class="screen-file">dashboard.html</span>
     <span class="access-badge access-auth">로그인 필요</span>
   </div>
-  <p class="screen-desc">로그인 후 메인 화면. 역할별 구독 기반으로 작업/승인/프로젝트/알림을 탭 형태로 표시합니다. 통계 카드 5개는 모두 클릭 가능합니다.</p>
+  <p class="screen-desc">로그인 후 메인 화면. 역할별 구독 기반으로 프로젝트/작업/알림을 탭 형태로 표시합니다. 통계 카드 3개는 모두 클릭 가능합니다.</p>
 
   <div class="browser-frame">
     <div class="browser-bar">
@@ -426,6 +426,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         </div>
         <div class="w-nav-links">
           <span class="w-nav-link">출시위원회</span>
+          <span class="w-nav-link">설계변경</span>
           <span class="w-nav-link">체크리스트</span>
           <span class="w-nav-link">리뷰 ▾</span>
         </div>
@@ -443,8 +444,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         <div class="flex items-center justify-between mb-2 anno" data-num="2">
           <div class="flex items-center gap-2">
             <span style="font-size:1.05rem;font-weight:700;color:#1e293b">김철수님</span>
-            <span class="w-badge badge-blue">실무자</span>
-            <span style="font-size:.7rem;color:#94a3b8">개발팀</span>
           </div>
           <div style="font-size:.7rem;color:#94a3b8">
             <span style="color:#ef4444;font-weight:600">2</span> 초과 &middot;
@@ -454,29 +453,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         </div>
 
         <!-- Stat Cards -->
-        <div class="w-stats w-stats-5 anno" data-num="3">
+        <div class="w-stats w-stats-3 anno" data-num="3">
           <div class="w-stat clickable">
-            <div class="w-stat-value" style="color:#4A90D9">12</div>
-            <div class="w-stat-label">작업 대기</div>
+            <div class="w-stat-value" style="color:#4A90D9">3</div>
+            <div class="w-stat-label">프로젝트 <span style="font-size:.55rem;color:#ef4444">(지연 1건)</span></div>
+            <div class="w-stat-click">클릭 &rarr; 프로젝트 탭</div>
+          </div>
+          <div class="w-stat clickable">
+            <div class="w-stat-value" style="color:#ef4444">5</div>
+            <div class="w-stat-label">긴급 (초과+오늘)</div>
             <div class="w-stat-click">클릭 &rarr; 작업 탭</div>
           </div>
           <div class="w-stat clickable">
-            <div class="w-stat-value" style="color:#f59e0b">5</div>
-            <div class="w-stat-label">승인 대기</div>
-            <div class="w-stat-click">클릭 &rarr; 승인 탭</div>
-          </div>
-          <div class="w-stat clickable">
-            <div class="w-stat-value" style="color:#ef4444">2</div>
-            <div class="w-stat-label">마감 초과</div>
-            <div class="w-stat-click">클릭 &rarr; 작업 탭</div>
-          </div>
-          <div class="w-stat clickable">
-            <div class="w-stat-value" style="color:#22c55e">3</div>
-            <div class="w-stat-label">프로젝트</div>
-            <div class="w-stat-click">클릭 &rarr; projects.html</div>
-          </div>
-          <div class="w-stat clickable">
-            <div class="w-stat-value" style="color:#ef4444">4</div>
+            <div class="w-stat-value" style="color:#f59e0b">4</div>
             <div class="w-stat-label">알림</div>
             <div class="w-stat-click">클릭 &rarr; 알림 탭</div>
           </div>
@@ -486,9 +475,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         <div class="w-card">
           <!-- Tab Bar -->
           <div class="w-tabs anno" data-num="4">
-            <span class="w-tab active">내 작업 <span class="w-badge badge-gray">12</span></span>
-            <span class="w-tab">승인 대기 <span class="w-badge badge-yellow">5</span></span>
-            <span class="w-tab">프로젝트 <span class="w-badge badge-gray">3</span></span>
+            <span class="w-tab active">프로젝트 <span class="w-badge badge-gray">3</span></span>
+            <span class="w-tab">작업 <span class="w-badge badge-gray">12</span></span>
             <span class="w-tab">알림 <span class="w-badge badge-red">4</span></span>
           </div>
 
@@ -548,10 +536,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
   <div class="annotations">
     <h4>어노테이션</h4>
     <div class="annotation-list">
-      <div class="annotation-item"><span class="annotation-num">1</span> <code>components.js:renderNavigation()</code> — 글로벌 네비게이션 바: PC 로고(클릭→대시보드), 3개 메뉴(출시위원회/체크리스트/리뷰▾ 드롭다운), 다크모드 토글(☾), 홈 아이콘(🏠), 알림 벨(🔔+미읽음 빨간 점), 사용자 이름, 로그아웃. 리뷰 드롭다운: 전체 화면 설계/업무 흐름/시스템 구조/피드백 모아보기/매뉴얼/사용자 관리(observer만)</div>
-      <div class="annotation-item"><span class="annotation-num">2</span> <code>dashboard.js:renderGreeting()</code> — 인사 헤더: "이름님" + 역할 배지 + 부서명. 우측에 마감 초과/오늘/이번주 카운트</div>
-      <div class="annotation-item"><span class="annotation-num">3</span> <code>.stat-card</code> — 통계 카드 5개 (모두 클릭→해당 탭 전환): 작업대기/승인대기/마감초과/프로젝트(외부→projects.html)/알림</div>
-      <div class="annotation-item"><span class="annotation-num">4</span> <code>.tab-btn[data-tab]</code> — 4개 탭: 프로젝트(기본) / 작업(카운트) / 승인 대기(카운트) / 알림(미읽음 카운트)</div>
+      <div class="annotation-item"><span class="annotation-num">1</span> <code>components.js:renderNavigation()</code> — 글로벌 네비게이션 바: PC 로고(클릭→대시보드), 4개 메뉴(출시위원회/설계변경/체크리스트/리뷰▾ 드롭다운) + 구분선(|) + 다른 사이트▾ 드롭다운, 다크모드 토글(☾), 홈 아이콘(🏠), 알림 벨(🔔+미읽음 빨간 점), 사용자 이름, 로그아웃. 리뷰 드롭다운: 전체 화면 설계/업무 흐름/시스템 구조/피드백 모아보기/매뉴얼/사용자 관리/권한 설정</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> <code>dashboard.js:renderGreeting()</code> — 인사 헤더: "이름님". 우측에 마감 초과/오늘/이번주 카운트</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> <code>.stat-card</code> — 통계 카드 3개 (모두 클릭→해당 탭 전환): 프로젝트(지연 N건)/긴급(초과+오늘)/알림</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> <code>.tab-btn[data-tab]</code> — 3개 탭: 프로젝트(기본) / 작업(카운트) / 알림(미읽음 카운트)</div>
       <div class="annotation-item"><span class="annotation-num">5</span> <code>.dash-project-card</code> — 프로젝트 카드: D-Day(큰 글씨) + 현재Phase 뱃지 + 지연 사유 1줄 요약. <code>getActivePhaseGroups()</code>로 동적 Phase</div>
       <div class="annotation-item"><span class="annotation-num">6</span> <code>.task-row</code> — 작업 행: 마감 상태 도트(빨강=초과/노랑=임박/회색=여유) + 작업명 + 상태 배지 + 부서 + D-day. 클릭→<code>task.html?id=</code></div>
       <div class="annotation-item"><span class="annotation-num">7</span> "더 보기" 버튼 (10건 단위 페이징)</div>
@@ -580,7 +568,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="w-nav">
         <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
         <div class="w-nav-links">
-          <span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span>
+          <span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span>
         </div>
         <div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
       </div>
@@ -616,47 +604,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
           <table class="w-table">
             <thead>
               <tr>
-                <th style="width:30%">프로젝트명 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:35%">프로젝트명 <span class="sort-icon">&udarr;</span></th>
                 <th style="width:15%">상태 <span class="sort-icon">&udarr;</span></th>
-                <th style="width:15%">PM <span class="sort-icon">&udarr;</span></th>
-                <th style="width:20%">진행률 <span class="sort-icon">&udarr;</span></th>
-                <th style="width:20%">시작일 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:15%">현재 단계 <span class="sort-icon">&udarr;</span></th>
+                <th style="width:20%">D-Day <span class="sort-icon">&udarr;</span></th>
+                <th style="width:15%">시작일 <span class="sort-icon">&udarr;</span></th>
               </tr>
             </thead>
             <tbody>
               <tr class="clickable">
                 <td><strong>차세대 혈압계 개발</strong><br><span style="font-size:.6rem;color:#94a3b8">혈압계 &middot; 신규개발</span></td>
                 <td><span class="w-badge badge-blue">활성</span></td>
-                <td>이영희</td>
-                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-blue" style="width:65%"></div></div><span style="font-size:.62rem;color:#4A90D9;margin-left:4px">65%</span></td>
+                <td><span class="w-badge badge-cyan">WM</span></td>
+                <td><span style="font-size:.85rem;font-weight:700;color:#4A90D9;font-family:monospace">D-111</span></td>
                 <td>2025.09.01</td>
               </tr>
               <tr class="clickable">
                 <td><strong>스마트 체온계 v2</strong><br><span style="font-size:.6rem;color:#94a3b8">체온계 &middot; 신규개발</span></td>
                 <td><span class="w-badge badge-blue">활성</span></td>
-                <td>김철수</td>
-                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-green" style="width:85%"></div></div><span style="font-size:.62rem;color:#22c55e;margin-left:4px">85%</span></td>
+                <td><span class="w-badge badge-cyan">MSG</span></td>
+                <td><span style="font-size:.85rem;font-weight:700;color:#22c55e;font-family:monospace">D-45</span></td>
                 <td>2025.06.15</td>
               </tr>
               <tr class="clickable">
                 <td><strong>무선 산소포화도 측정기</strong><br><span style="font-size:.6rem;color:#94a3b8">산소포화도 &middot; 신규개발</span></td>
                 <td><span class="w-badge badge-blue">활성</span></td>
-                <td>박민수</td>
-                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-yellow" style="width:30%"></div></div><span style="font-size:.62rem;color:#f59e0b;margin-left:4px">30%</span></td>
+                <td><span class="w-badge badge-cyan">기획</span></td>
+                <td><span style="font-size:.85rem;font-weight:700;color:#ef4444;font-family:monospace">D+3</span></td>
                 <td>2026.01.10</td>
               </tr>
               <tr class="clickable">
                 <td><strong>혈당 모니터링 시스템</strong><br><span style="font-size:.6rem;color:#94a3b8">혈당계 &middot; 신규개발</span></td>
                 <td><span class="w-badge badge-green">완료</span></td>
-                <td>이영희</td>
-                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-green" style="width:100%"></div></div><span style="font-size:.62rem;color:#22c55e;margin-left:4px">100%</span></td>
+                <td><span class="w-badge badge-green">완료</span></td>
+                <td><span style="font-size:.85rem;font-weight:700;color:#22c55e;font-family:monospace">완료</span></td>
                 <td>2024.11.01</td>
               </tr>
               <tr class="clickable">
                 <td><strong>디지털 청진기 프로</strong><br><span style="font-size:.6rem;color:#94a3b8">청진기 &middot; 신규개발</span></td>
                 <td><span class="w-badge badge-yellow">보류</span></td>
-                <td>김철수</td>
-                <td><div class="w-progress" style="width:80px"><div class="w-progress-fill fill-yellow" style="width:15%"></div></div><span style="font-size:.62rem;color:#f59e0b;margin-left:4px">15%</span></td>
+                <td><span class="w-badge badge-gray">발의</span></td>
+                <td><span style="font-size:.85rem;font-weight:700;color:#f59e0b;font-family:monospace">D-200</span></td>
                 <td>2026.02.01</td>
               </tr>
             </tbody>
@@ -677,21 +665,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
               <tbody>
                 <tr>
                   <td style="text-align:left;font-weight:500;font-size:.7rem">차세대 혈압계</td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">5/5</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">4/4</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-current" style="width:16px;height:16px;font-size:.45rem">3/6</span><span class="w-phase-dot dot-gate-pending" style="width:16px;height:16px;font-size:.5rem">&#9203;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">5/5</span></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">4/4</span></td>
+                  <td><span class="w-phase-dot dot-current" style="width:18px;height:18px;font-size:.45rem">3/6</span></td>
+                  <td><span class="w-phase-dot dot-future" style="width:18px;height:18px;font-size:.5rem">&mdash;</span></td>
+                  <td><span class="w-phase-dot dot-future" style="width:18px;height:18px;font-size:.5rem">&mdash;</span></td>
+                  <td><span class="w-phase-dot dot-future" style="width:18px;height:18px;font-size:.5rem">&mdash;</span></td>
                 </tr>
                 <tr>
                   <td style="text-align:left;font-weight:500;font-size:.7rem">스마트 체온계</td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">3/3</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">5/5</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">4/4</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-done" style="width:16px;height:16px;font-size:.45rem">6/6</span><span class="w-phase-dot dot-gate-approved" style="width:16px;height:16px;font-size:.5rem">&check;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-current" style="width:16px;height:16px;font-size:.45rem">2/5</span><span class="w-phase-dot dot-gate-pending" style="width:16px;height:16px;font-size:.5rem">&#9203;</span></div></td>
-                  <td><div class="w-matrix-cell"><span class="w-phase-dot dot-future" style="width:16px;height:16px;font-size:.5rem">&mdash;</span><span class="w-phase-dot dot-gate-none" style="width:16px;height:16px;font-size:.5rem">&mdash;</span></div></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">3/3</span></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">5/5</span></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">4/4</span></td>
+                  <td><span class="w-phase-dot dot-done" style="width:18px;height:18px;font-size:.45rem">6/6</span></td>
+                  <td><span class="w-phase-dot dot-current" style="width:18px;height:18px;font-size:.45rem">2/5</span></td>
+                  <td><span class="w-phase-dot dot-future" style="width:18px;height:18px;font-size:.5rem">&mdash;</span></td>
                 </tr>
               </tbody>
             </table>
@@ -700,8 +688,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
               <span class="flex items-center gap-1"><span class="w-phase-dot dot-done" style="width:12px;height:12px;font-size:0"></span> 작업완료</span>
               <span class="flex items-center gap-1"><span class="w-phase-dot dot-current" style="width:12px;height:12px;font-size:0"></span> 진행중</span>
               <span class="flex items-center gap-1"><span class="w-phase-dot dot-future" style="width:12px;height:12px;font-size:0"></span> 미진행</span>
-              <span class="flex items-center gap-1"><span class="w-phase-dot dot-gate-approved" style="width:12px;height:12px;font-size:.45rem">&check;</span> 승인</span>
-              <span class="flex items-center gap-1"><span class="w-phase-dot dot-gate-pending" style="width:12px;height:12px;font-size:.45rem">&#9203;</span> 대기</span>
             </div>
           </div>
         </div>
@@ -716,7 +702,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
                 <span style="font-size:.95rem;font-weight:700;color:#4A90D9">65%</span>
               </div>
               <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
-                <span>혈압계</span><span>PM: 이영희</span>
+                <span>혈압계</span><span>D-30</span>
                 <span class="w-badge badge-yellow">중요</span>
               </div>
               <div class="w-progress mb-2"><div class="w-progress-fill fill-blue" style="width:65%"></div></div>
@@ -735,7 +721,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
                 <span style="font-size:.95rem;font-weight:700;color:#22c55e">85%</span>
               </div>
               <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
-                <span>체온계</span><span>PM: 김철수</span>
+                <span>체온계</span><span>D-85</span>
                 <span class="w-badge badge-green">보통</span>
               </div>
               <div class="w-progress mb-2"><div class="w-progress-fill fill-green" style="width:85%"></div></div>
@@ -754,7 +740,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
                 <span style="font-size:.95rem;font-weight:700;color:#f59e0b">30%</span>
               </div>
               <div class="flex items-center gap-2 mb-2" style="font-size:.65rem;color:#94a3b8">
-                <span>산소포화도</span><span>PM: 박민수</span>
+                <span>산소포화도</span><span class="w-badge badge-red">D+5 지연</span>
                 <span class="w-badge badge-red">긴급</span>
               </div>
               <div class="w-progress mb-2"><div class="w-progress-fill fill-yellow" style="width:30%"></div></div>
@@ -780,8 +766,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="annotation-item"><span class="annotation-num">2</span> <code>.filter-bar</code> — 컨트롤 바: 검색 입력 + 상태 필터(전체/활성/완료/보류) + 뷰 전환</div>
       <div class="annotation-item"><span class="annotation-num">3</span> <code>.view-switch</code> — 뷰 모드 스위처: 테이블(기본) → 매트릭스 → 카드 → 간트 → 칸반 → 타임라인 → 캘린더. <code>projects.js:setView()</code></div>
       <div class="annotation-item"><span class="annotation-num">4</span> <code>projects.js:renderTable()</code> — 테이블 뷰: 정렬 가능한 5개 컬럼. 행 클릭 시 <code>project.html?id=</code>로 이동</div>
-      <div class="annotation-item"><span class="annotation-num">5</span> <code>projects.js:renderMatrix()</code> — 매트릭스 뷰: 프로젝트 행 x 6 Phase 열(Firestore <code>templateStages</code> 동적). 각 셀에 동그라미 2개 (좌=작업 완료/전체, 우=승인위원회 상태)</div>
-      <div class="annotation-item"><span class="annotation-num">6</span> <code>projects.js:renderCards()</code> — 카드 뷰: 3열 그리드. 프로젝트명, PM, 중요도 배지, 진행률 바+%, 6개 Phase 도트</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> <code>projects.js:renderMatrix()</code> — 매트릭스 뷰: 프로젝트 행 x 6 Phase 열(Firestore <code>templateStages</code> 동적). 각 셀에 동그라미 1개 (작업 완료/전체)</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> <code>projects.js:renderCards()</code> — 카드 뷰: 3열 그리드. 프로젝트명, D-Day, 중요도 배지, 진행률 바+%, 6개 Phase 도트</div>
     </div>
   </div>
 </section>
@@ -804,7 +790,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="browser-url">processcheck.example.com/project.html?id=proj-001</div>
     </div>
     <div class="browser-content">
-      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">이영희</span><span class="w-logout">로그아웃</span></div></div>
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">이영희</span><span class="w-logout">로그아웃</span></div></div>
 
       <div class="w-body">
         <!-- Project Header -->
@@ -817,36 +803,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
               </div>
               <div class="flex items-center gap-3" style="font-size:.75rem;color:#6c757d">
                 <span>제품: <strong style="color:#334155">혈압계</strong></span>
-                <span>PM: <strong style="color:#334155">이영희</strong></span>
                 <span>2025.09.01 ~ 2026.06.30</span>
               </div>
               <div style="margin-top:8px;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px">
                 <span style="font-size:.75rem;font-weight:600;color:#0891b2">&#9889; 현재 단계: WM</span>
               </div>
+              <div style="margin-top:6px;padding:4px 10px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;font-size:.72rem;color:#16a34a;font-weight:600">정상 진행</div>
             </div>
             <div style="text-align:center">
-              <div style="font-size:2.2rem;font-weight:700;color:#4A90D9">65%</div>
-              <div style="font-size:.65rem;color:#94a3b8">전체 진행률</div>
-              <div class="w-progress mt-1" style="width:100px"><div class="w-progress-fill fill-blue" style="width:65%"></div></div>
+              <div style="font-size:2.2rem;font-weight:700;color:#4A90D9">D-111</div>
+              <div style="font-size:.65rem;color:#94a3b8">마감까지</div>
             </div>
           </div>
         </div>
 
         <!-- Tabs -->
         <div class="w-tabs anno" data-num="2" style="margin-top:14px">
-          <span class="w-tab active">개요</span>
-          <span class="w-tab">체크리스트</span>
-          <span class="w-tab">파일</span>
-          <span class="w-tab">설계 변경</span>
+          <span class="w-tab active">개요+작업</span>
+          <span class="w-tab">스케줄</span>
+          <span class="w-tab">병목</span>
         </div>
 
         <!-- Stat Cards -->
-        <div class="w-stats w-stats-5 anno" data-num="3">
-          <div class="w-stat clickable"><div class="w-stat-value" style="color:#334155">142</div><div class="w-stat-label">전체 작업</div><div class="w-stat-click">클릭 &rarr; 체크리스트 탭</div></div>
+        <div class="w-stats anno" data-num="3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div class="w-stat clickable"><div class="w-stat-value" style="color:#334155">142</div><div class="w-stat-label">전체 작업</div><div class="w-stat-click">클릭 &rarr; 체크리스트 필터</div></div>
           <div class="w-stat clickable"><div class="w-stat-value" style="color:#4A90D9">18</div><div class="w-stat-label">진행 중</div><div class="w-stat-click">클릭 &rarr; 필터 적용</div></div>
           <div class="w-stat clickable"><div class="w-stat-value" style="color:#ef4444">3</div><div class="w-stat-label">지연</div><div class="w-stat-click">클릭 &rarr; 지연 필터</div></div>
-          <div class="w-stat clickable"><div class="w-stat-value" style="color:#f59e0b">5</div><div class="w-stat-label">매니저 승인 대기</div><div class="w-stat-click">클릭 &rarr; 필터</div></div>
-          <div class="w-stat clickable"><div class="w-stat-value" style="color:#f59e0b">2</div><div class="w-stat-label">위원회 승인 대기</div><div class="w-stat-click">클릭 &rarr; 필터</div></div>
         </div>
 
         <!-- Summary Card -->
@@ -879,8 +861,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
             <table class="w-matrix" style="font-size:.6rem">
               <thead><tr><th style="text-align:left">부서</th><th>발의</th><th>기획</th><th>WM</th><th>Tx</th><th>MSG</th><th>양산/이관</th></tr></thead>
               <tbody>
-                <tr><td style="text-align:left">개발팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">3/3</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">1/3</span><span class="w-phase-dot dot-gate-none" style="width:14px;height:14px;font-size:.4rem">&mdash;</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
-                <tr><td style="text-align:left">품질팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">1/1</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span><span class="w-phase-dot dot-gate-approved" style="width:14px;height:14px;font-size:.4rem">&check;</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">0/2</span><span class="w-phase-dot dot-gate-pending" style="width:14px;height:14px;font-size:.4rem">&#9203;</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
+                <tr><td style="text-align:left">개발팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">3/3</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">1/3</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
+                <tr><td style="text-align:left">품질팀</td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">1/1</span></td><td><span class="w-phase-dot dot-done" style="width:14px;height:14px;font-size:.4rem">2/2</span></td><td><span class="w-phase-dot dot-current" style="width:14px;height:14px;font-size:.4rem">0/2</span></td><td colspan="3" style="color:#d1d5db;font-size:.55rem">&mdash;</td></tr>
               </tbody>
             </table>
             <div class="w-filter-bar mt-2">
@@ -890,25 +872,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
           </div>
         </div>
 
-        <!-- Changes Tab preview -->
+        <!-- Activity Timeline preview -->
         <div style="margin-top:16px">
-          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">설계변경 탭 (미리보기)</div>
-          <div class="w-card anno" data-num="6">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="w-badge badge-yellow">중간</span>
-              <span class="w-badge badge-yellow">검토 중</span>
-            </div>
-            <div style="font-size:.82rem;font-weight:600;color:#1e293b">센서 모듈 교체 요청</div>
-            <div style="font-size:.7rem;color:#64748b;margin-top:4px">요청부서: 구매팀 &middot; 2026.02.15</div>
-            <div class="flex items-center gap-2 mt-2">
-              <span class="w-badge badge-green">개발팀 &#10004;</span>
-              <span class="w-badge badge-gray">품질팀 &#9675;</span>
-              <span class="w-badge badge-gray">인증팀 &#9675;</span>
-            </div>
-            <div class="flex gap-2 mt-2">
-              <span class="w-btn w-btn-primary" style="font-size:.62rem">승인</span>
-              <span class="w-btn w-btn-danger" style="font-size:.62rem">반려</span>
-            </div>
+          <div style="font-size:.8rem;font-weight:600;color:#475569;margin-bottom:6px">최근 활동 타임라인</div>
+          <div class="w-card anno" data-num="6" style="padding:10px">
+            <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">김철수가 &ldquo;회로 설계 검증&rdquo; 완료</div><div style="font-size:.62rem;color:#94a3b8">2시간 전</div></div></div>
+            <div class="w-timeline-item"><span class="w-timeline-dot active"></span><div><div style="font-size:.72rem;color:#334155">품질팀에 2건 작업 배분됨</div><div style="font-size:.62rem;color:#94a3b8">5시간 전</div></div></div>
+            <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">WM승인회 통과</div><div style="font-size:.62rem;color:#94a3b8">어제</div></div></div>
           </div>
         </div>
       </div>
@@ -918,12 +888,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
   <div class="annotations">
     <h4>어노테이션</h4>
     <div class="annotation-list">
-      <div class="annotation-item"><span class="annotation-num">1</span> <code>project-detail.js:renderHeader()</code> — 프로젝트 헤더: 이름 + 중요도 도트(green/yellow/red) + 제품유형 + PM + 기간 + 현재 Phase 뱃지 + D-Day(큰 글씨) + 지연 시 빨강 배너</div>
+      <div class="annotation-item"><span class="annotation-num">1</span> <code>project-detail.js:renderHeader()</code> — 프로젝트 헤더: 이름 + 중요도 도트(green/yellow/red) + 제품유형 + 기간 + 현재 Phase 뱃지 + D-Day(큰 글씨) + 지연 시 빨강 배너 / 정상 시 녹색 배너</div>
       <div class="annotation-item"><span class="annotation-num">2</span> <code>.tab-btn[data-tab]</code> — 3개 탭: 개요+작업 / 스케줄 / 병목 (파일/설계변경 탭 제거됨)</div>
-      <div class="annotation-item"><span class="annotation-num">3</span> <code>.stat-card</code> — Stat 카드 5개(클릭 가능): 전체/진행중/지연/승인대기/위원회승인대기. 클릭 시 체크리스트 필터 적용</div>
-      <div class="annotation-item"><span class="annotation-num">4</span> <code>renderPhasePipeline()</code> — Phase 파이프라인: ✔완료/▶현재/미래 단계 표시 + 각 Phase별 승인위원회 분리 섹션</div>
-      <div class="annotation-item"><span class="annotation-num">5</span> <code>renderPhaseView()</code> — 체크리스트: Phase별 그룹, 각 Phase 내 작업 목록 + 승인위원회 분리 섹션(🛡 아이콘, 색상 배너). 5가지 뷰(Phase/타임라인/부서/보드/리스트) + 필터(단계/부서) + "작업 추가" 버튼 <code>handleQuickAdd()</code></div>
-      <div class="annotation-item"><span class="annotation-num">6</span> <code>openTaskPeek()</code> — 작업 Peek 슬라이드오버: 클릭 시 우측에서 슬라이드인. 작업 상세 정보(담당자/부서/상태/마감일) + 편집 버튼</div>
+      <div class="annotation-item"><span class="annotation-num">3</span> <code>.stat-card</code> — Stat 카드 3개(클릭 가능): 전체 작업 / 진행 중 / 지연. 클릭 시 체크리스트 필터 적용</div>
+      <div class="annotation-item"><span class="annotation-num">4</span> <code>renderPhasePipeline()</code> — Phase 파이프라인: ✔완료/▶현재/미래 단계 표시 + 각 Phase별 위원회 승인 인라인 표시</div>
+      <div class="annotation-item"><span class="annotation-num">5</span> <code>renderPhaseView()</code> — 체크리스트: Phase별 그룹, 위원회 승인 인라인 + 회의록 인라인. 5가지 뷰(Phase/타임라인/부서/보드/리스트) + 필터(단계/부서) + "작업 추가" 버튼 <code>handleQuickAdd()</code></div>
+      <div class="annotation-item"><span class="annotation-num">6</span> <code>renderActivityTimeline()</code> — 최근 활동 타임라인: 작업 완료/배분/위원회 승인 이벤트 시간순 표시</div>
     </div>
   </div>
 </section>
@@ -946,7 +916,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="browser-url">processcheck.example.com/task.html?projectId=proj-001&amp;taskId=task-042</div>
     </div>
     <div class="browser-content">
-      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link active">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div></div>
 
       <div class="w-body">
         <!-- Breadcrumb -->
@@ -958,16 +928,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         <div class="w-card anno" data-num="2">
           <div class="flex items-center gap-2 mb-2">
             <span class="w-badge badge-blue">진행 중</span>
-            <span class="w-badge badge-yellow">승인 대기</span>
             <span class="w-badge badge-gray">WM 제작</span>
           </div>
           <div style="font-size:1.1rem;font-weight:700;color:#1e293b;margin-bottom:4px">회로 설계 검증 완료</div>
           <div style="font-size:.75rem;color:#64748b;line-height:1.6">전자 회로 설계의 최종 검증을 수행하고, 시뮬레이션 결과와 실측 데이터를 비교합니다.</div>
           <hr style="margin:10px 0;border:none;border-top:1px solid #e2e8f0">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:.72rem">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:.72rem">
             <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">부서</div><div style="color:#334155">개발팀</div></div>
             <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">담당자</div><div style="color:#334155">김철수</div></div>
-            <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">검토자</div><div style="color:#334155">이영희</div></div>
             <div><div style="color:#94a3b8;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">마감일</div><div style="color:#334155">2026.03.15</div></div>
           </div>
         </div>
@@ -1031,10 +999,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
               <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
                 <div style="font-size:.68rem;color:#64748b;text-align:center;margin-bottom:4px">역할별 액션 버튼:</div>
                 <span class="w-btn w-btn-primary" style="justify-content:center;width:100%">&#9745; 작업 완료 (실무자)</span>
-                <span class="w-btn w-btn-success" style="justify-content:center;width:100%">&#10004; 승인 (매니저/기획조정실)</span>
-                <div style="border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:.68rem;color:#94a3b8">반려 사유를 입력하세요...</div>
-                <span class="w-btn w-btn-danger" style="justify-content:center;width:100%">&#10006; 반려 (매니저/기획조정실)</span>
                 <span class="w-btn w-btn-ghost" style="justify-content:center;width:100%">&#8635; 재작업 시작 (반려 후 실무자)</span>
+                <div style="font-size:.62rem;color:#94a3b8;text-align:center;padding:4px;background:#f8fafc;border-radius:6px">개별 작업 승인 제거됨 — 완료 처리 = 최종 완료</div>
               </div>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin-bottom:10px">
               <!-- Timeline -->
@@ -1042,7 +1008,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
               <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">작업 배정됨</div><div style="font-size:.62rem;color:#94a3b8">2026.02.28</div></div></div>
               <div class="w-timeline-item"><span class="w-timeline-dot done"></span><div><div style="font-size:.72rem;color:#334155">작업 시작됨</div><div style="font-size:.62rem;color:#94a3b8">2026.03.05</div></div></div>
               <div class="w-timeline-item"><span class="w-timeline-dot active"></span><div><div style="font-size:.72rem;color:#334155">작업 완료됨</div><div style="font-size:.62rem;color:#94a3b8">2026.03.10</div></div></div>
-              <div class="w-timeline-item"><span class="w-timeline-dot pending"></span><div><div style="font-size:.72rem;color:#d1d5db">승인 완료</div></div></div>
             </div>
           </div>
         </div>
@@ -1054,12 +1019,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
     <h4>어노테이션</h4>
     <div class="annotation-list">
       <div class="annotation-item"><span class="annotation-num">1</span> <code>.breadcrumb</code> — 브레드크럼: 프로젝트 > 프로젝트명(링크) > 작업 상세</div>
-      <div class="annotation-item"><span class="annotation-num">2</span> <code>task.js:renderTaskHeader()</code> — 작업 헤더 카드: <code>.inline-status-select</code>(pill형 상태 변경) + 승인 상태 + 단계명 + 제목 + 설명 + 4열 정보(부서/담당자/검토자/마감일). 반려 시 빨간 반려사유 박스</div>
+      <div class="annotation-item"><span class="annotation-num">2</span> <code>task.js:renderTaskHeader()</code> — 작업 헤더 카드: <code>.inline-status-select</code>(pill형 상태 변경) + 단계명 + 제목 + 설명 + 3열 정보(부서/담당자/마감일). 반려 시 빨간 반려사유 박스</div>
       <div class="annotation-item"><span class="annotation-num">3</span> <code>renderChecklist()</code> — 체크리스트: 진행률 바 + 각 항목(체크박스+내용+필수/선택 라벨). 실무자만 토글 가능</div>
       <div class="annotation-item"><span class="annotation-num">4</span> 첨부 파일: 드래그&드롭 업로드 영역 + 파일 목록 (Firebase Storage 미연동)</div>
       <div class="annotation-item"><span class="annotation-num">5</span> <code>renderComments()</code> — 코멘트: 입력란 + "코멘트 추가" 버튼 + 아바타+이름+시간+내용 리스트</div>
-      <div class="annotation-item"><span class="annotation-num">6</span> <code>renderActions()</code> — 우측 작업 관리: 실무자→<code>completeTask()</code>/"재작업 시작"<code>restartTask()</code>, 기획조정실(observer)만→<code>approveTask()</code>/<code>rejectTask()</code>(사유입력). 매니저는 작업 배분만</div>
-      <div class="annotation-item"><span class="annotation-num">7</span> <code>renderTimeline()</code> — 히스토리 타임라인: 배정/시작/완료/승인/반려 이벤트별 날짜+행위자. 도트 색상으로 상태 구분</div>
+      <div class="annotation-item"><span class="annotation-num">6</span> <code>renderActions()</code> — 우측 작업 관리: 실무자→<code>completeTask()</code>(바로 완료)/"재작업 시작"<code>restartTask()</code>. 개별 작업 승인 제거됨, 매니저는 작업 배분만</div>
+      <div class="annotation-item"><span class="annotation-num">7</span> <code>renderTimeline()</code> — 히스토리 타임라인: 배정/시작/완료 이벤트별 날짜+행위자. 도트 색상으로 상태 구분</div>
     </div>
   </div>
 </section>
@@ -1082,7 +1047,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <div class="browser-url">processcheck.example.com/admin-checklists.html</div>
     </div>
     <div class="browser-content">
-      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link active">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">박민수</span><span class="w-logout">로그아웃</span></div></div>
+      <div class="w-nav"><div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div><div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link active">체크리스트</span><span class="w-nav-link">리뷰 ▾</span></div><div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">박민수</span><span class="w-logout">로그아웃</span></div></div>
 
       <div class="w-body">
         <div class="flex items-center justify-between mb-3">
@@ -1222,7 +1187,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
       <!-- Nav (logged in or minimal) -->
       <div class="w-nav">
         <div class="w-nav-logo"><div class="w-nav-logo-icon">PC</div><span class="w-nav-logo-text">Process<span>Check</span></span></div>
-        <div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link active">리뷰 ▾</span></div>
+        <div class="w-nav-links"><span class="w-nav-link">출시위원회</span><span class="w-nav-link">설계변경</span><span class="w-nav-link">체크리스트</span><span class="w-nav-link active">리뷰 ▾</span></div>
         <div class="w-nav-right"><div class="w-theme-btn">&#9789;</div><div class="w-home-btn">&#127968;</div><div class="w-nav-bell">&#128276;</div><span class="w-nav-user">김철수</span><span class="w-logout">로그아웃</span></div>
       </div>
 
@@ -1275,7 +1240,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
             </p>
             <ul style="font-size:.75rem;color:#475569;padding-left:18px;margin-bottom:12px;line-height:1.8">
               <li><strong>실무자 (Worker)</strong> &mdash; 체크리스트 작업 수행, 완료 보고</li>
-              <li><strong>매니저 (Manager)</strong> &mdash; 부서별 작업 검토, 승인/반려</li>
+              <li><strong>매니저 (Manager)</strong> &mdash; 부서별 작업 배분 · 재배분</li>
               <li><strong>기획조정실 (Observer)</strong> &mdash; 전체 현황 모니터링, 게이트 승인</li>
             </ul>
 

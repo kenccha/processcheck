@@ -11,8 +11,6 @@ import {
   subscribeProjects,
   subscribeChecklistItems,
   completeTask,
-  approveTask,
-  rejectTask,
   restartTask,
   addComment,
   updateComment,
@@ -21,8 +19,12 @@ import {
   removeFileMetadata,
   subscribeActivityLogs,
   getUsers,
+  updateChecklistItem,
+  updateChecklistItemStatus,
+  subscribeGateRecords,
+  addGateMeetingNote,
 } from "../firestore-service.js";
-import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES, parseMentions, renderSimpleMarkdown, getFileIcon, formatFileSize, validateFile, extractMentions } from "../utils.js";
+import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES, parseMentions, renderSimpleMarkdown, getFileIcon, formatFileSize, validateFile, extractMentions, departments, PHASE_GROUPS, projectStages } from "../utils.js";
 import { storage } from "../firebase-init.js";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -41,20 +43,15 @@ const projectId = params.get("projectId");
 const taskId = params.get("taskId");
 
 if (!projectId || !taskId) {
-  app.innerHTML = `<div class="container"><div class="card p-6 mt-6 text-center"><p class="text-soft">잘못된 접근입니다. 프로젝트 ID 또는 작업 ID가 없습니다.</p><a href="dashboard.html" class="btn-primary mt-4" style="display:inline-flex">대시보드로 이동</a></div></div>`;
+  app.innerHTML = `<div class="container"><div class="card p-6 mt-6 text-center"><p class="text-soft">잘못된 접근입니다. 프로젝트 ID 또는 작업 ID가 없습니다.</p><a href="projects.html?type=신규개발" class="btn-primary mt-4" style="display:inline-flex">대시보드로 이동</a></div></div>`;
   throw new Error("Missing projectId or taskId");
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
 let task = null;
 let project = null;
-let checklist = [
-  { id: "cl-1", content: "요구사항 문서 검토 완료", checked: false, required: true },
-  { id: "cl-2", content: "기술 스펙 확인 완료", checked: false, required: true },
-  { id: "cl-3", content: "관련 부서 협의 완료", checked: false, required: true },
-  { id: "cl-4", content: "테스트 결과 확인", checked: false, required: false },
-  { id: "cl-5", content: "최종 검토 및 서명", checked: false, required: true },
-];
+let gateRecords = [];
+let meetingNoteText = "";
 let comment = "";
 let rejectionReason = "";
 let actionLoading = false;
@@ -81,6 +78,15 @@ const unsubItems = subscribeChecklistItems(projectId, (items) => {
   render();
 });
 unsubscribers.push(unsubItems);
+
+// Gate records subscription (for meeting notes)
+if (projectId) {
+  const unsubGate = subscribeGateRecords(projectId, (records) => {
+    gateRecords = records;
+    render();
+  });
+  unsubscribers.push(unsubGate);
+}
 
 // Load all users for @mention support
 getUsers().then(users => { allUsers = users; });
@@ -147,38 +153,22 @@ function handleFileUpload(files) {
   );
 }
 
-function getApprovalBadge(t) {
-  // 승인 절차 제거됨
-  return "";
+function getPhaseForStage(stageName) {
+  return PHASE_GROUPS.find(p => p.workStage === stageName || p.gateStage === stageName) || null;
 }
 
-function canComplete() {
-  return user.role === "worker" && task && (task.status === "pending" || task.status === "in_progress");
+function getGateRecordForPhase(phaseName) {
+  return gateRecords.find(gr => gr.phaseName === phaseName) || null;
 }
 
-function isGateStage(stageName) {
-  return GATE_STAGES.includes(stageName);
-}
-
-function canApprove() {
-  // 승인 절차 제거됨
-  return false;
-}
-
-function canRestart() {
-  return false;
-}
-
-function allRequiredChecked() {
-  return checklist.filter((c) => c.required).every((c) => c.checked);
-}
-
-function getCheckedCount() {
-  return checklist.filter((c) => c.checked).length;
-}
-
-function getChecklistProgress() {
-  return Math.round((getCheckedCount() / checklist.length) * 100);
+function getMeetingNotes() {
+  const phase = getPhaseForStage(task?.stage);
+  if (!phase) return [];
+  const gr = getGateRecordForPhase(phase.name);
+  return (gr?.meetingNotes || []).map(n => ({
+    ...n,
+    createdAt: n.createdAt?.toDate ? n.createdAt.toDate() : (n.createdAt ? new Date(n.createdAt) : null),
+  })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 }
 
 // ── SVG Icons ────────────────────────────────────────────────────────────────
@@ -205,95 +195,108 @@ function render() {
       return;
     }
     if (!task) {
-      app.innerHTML = `<div class="container"><div class="card p-6 mt-6 text-center"><p class="text-soft">작업을 찾을 수 없습니다.</p><a href="dashboard.html" class="btn-primary mt-4" style="display:inline-flex">대시보드로 이동</a></div></div>`;
+      app.innerHTML = `<div class="container"><div class="card p-6 mt-6 text-center"><p class="text-soft">작업을 찾을 수 없습니다.</p><a href="projects.html?type=신규개발" class="btn-primary mt-4" style="display:inline-flex">대시보드로 이동</a></div></div>`;
       return;
     }
     return;
   }
 
-  const statusClass = getStatusBadgeClass(task.status);
-  const statusLabel = getStatusLabel(task.status);
-  const progress = getChecklistProgress();
-  const checkedCount = getCheckedCount();
-  const _canComplete = canComplete();
-  const _canApprove = canApprove();
+  const statusLabels = { pending: "대기", in_progress: "진행 중", completed: "완료", rejected: "반려" };
+  const dueDateVal = task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)).toISOString().slice(0, 10) : "";
+  const deptOptions = departments.map(d => `<option value="${d}" ${task.department === d ? "selected" : ""}>${d}</option>`).join("");
+  const userOptions = allUsers.map(u => `<option value="${u.name}" ${task.assignee === u.name ? "selected" : ""}>${u.name}${u.department ? ` (${u.department})` : ""}</option>`).join("");
+  const phase = getPhaseForStage(task.stage);
+  const meetingNotes = getMeetingNotes();
+
+  // D-Day calculation
+  let ddText = "";
+  let ddColor = "var(--slate-400)";
+  if (task.dueDate) {
+    const due = task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate);
+    const now = new Date();
+    const diff = Math.ceil((due - now) / 86400000);
+    if (task.status === "completed") { ddText = "완료"; ddColor = "var(--success-400)"; }
+    else if (diff < 0) { ddText = `D+${Math.abs(diff)}`; ddColor = "var(--danger-400)"; }
+    else if (diff === 0) { ddText = "D-Day"; ddColor = "var(--warning-400)"; }
+    else { ddText = `D-${diff}`; ddColor = diff <= 3 ? "var(--warning-400)" : "var(--slate-300)"; }
+  }
 
   app.innerHTML = `
     <div class="container animate-fade-in">
       <!-- Breadcrumb -->
       <nav class="flex items-center gap-2 text-sm text-soft mb-6" style="margin-top:0.5rem">
-        <a href="dashboard.html" style="color:var(--slate-400);text-decoration:none">프로젝트</a>
+        <a href="projects.html?type=신규개발" style="color:var(--slate-400);text-decoration:none">프로젝트</a>
         <span style="color:var(--slate-400)">${ICONS.chevronRight}</span>
         <a href="project.html?id=${escapeHtml(projectId)}" style="color:var(--slate-400);text-decoration:none">${escapeHtml(project.name)}</a>
         <span style="color:var(--slate-400)">${ICONS.chevronRight}</span>
         <span style="color:var(--slate-300)">작업 상세</span>
       </nav>
 
-      <!-- Task Header Card -->
+      <!-- Feedback Toast -->
+      ${feedback ? `
+        <div class="mb-4 animate-fade-in" style="padding:0.75rem 1rem;border-radius:var(--radius-lg);${feedback.type === "success"
+          ? "background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:var(--success-400)"
+          : "background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:var(--danger-400)"}">
+          <span class="text-sm">${escapeHtml(feedback.text)}</span>
+        </div>
+      ` : ""}
+
+      <!-- Task Header Card (Editable) -->
       <div class="card p-6 mb-6">
         <div class="flex items-center gap-3 flex-wrap mb-3">
-          <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
-          ${getApprovalBadge(task)}
+          <select id="task-status" style="padding:0.375rem 0.75rem;font-size:0.8rem;border:1px solid var(--surface-3);border-radius:var(--radius-lg);background:var(--surface-2);color:var(--slate-200);font-weight:600;">
+            ${Object.entries(statusLabels).map(([k, v]) => `<option value="${k}" ${task.status === k ? "selected" : ""}>${v}</option>`).join("")}
+          </select>
           <span class="badge badge-neutral">${escapeHtml(formatStageName(task.stage))}</span>
+          <span style="font-size:1.1rem;font-weight:700;color:${ddColor};margin-left:auto;">${ddText}</span>
         </div>
         <h1 style="font-size:1.5rem;font-weight:700;color:var(--slate-100);letter-spacing:-0.025em;margin-bottom:0.5rem">${escapeHtml(task.title)}</h1>
-        <p class="text-sm text-soft" style="line-height:1.6;max-width:48rem">${escapeHtml(task.description || "")}</p>
+        ${task.description ? `<p class="text-sm text-soft" style="line-height:1.6;max-width:48rem">${escapeHtml(task.description)}</p>` : ""}
 
         <hr class="divider" style="margin:1.25rem 0" />
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Editable Fields Grid -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;">
           <div>
-            <div class="text-xs text-dim font-medium mb-1" style="text-transform:uppercase;letter-spacing:0.05em">부서</div>
-            <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(task.department || "-")}</div>
+            <label class="text-xs text-dim font-medium" style="display:block;margin-bottom:0.375rem;text-transform:uppercase;letter-spacing:0.05em">부서</label>
+            <select id="task-dept" class="input-field" style="font-size:0.85rem;padding:0.5rem 0.75rem;">
+              <option value="">미지정</option>
+              ${deptOptions}
+            </select>
           </div>
           <div>
-            <div class="text-xs text-dim font-medium mb-1" style="text-transform:uppercase;letter-spacing:0.05em">담당자</div>
-            <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(task.assignee || "-")}</div>
+            <label class="text-xs text-dim font-medium" style="display:block;margin-bottom:0.375rem;text-transform:uppercase;letter-spacing:0.05em">담당자</label>
+            <select id="task-assignee" class="input-field" style="font-size:0.85rem;padding:0.5rem 0.75rem;">
+              <option value="">미배분</option>
+              ${userOptions}
+            </select>
           </div>
           <div>
-            <div class="text-xs text-dim font-medium mb-1" style="text-transform:uppercase;letter-spacing:0.05em">검토자</div>
-            <div class="text-sm" style="color:var(--slate-200)">${escapeHtml(task.reviewer || "-")}</div>
+            <label class="text-xs text-dim font-medium" style="display:block;margin-bottom:0.375rem;text-transform:uppercase;letter-spacing:0.05em">마감일</label>
+            <input type="date" id="task-duedate" class="input-field" style="font-size:0.85rem;padding:0.5rem 0.75rem;" value="${dueDateVal}">
           </div>
           <div>
-            <div class="text-xs text-dim font-medium mb-1" style="text-transform:uppercase;letter-spacing:0.05em">마감일</div>
-            <div class="text-sm" style="color:var(--slate-200)">${formatDate(task.dueDate)}</div>
+            <label class="text-xs text-dim font-medium" style="display:block;margin-bottom:0.375rem;text-transform:uppercase;letter-spacing:0.05em">중요도</label>
+            <select id="task-importance" class="input-field" style="font-size:0.85rem;padding:0.5rem 0.75rem;">
+              <option value="green" ${(task.importance || "green") === "green" ? "selected" : ""}>보통</option>
+              <option value="yellow" ${task.importance === "yellow" ? "selected" : ""}>중요</option>
+              <option value="red" ${task.importance === "red" ? "selected" : ""}>긴급</option>
+            </select>
           </div>
         </div>
 
+        <!-- Save Button -->
+        <div class="flex justify-end mt-4 gap-3">
+          <button class="btn-primary" id="save-task-btn" style="border-radius:var(--radius-xl);padding:0.5rem 1.5rem;">
+            저장
+          </button>
+        </div>
       </div>
 
       <!-- Two-Column Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Column -->
         <div style="grid-column:span 1" class="lg-col-span-2 flex flex-col gap-6">
-
-          <!-- Checklist Section -->
-          <div class="card p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="section-title">체크리스트</h2>
-              <span class="text-sm text-soft font-mono">${checkedCount}/${checklist.length}</span>
-            </div>
-            <div class="progress-bar mb-4">
-              <div class="progress-fill${progress === 100 ? " success" : ""}" style="width:${progress}%"></div>
-            </div>
-            <div class="flex flex-col gap-2">
-              ${checklist.map((item, idx) => `
-                <div class="flex items-center gap-3" style="padding:0.5rem 0.75rem;border-radius:var(--radius-lg);transition:background 0.15s;${_canComplete ? "cursor:pointer" : ""}" data-checklist-idx="${idx}" ${_canComplete ? 'role="button" tabindex="0"' : ""}>
-                  <div class="checkbox-custom${item.checked ? " checked" : ""}" data-checklist-toggle="${idx}">
-                    ${item.checked ? ICONS.check : ""}
-                  </div>
-                  <span class="text-sm${item.checked ? "" : ""}" style="color:${item.checked ? "var(--slate-300)" : "var(--slate-200)"};${item.checked ? "text-decoration:line-through" : ""};flex:1">${escapeHtml(item.content)}</span>
-                  ${item.required ? `<span class="text-xs" style="color:var(--danger-400);font-weight:500">필수</span>` : `<span class="text-xs text-dim">선택</span>`}
-                </div>
-              `).join("")}
-            </div>
-            ${_canComplete && !allRequiredChecked() ? `
-              <div class="flex items-center gap-2 mt-4" style="padding:0.75rem 1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-lg)">
-                <span style="color:var(--warning-400)">${ICONS.warning}</span>
-                <span class="text-xs" style="color:var(--warning-400)">모든 필수 항목을 완료해야 작업을 완료할 수 있습니다.</span>
-              </div>
-            ` : ""}
-          </div>
 
           <!-- Attachments Section -->
           <div class="card p-6">
@@ -308,34 +311,42 @@ function render() {
               <div class="progress-bar"><div id="upload-progress-bar" class="progress-fill progress-fill-primary" style="width:0%"></div></div>
             </div>
             <div id="file-list" class="mt-3">
-              ${(task.files || []).length > 0 ? task.files.map(f => `
-                <div class="flex items-center gap-3" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3)">
-                  <span>${getFileIcon(f.name || '')}</span>
-                  <a href="${escapeHtml(f.url || '#')}" target="_blank" class="text-sm" style="color:var(--primary-400);flex:1;text-decoration:none">${escapeHtml(f.name || '파일')}</a>
-                  <span class="text-xs" style="color:var(--slate-400)">${formatFileSize(f.size)}</span>
-                  <span class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.uploadedBy || '')}</span>
-                  ${f.uploadedBy === user.name ? `<button class="btn-ghost btn-xs" data-delete-file="${escapeHtml(f.id || '')}" data-file-path="${escapeHtml(f.storagePath || '')}">삭제</button>` : ''}
-                </div>
-              `).join("") : `
-                <div class="text-xs" style="color:var(--slate-400);padding:8px">업로드된 파일이 없습니다</div>
-              `}
+              ${(() => {
+                const allFiles = [
+                  ...(task.files || []).map(f => ({ ...f, source: "upload" })),
+                  ...(task.attachments || []).map(f => ({ ...f, source: "attachment" })),
+                ];
+                if (allFiles.length === 0) return '<div class="text-xs" style="color:var(--slate-400);padding:8px">업로드된 파일이 없습니다</div>';
+                return allFiles.map(f => `
+                  <div class="flex items-center gap-3" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3)">
+                    <span>${getFileIcon(f.name || '')}</span>
+                    ${f.url
+                      ? `<a href="${escapeHtml(f.url)}" target="_blank" class="text-sm" style="color:var(--primary-400);flex:1;text-decoration:none">${escapeHtml(f.name || '파일')}</a>`
+                      : `<span class="text-sm" style="color:var(--slate-200);flex:1">${escapeHtml(f.name || '파일')}</span>`
+                    }
+                    <span class="text-xs" style="color:var(--slate-400)">${f.size ? formatFileSize(f.size) : ''}</span>
+                    <span class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.uploadedBy || '')}</span>
+                    ${f.source === "upload" && f.uploadedBy === user.name ? `<button class="btn-ghost btn-xs" data-delete-file="${escapeHtml(f.id || '')}" data-file-path="${escapeHtml(f.storagePath || '')}">삭제</button>` : ''}
+                  </div>
+                `).join("");
+              })()}
             </div>
           </div>
 
-          <!-- Comments Section -->
+          <!-- Meeting Notes Section (회의록) -->
           <div class="card p-6">
-            <h2 class="section-title mb-4">코멘트</h2>
-            <div class="flex flex-col gap-3 mb-4" style="position:relative">
-              <textarea class="input-field" id="comment-input" placeholder="코멘트를 입력하세요... (@로 멘션)" rows="3"></textarea>
-              <div id="mention-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-lg);max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.3)"></div>
+            <h2 class="section-title mb-4">회의록</h2>
+            ${phase ? `<div class="text-xs text-dim mb-3">Phase: ${escapeHtml(phase.name)}</div>` : ""}
+            <div class="flex flex-col gap-3 mb-4">
+              <textarea class="input-field" id="meeting-note-input" placeholder="회의록을 입력하세요..." rows="3">${escapeHtml(meetingNoteText)}</textarea>
               <div class="flex justify-end">
-                <button class="btn-primary btn-sm" id="add-comment-btn" ${!comment.trim() ? "disabled" : ""}>
-                  코멘트 추가
+                <button class="btn-primary btn-sm" id="add-meeting-note-btn" style="border-radius:var(--radius-xl);">
+                  회의록 추가
                 </button>
               </div>
             </div>
-            <div id="comments-list">
-              ${renderComments()}
+            <div id="meeting-notes-list">
+              ${renderMeetingNotes(meetingNotes)}
             </div>
           </div>
         </div>
@@ -344,26 +355,7 @@ function render() {
         <div style="grid-column:span 1">
           <div class="sticky" style="top:5rem">
             <div class="card p-6">
-              <h3 class="section-title mb-4">작업 관리</h3>
-
-              <!-- Feedback -->
-              ${feedback ? `
-                <div class="mb-4 animate-fade-in" style="padding:0.75rem 1rem;border-radius:var(--radius-lg);${feedback.type === "success"
-                  ? "background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:var(--success-400)"
-                  : "background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:var(--danger-400)"}">
-                  <span class="text-sm">${escapeHtml(feedback.text)}</span>
-                </div>
-              ` : ""}
-
-              <!-- Action Buttons -->
-              <div class="flex flex-col gap-3 mb-6">
-                ${renderActionSection()}
-              </div>
-
-              <hr class="divider" style="margin-bottom:1.25rem" />
-
-              <!-- Timeline -->
-              <h4 class="text-sm font-semibold mb-4" style="color:var(--slate-300)">작업 히스토리</h4>
+              <h3 class="section-title mb-4">작업 히스토리</h3>
               <div class="timeline">
                 ${renderTimeline()}
               </div>
@@ -389,73 +381,19 @@ function render() {
 
 // ── Render Helpers ────────────────────────────────────────────────────────────
 
-function renderComments() {
-  const comments = task.comments || [];
-  if (comments.length === 0) {
-    return `<div class="empty-state" style="padding:1rem"><span class="empty-state-text">아직 코멘트가 없습니다</span></div>`;
+function renderMeetingNotes(notes) {
+  if (!notes || notes.length === 0) {
+    return `<div class="empty-state" style="padding:1rem"><span class="empty-state-text">아직 회의록이 없습니다</span></div>`;
   }
-  const sorted = [...comments].sort((a, b) => {
-    const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
-    const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
-    return bTime - aTime;
-  });
-  return sorted.map((c) => `
-    <div class="comment">
-      <div class="comment-avatar">${escapeHtml((c.userName || "?").charAt(0))}</div>
-      <div class="comment-body">
-        <div class="comment-header">
-          <span class="comment-author">${escapeHtml(c.userName || "알 수 없음")}</span>
-          <span class="comment-time">${timeAgo(c.createdAt)}</span>
-        </div>
-        <div class="comment-text">${parseMentions(c.content || "", allUsers.map(u => u.name))}</div>
-        ${c.editedAt ? '<div class="text-xs" style="color:var(--slate-300);margin-top:2px">(수정됨)</div>' : ''}
-        ${c.userId === user.id ? `
-          <div class="flex gap-2 mt-1">
-            <button class="btn-ghost btn-xs" data-edit-comment="${c.id}">수정</button>
-            <button class="btn-ghost btn-xs" style="color:var(--danger-400)" data-delete-comment="${c.id}">삭제</button>
-          </div>
-        ` : ''}
+  return notes.map((n) => `
+    <div style="padding:0.75rem;background:var(--surface-1);border-radius:var(--radius-lg);margin-bottom:0.5rem;border-left:3px solid var(--primary-400);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.375rem;">
+        <span style="font-weight:600;font-size:0.8rem;color:var(--slate-200);">${escapeHtml(n.author || "")}</span>
+        <span style="font-size:0.7rem;color:var(--slate-400);">${n.createdAt ? formatDate(n.createdAt) : ""}</span>
       </div>
+      <div style="font-size:0.8rem;color:var(--slate-300);line-height:1.5;white-space:pre-wrap;">${escapeHtml(n.content || "")}</div>
     </div>
   `).join("");
-}
-
-function renderActionSection() {
-  if (!task) return "";
-
-  const _canComplete = canComplete();
-  const _canApprove = canApprove();
-
-  // Worker: complete task
-  if (_canComplete) {
-    const disabled = !allRequiredChecked() || actionLoading;
-    return `
-      <button class="btn-primary w-full" id="complete-task-btn" ${disabled ? "disabled" : ""}>
-        ${actionLoading ? ICONS.spinner : ICONS.checkCircle}
-        <span>작업 완료</span>
-      </button>
-      ${!allRequiredChecked() ? `<p class="text-xs text-dim text-center">필수 체크리스트 항목을 모두 완료하세요</p>` : ""}
-    `;
-  }
-
-  // Completed state
-  if (task.status === "completed") {
-    return `
-      <div class="flex items-center justify-center gap-2 p-4" style="color:var(--success-400)">
-        ${ICONS.checkCircle}
-        <span class="text-sm font-semibold">처리 완료</span>
-      </div>
-      ${task.completedDate ? `<p class="text-xs text-dim text-center">완료일: ${formatDate(task.completedDate)}</p>` : ""}
-    `;
-  }
-
-  // View only
-  return `
-    <div class="flex items-center justify-center gap-2 p-4" style="color:var(--slate-300)">
-      ${ICONS.eye}
-      <span class="text-sm font-semibold">조회 전용</span>
-    </div>
-  `;
 }
 
 function renderTimeline() {
@@ -515,148 +453,65 @@ function renderTimeline() {
 // ── Event Binding ────────────────────────────────────────────────────────────
 
 function bindEvents() {
-  // Checklist toggles
-  if (canComplete()) {
-    app.querySelectorAll("[data-checklist-toggle]").forEach((el) => {
-      const parent = el.closest("[data-checklist-idx]");
-      const handler = () => {
-        const idx = parseInt(el.dataset.checklistToggle, 10);
-        checklist[idx].checked = !checklist[idx].checked;
-        render();
-      };
-      el.addEventListener("click", handler);
-      if (parent) {
-        parent.addEventListener("click", (e) => {
-          if (e.target === el || el.contains(e.target)) return;
-          handler();
-        });
-        parent.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handler();
-          }
-        });
-      }
-    });
-  }
-
-  // Complete task
-  const completeBtn = app.querySelector("#complete-task-btn");
-  if (completeBtn) {
-    completeBtn.addEventListener("click", async () => {
-      if (!allRequiredChecked() || actionLoading) return;
-      actionLoading = true;
-      render();
-      try {
-        await completeTask(taskId);
-        showFeedback("success", "작업이 완료 처리되었습니다.");
-      } catch (e) {
-        console.error(e);
-        showFeedback("error", "작업 완료 중 오류가 발생했습니다.");
-      } finally {
-        actionLoading = false;
-      }
-    });
-  }
-
-  // Approve task
-  const approveBtn = app.querySelector("#approve-task-btn");
-  if (approveBtn) {
-    approveBtn.addEventListener("click", async () => {
+  // Save task fields
+  const saveBtn = app.querySelector("#save-task-btn");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
       if (actionLoading) return;
       actionLoading = true;
-      render();
+      const dueDateVal = task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)).toISOString().slice(0, 10) : "";
+      const updates = {};
+      const newAssignee = document.getElementById("task-assignee")?.value;
+      const newDept = document.getElementById("task-dept")?.value;
+      const newDueDate = document.getElementById("task-duedate")?.value;
+      const newImportance = document.getElementById("task-importance")?.value;
+      const newStatus = document.getElementById("task-status")?.value;
+
+      if (newAssignee !== (task.assignee || "")) updates.assignee = newAssignee;
+      if (newDept !== (task.department || "")) updates.department = newDept;
+      if (newImportance !== (task.importance || "green")) updates.importance = newImportance;
+      if (newDueDate && newDueDate !== dueDateVal) updates.dueDate = new Date(newDueDate);
+
       try {
-        await approveTask(taskId, user.name);
-        showFeedback("success", "작업이 승인되었습니다.");
+        if (newStatus && newStatus !== task.status) {
+          await updateChecklistItemStatus(task.id, newStatus);
+        }
+        if (Object.keys(updates).length > 0) {
+          await updateChecklistItem(task.id, updates);
+        }
+        showFeedback("success", "저장 완료");
       } catch (e) {
         console.error(e);
-        showFeedback("error", "승인 중 오류가 발생했습니다.");
+        showFeedback("error", "저장 중 오류가 발생했습니다.");
       } finally {
         actionLoading = false;
       }
     });
   }
 
-  // Reject task
-  const rejectBtn = app.querySelector("#reject-task-btn");
-  if (rejectBtn) {
-    rejectBtn.addEventListener("click", async () => {
-      const reasonInput = app.querySelector("#rejection-reason-input");
-      const reason = reasonInput ? reasonInput.value.trim() : "";
-      if (!reason) {
-        showFeedback("error", "반려 사유를 입력해주세요.");
-        return;
-      }
-      if (actionLoading) return;
-      actionLoading = true;
-      rejectionReason = reason;
-      render();
+  // Meeting note input sync
+  const meetingNoteInput = app.querySelector("#meeting-note-input");
+  if (meetingNoteInput) {
+    meetingNoteInput.addEventListener("input", (e) => {
+      meetingNoteText = e.target.value;
+    });
+  }
+
+  // Add meeting note
+  const addMeetingNoteBtn = app.querySelector("#add-meeting-note-btn");
+  if (addMeetingNoteBtn) {
+    addMeetingNoteBtn.addEventListener("click", async () => {
+      const text = meetingNoteText.trim();
+      if (!text) { showFeedback("error", "회의록 내용을 입력하세요."); return; }
+      const phase = getPhaseForStage(task.stage);
+      if (!phase) { showFeedback("error", "Phase를 찾을 수 없습니다."); return; }
       try {
-        await rejectTask(taskId, user.name, rejectionReason);
-        showFeedback("success", "작업이 반려되었습니다.");
-        rejectionReason = "";
+        await addGateMeetingNote(projectId, phase.name === "발의" ? "phase0" : phase.name === "기획" ? "phase1" : phase.name === "WM" ? "phase2" : phase.name === "Tx" ? "phase3" : phase.name === "MSG" ? "phase4" : "phase5", phase.name, user.name, text);
+        meetingNoteText = "";
+        showFeedback("success", "회의록이 추가되었습니다.");
       } catch (e) {
         console.error(e);
-        showFeedback("error", "반려 중 오류가 발생했습니다.");
-      } finally {
-        actionLoading = false;
-      }
-    });
-  }
-
-  // Restart task (after rejection)
-  const restartBtn = app.querySelector("#restart-task-btn");
-  if (restartBtn) {
-    restartBtn.addEventListener("click", async () => {
-      if (actionLoading) return;
-      actionLoading = true;
-      render();
-      try {
-        await restartTask(taskId);
-        showFeedback("success", "작업이 재시작되었습니다.");
-      } catch (e) {
-        console.error(e);
-        showFeedback("error", "재시작 중 오류가 발생했습니다.");
-      } finally {
-        actionLoading = false;
-      }
-    });
-  }
-
-  // Rejection reason textarea sync
-  const rejectionInput = app.querySelector("#rejection-reason-input");
-  if (rejectionInput) {
-    rejectionInput.value = rejectionReason;
-    rejectionInput.addEventListener("input", (e) => {
-      rejectionReason = e.target.value;
-    });
-  }
-
-  // Comment input
-  const commentInput = app.querySelector("#comment-input");
-  if (commentInput) {
-    commentInput.value = comment;
-    commentInput.addEventListener("input", (e) => {
-      comment = e.target.value;
-      const addBtn = app.querySelector("#add-comment-btn");
-      if (addBtn) addBtn.disabled = !comment.trim();
-    });
-  }
-
-  // Add comment
-  const addCommentBtn = app.querySelector("#add-comment-btn");
-  if (addCommentBtn) {
-    addCommentBtn.addEventListener("click", async () => {
-      const text = comment.trim();
-      if (!text) return;
-      try {
-        await addComment(taskId, user.id, user.name, text);
-        comment = "";
-        showFeedback("success", "코멘트가 추가되었습니다.");
-      } catch (e) {
-        console.error(e);
-        showFeedback("error", "코멘트 추가 중 오류가 발생했습니다.");
+        showFeedback("error", "회의록 추가 중 오류가 발생했습니다.");
       }
     });
   }
@@ -687,28 +542,6 @@ function bindEvents() {
         await removeFileMetadata(task.id, fileId);
         showFeedback("success", "파일 삭제 완료");
       } catch(err) { showFeedback("error", "파일 삭제 실패"); }
-    });
-  });
-
-  // Comment edit
-  app.querySelectorAll("[data-edit-comment]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const cId = btn.dataset.editComment;
-      const existing = (task.comments || []).find(c => c.id === cId);
-      const newText = prompt("코멘트 수정:", existing?.content || "");
-      if (newText !== null && newText.trim()) {
-        await updateComment(task.id, cId, newText.trim());
-        showFeedback("success", "코멘트 수정 완료");
-      }
-    });
-  });
-
-  // Comment delete
-  app.querySelectorAll("[data-delete-comment]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!await confirmModal("코멘트를 삭제하시겠습니까?")) return;
-      await deleteComment(task.id, btn.dataset.deleteComment);
-      showFeedback("success", "코멘트 삭제 완료");
     });
   });
 

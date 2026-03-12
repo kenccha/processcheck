@@ -1,5 +1,5 @@
 // =============================================================================
-// Projects Page -- 7 view modes (cards, table, gantt, kanban, timeline, calendar, matrix)
+// Projects Page -- 2 view modes (table, card)
 // =============================================================================
 
 import { guardPage, getUser } from "../auth.js";
@@ -39,19 +39,16 @@ const unsubNav = renderNav(navRoot);
 
 // -- Read query params --
 const urlParams = new URLSearchParams(window.location.search);
-const forcedType = urlParams.get("type"); // "신규개발" | "설계변경" | null
+const forcedType = urlParams.get("type"); // "신규개발" | null
 
 // -- State --
 let projects = [];
 let allTasks = [];
-let projectTypeTab = forcedType || "신규개발"; // "신규개발" | "설계변경"
 const _savedProj = loadViewState('projects');
-let viewMode = (_savedProj && _savedProj.viewMode) || "table";
-let changeViewMode = "table"; // table | kanban (설계변경 전용)
+const _validViews = ["table", "cards"];
+let viewMode = (_savedProj && _validViews.includes(_savedProj.viewMode) && _savedProj.viewMode) || "table";
 let searchQuery = "";
 let statusFilter = (_savedProj && _savedProj.statusFilter) || "all";
-let calendarYear = new Date().getFullYear();
-let calendarMonth = new Date().getMonth(); // 0-based
 let sortField = (_savedProj && _savedProj.sortField) || "startDate";
 let sortDir = (_savedProj && _savedProj.sortDir) || "desc";
 
@@ -102,9 +99,6 @@ window.addEventListener("beforeunload", () => {
 
 function getFilteredProjects() {
   return projects.filter((p) => {
-    // project type tab filter
-    const pType = p.projectType || "신규개발";
-    if (pType !== projectTypeTab) return false;
     // status filter
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     // search filter
@@ -221,18 +215,9 @@ function sameDay(d1, d2) {
 
 const VIEW_MODES = [
   { key: "table", label: "테이블" },
-  { key: "matrix", label: "매트릭스" },
   { key: "cards", label: "카드" },
-  { key: "gantt", label: "간트" },
-  { key: "kanban", label: "칸반" },
-  { key: "timeline", label: "타임라인" },
-  { key: "calendar", label: "캘린더" },
 ];
 
-const CHANGE_VIEW_MODES = [
-  { key: "table", label: "테이블" },
-  { key: "kanban", label: "칸반" },
-];
 
 // =============================================================================
 // Status filter labels
@@ -270,11 +255,10 @@ function getProjectStatusBadge(status) {
 function render() {
   saveViewState('projects', { viewMode, sortField, sortDir, statusFilter });
   const filtered = getFilteredProjects();
-  const isChangeTab = projectTypeTab === "설계변경";
-  const currentViewModes = isChangeTab ? CHANGE_VIEW_MODES : VIEW_MODES;
-  const currentView = isChangeTab ? changeViewMode : viewMode;
+  const currentViewModes = VIEW_MODES;
+  const currentView = viewMode;
 
-  const pageTitle = forcedType === "설계변경" ? "설계변경" : forcedType === "신규개발" ? "출시위원회" : "프로젝트";
+  const pageTitle = forcedType === "신규개발" ? "출시위원회" : "프로젝트";
 
   app.innerHTML = `
     <div class="container">
@@ -290,16 +274,10 @@ function render() {
           </button>
           <button class="btn btn-primary" id="btn-create-project" style="gap:6px">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            ${isChangeTab ? "설계변경 등록" : "프로젝트 등록"}
+            프로젝트 등록
           </button>
         </div>
       </div>
-
-      <!-- Project Type Tabs (신규개발 / 설계변경) — hidden when forced via URL -->
-      ${!forcedType ? `<div class="tab-bar mb-4">
-        <button class="tab-btn${projectTypeTab === "신규개발" ? " active" : ""}" data-type-tab="신규개발">신규개발</button>
-        <button class="tab-btn${projectTypeTab === "설계변경" ? " active" : ""}" data-type-tab="설계변경">설계변경</button>
-      </div>` : ""}
 
       <!-- Controls -->
       <div class="flex items-center gap-4 mb-6 flex-wrap">
@@ -327,7 +305,7 @@ function render() {
 
       <!-- Content -->
       <div id="view-content">
-        ${isChangeTab ? renderChangeViewContent(filtered) : renderViewContent(filtered)}
+        ${renderViewContent(filtered)}
       </div>
     </div>
 
@@ -335,30 +313,19 @@ function render() {
     <div class="modal-backdrop" id="create-modal" style="display:none">
       <div class="modal" style="max-width:520px">
         <div class="modal-header">
-          <h3 class="modal-title">${isChangeTab ? "설계변경 등록" : "신규개발 프로젝트 등록"}</h3>
+          <h3 class="modal-title">프로젝트 등록</h3>
           <button class="modal-close" id="create-modal-close">&times;</button>
         </div>
         <div class="modal-body">
           <div class="flex flex-col gap-4">
             <div>
               <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">프로젝트명 <span style="color:var(--danger-400)">*</span></label>
-              <input type="text" class="input-field" id="cp-name" placeholder="${isChangeTab ? "예: 센서 교체 (혈압계)" : "예: 신규 체성분 분석기 개발"}" />
+              <input type="text" class="input-field" id="cp-name" placeholder="예: 신규 체성분 분석기 개발" />
             </div>
             <div>
               <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">제품 유형 <span style="color:var(--danger-400)">*</span></label>
               <input type="text" class="input-field" id="cp-product" placeholder="예: 체성분 분석기, 혈압계, FRA" />
             </div>
-            ${isChangeTab ? `
-            <div>
-              <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">변경 규모 <span style="color:var(--danger-400)">*</span></label>
-              <select class="input-field" id="cp-scale">
-                <option value="">선택하세요</option>
-                <option value="minor">경미 (minor) — 접수→승인</option>
-                <option value="medium">중간 (medium) — 접수→검토→승인→적용</option>
-                <option value="major">대규모 (major) — 전체 6 Phase</option>
-              </select>
-            </div>
-            ` : ""}
             <div class="flex gap-4">
               <div style="flex:1">
                 <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">시작일 <span style="color:var(--danger-400)">*</span></label>
@@ -387,130 +354,8 @@ function renderViewContent(filtered) {
   switch (viewMode) {
     case "cards":    return renderCards(filtered);
     case "table":    return renderTable(filtered);
-    case "gantt":    return renderGantt(filtered);
-    case "kanban":   return renderKanban(filtered);
-    case "timeline": return renderTimeline(filtered);
-    case "calendar": return renderCalendar(filtered);
-    case "matrix":   return renderMatrix(filtered);
-    default:         return renderCards(filtered);
+    default:         return renderTable(filtered);
   }
-}
-
-function renderChangeViewContent(filtered) {
-  switch (changeViewMode) {
-    case "kanban":  return renderChangeKanban(filtered);
-    case "table":   return renderChangeTable(filtered);
-    default:        return renderChangeTable(filtered);
-  }
-}
-
-// =============================================================================
-// 설계변경 전용 테이블 뷰
-// =============================================================================
-
-function getChangeScaleLabel(scale) {
-  switch (scale) {
-    case "major": return "대규모";
-    case "medium": return "중간";
-    case "minor": return "경미";
-    default: return scale || "-";
-  }
-}
-
-function getChangeScaleBadge(scale) {
-  switch (scale) {
-    case "major": return "badge-danger";
-    case "medium": return "badge-warning";
-    case "minor": return "badge-neutral";
-    default: return "badge-neutral";
-  }
-}
-
-function renderChangeTable(filtered) {
-  if (filtered.length === 0) return renderEmpty();
-
-  return `
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>프로젝트명</th>
-            <th>규모</th>
-            <th>상태</th>
-            <th>PM</th>
-            <th>중요도</th>
-            <th>진행률</th>
-            <th>요청일</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filtered.map(p => `
-            <tr class="cursor-pointer" data-project-id="${p.id}">
-              <td><span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span></td>
-              <td><span class="badge ${getChangeScaleBadge(p.changeScale)}">${getChangeScaleLabel(p.changeScale)}</span></td>
-              <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
-              <!-- PM 제거됨 -->
-              <td><span class="risk-dot ${p.riskLevel || ""}"></span> ${getRiskLabel(p.riskLevel)}</td>
-              <td>
-                <div class="flex items-center gap-2">
-                  <div class="progress-bar" style="width:80px">
-                    <div class="progress-fill" style="width:${p.progress || 0}%"></div>
-                  </div>
-                  <span class="text-xs font-mono">${p.progress || 0}%</span>
-                </div>
-              </td>
-              <td class="text-xs whitespace-nowrap">${formatDate(p.startDate)}</td>
-            </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-// =============================================================================
-// 설계변경 전용 칸반 뷰
-// =============================================================================
-
-function renderChangeKanban(filtered) {
-  const columns = [
-    { key: "active", label: "진행 중", color: "var(--primary-400)" },
-    { key: "completed", label: "완료", color: "var(--success-400)" },
-    { key: "on_hold", label: "보류", color: "var(--warning-400)" },
-  ];
-  // Note: DnD is handled by bindControls() via data-drop-zone and data-drag-project attributes
-
-  return `
-    <div class="kanban-board">
-      ${columns.map(col => {
-        const colProjects = filtered.filter(p => p.status === col.key);
-        return `
-        <div class="kanban-column" data-kanban-col="${col.key}" style="flex:1;max-width:none">
-          <div class="kanban-column-header">
-            <div class="flex items-center gap-2">
-              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col.color}"></span>
-              <span class="kanban-column-title">${col.label}</span>
-            </div>
-            <span class="kanban-column-count">${colProjects.length}</span>
-          </div>
-          <div class="kanban-column-body" data-drop-zone="${col.key}">
-            ${colProjects.length === 0
-              ? `<div class="empty-state" style="padding:2rem"><span class="empty-state-text">프로젝트 없음</span></div>`
-              : colProjects.map(p => `
-                <div class="kanban-card" data-project-id="${p.id}" draggable="true" data-drag-project="${p.id}">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
-                    <span class="badge ${getChangeScaleBadge(p.changeScale)}" style="font-size:0.625rem">${getChangeScaleLabel(p.changeScale)}</span>
-                  </div>
-                  <div class="progress-bar mb-1">
-                    <div class="progress-fill" style="width:${p.progress || 0}%"></div>
-                  </div>
-                  <div class="text-xs text-soft">${p.progress || 0}%</div>
-                </div>`).join("")}
-          </div>
-        </div>`;
-      }).join("")}
-    </div>
-  `;
 }
 
 // =============================================================================
@@ -1066,14 +911,6 @@ function renderEmpty() {
 // =============================================================================
 
 function bindControls() {
-  // Project type tab switcher (신규개발 / 설계변경)
-  document.querySelectorAll("[data-type-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      projectTypeTab = btn.dataset.typeTab;
-      render();
-    });
-  });
-
   // Search
   const searchInput = document.getElementById("search-input");
   if (searchInput) {
@@ -1101,11 +938,7 @@ function bindControls() {
   // View mode switcher
   document.querySelectorAll("[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (projectTypeTab === "설계변경") {
-        changeViewMode = btn.dataset.view;
-      } else {
-        viewMode = btn.dataset.view;
-      }
+      viewMode = btn.dataset.view;
       render();
     });
   });
@@ -1248,17 +1081,10 @@ function bindControls() {
       const startStr = document.getElementById("cp-start")?.value;
       const endStr = document.getElementById("cp-end")?.value;
       const pm = document.getElementById("cp-pm")?.value.trim() || "";
-      const scaleEl = document.getElementById("cp-scale");
-      const changeScale = scaleEl ? scaleEl.value : null;
-      const isChange = projectTypeTab === "설계변경";
 
       // Validation
       if (!name || !productType || !startStr || !endStr) {
         showToast('warning', "필수 항목을 모두 입력하세요.");
-        return;
-      }
-      if (isChange && !changeScale) {
-        showToast('warning', "변경 규모를 선택하세요.");
         return;
       }
       if (new Date(endStr) <= new Date(startStr)) {
@@ -1273,7 +1099,7 @@ function bindControls() {
         const projData = {
           name,
           productType,
-          projectType: isChange ? "설계변경" : "신규개발",
+          projectType: "신규개발",
           status: "active",
           progress: 0,
           startDate: new Date(startStr),
@@ -1282,7 +1108,6 @@ function bindControls() {
           riskLevel: "green",
           currentStage: "발의검토",
         };
-        if (isChange) projData.changeScale = changeScale;
 
         const newId = await createProject(projData);
         closeModal();

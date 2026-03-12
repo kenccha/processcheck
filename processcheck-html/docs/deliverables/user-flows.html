@@ -603,7 +603,7 @@ body {
 <div class="tab-content active" id="tab-worker">
   <div class="section-header">
     <h2>실무자 (Worker) 플로우</h2>
-    <p>실무자는 실제 업무를 담당하며, 작업을 수행하고 완료 보고를 합니다. 매니저의 승인을 받아야 최종 완료됩니다.</p>
+    <p>실무자는 실제 업무를 담당하며, 작업을 수행하고 완료 처리합니다. 완료 처리 = 최종 완료 (개별 작업 승인 절차 없음).</p>
   </div>
 
   <div class="legend">
@@ -665,7 +665,7 @@ body {
         </div>
 
         <div class="node node-screen"
-          data-tooltip="나의 작업 목록, 승인 대기, 알림 확인\n실무자: subscribeChecklistItemsByAssignee"
+          data-tooltip="나의 작업 목록, 알림 확인\n실무자: subscribeChecklistItemsByAssignee\n통계 카드 3개: 프로젝트, 긴급, 알림"
           data-popup="worker-dashboard">
           대시보드 (dashboard.html)
         </div>
@@ -728,48 +728,19 @@ body {
         </div>
 
         <div class="node node-action"
-          data-tooltip="작업 완료 버튼 클릭\nstatus: completed, approvalStatus: pending\n매니저에게 자동 알림 생성"
+          data-tooltip="작업 완료 버튼 클릭\ncompleteTask() → status: completed\n개별 승인 없이 바로 최종 완료"
           data-popup="task-complete">
           "작업 완료" 클릭
         </div>
 
         <div class="arrow-down"><div class="line"></div><div class="head"></div>
-          <span class="label">approvalStatus: pending</span>
+          <span class="label">status: completed (최종)</span>
         </div>
 
-        <div class="node node-condition"
-          data-tooltip="매니저가 work stage 작업을 검토\napprovalStatus 변경 대기"
-          data-popup="approval-wait">
-          매니저 승인 대기
-        </div>
-
-        <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
-
-        <div class="branch-container">
-          <div class="branch">
-            <span class="branch-label yes">승인됨</span>
-            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
-            <div class="node node-end"
-              data-tooltip="작업이 최종 승인됨\napprovalStatus: approved"
-              data-popup="task-approved">
-              작업 완료
-            </div>
-          </div>
-          <div class="branch">
-            <span class="branch-label no">반려됨</span>
-            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
-            <div class="node node-action"
-              data-tooltip="반려 사유 확인 후 재작업\nrestartTask() 호출\nstatus: rejected -> in_progress"
-              data-popup="task-restart">
-              "재작업 시작"
-            </div>
-            <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div>
-              <span class="label" style="left:14px;">다시 작업 수행</span>
-            </div>
-            <div class="node node-sub" style="font-size:11px; opacity:0.7; border-style:dashed;">
-              작업 수행 (위로 반복)
-            </div>
-          </div>
+        <div class="node node-end"
+          data-tooltip="작업 완료 처리 = 최종 완료\n개별 작업 승인 절차 제거됨"
+          data-popup="task-approved">
+          작업 완료
         </div>
 
       </div>
@@ -821,7 +792,7 @@ body {
 <div class="tab-content" id="tab-manager">
   <div class="section-header">
     <h2>매니저 (Manager) 플로우</h2>
-    <p>매니저는 부서 관리자로서, work stage 작업의 승인/반려와 체크리스트 관리를 담당합니다.</p>
+    <p>매니저는 부서 관리자로서, 작업 배분 · 재배분과 체크리스트 관리를 담당합니다. (개별 작업 승인 권한 없음)</p>
   </div>
 
   <div class="legend">
@@ -834,7 +805,7 @@ body {
 
   <!-- Main: Approval Flow -->
   <div class="flow-section">
-    <h3>메인 플로우: 로그인 - 승인 처리</h3>
+    <h3>메인 플로우: 로그인 - 작업 배분</h3>
     <div class="flow-container">
       <div class="flow-diagram">
 
@@ -849,70 +820,62 @@ body {
         </div>
 
         <div class="node node-screen"
-          data-tooltip="승인 대기 목록 + 부서별 작업 현황\nsubscribeAllChecklistItems -> 자기 부서 필터\n통계 카드: 작업대기, 승인대기, 프로젝트, 알림, 고객요청"
+          data-tooltip="부서별 작업 현황 확인\nsubscribeAllChecklistItems -> 자기 부서 필터\n통계 카드 3개: 프로젝트, 긴급, 알림"
           data-popup="mgr-dashboard">
           대시보드 (dashboard.html)
         </div>
 
         <div class="arrow-down"><div class="line"></div><div class="head"></div>
-          <span class="label">승인대기 항목 클릭</span>
+          <span class="label">작업 항목 클릭</span>
         </div>
 
         <div class="node node-screen"
-          data-tooltip="실무자가 완료한 작업 상세 확인\n타임라인, 첨부파일, 코멘트"
+          data-tooltip="작업 상세 확인\n담당자 변경(재배분) 가능"
           data-popup="mgr-task">
           작업 상세 (task.html)
         </div>
 
         <div class="arrow-down"><div class="line"></div><div class="head"></div>
-          <span class="label">작업 내용 검토</span>
+          <span class="label">담당자 확인</span>
         </div>
-
-        <div class="node node-action"
-          data-tooltip="work stage 작업의 결과물 검토\n파일 확인, 코멘트 읽기"
-          data-popup="mgr-review">
-          작업 내용 검토
-        </div>
-
-        <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
 
         <div class="node node-condition"
-          data-tooltip="승인 또는 반려 결정\nwork stage만 매니저가 승인 가능"
+          data-tooltip="작업 담당자를 적합한 사람에게 배분\n또는 다른 담당자로 재배분"
           data-popup="mgr-decision">
-          승인 / 반려?
+          배분 / 재배분?
         </div>
 
         <div class="arrow-down"><div class="line" style="height:12px;"></div></div>
 
         <div class="branch-container">
           <div class="branch">
-            <span class="branch-label yes">승인</span>
+            <span class="branch-label yes">배분</span>
             <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
             <div class="node node-action"
-              data-tooltip="approveTask() 호출\napprovalStatus: approved\n담당자에게 알림 자동 생성"
-              data-popup="mgr-approve">
-              "승인" 버튼 클릭
+              data-tooltip="적합한 실무자에게 작업 배분\nassignee 필드 변경"
+              data-popup="mgr-assign">
+              담당자 배분
             </div>
             <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
             <div class="node node-end"
-              data-tooltip="작업 승인 처리 완료\n대시보드로 돌아가 다음 승인 대기 항목 처리"
+              data-tooltip="작업 배분 완료\n대시보드로 돌아가 다른 작업 배분"
               data-popup="mgr-done">
-              승인 완료
+              배분 완료
             </div>
           </div>
           <div class="branch">
-            <span class="branch-label no">반려</span>
+            <span class="branch-label neutral">재배분</span>
             <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
             <div class="node node-action"
-              data-tooltip="rejectTask() 호출\n반려 사유 입력 필수\n담당자에게 반려 알림 자동 생성"
-              data-popup="mgr-reject">
-              "반려" + 사유 입력
+              data-tooltip="기존 담당자를 다른 사람으로 변경\nassignee 필드 업데이트"
+              data-popup="mgr-reassign">
+              담당자 변경
             </div>
             <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
             <div class="node node-end"
-              data-tooltip="반려 처리 완료\n실무자에게 재작업 요청됨"
-              data-popup="mgr-rejected">
-              반려 완료
+              data-tooltip="재배분 처리 완료"
+              data-popup="mgr-reassigned">
+              재배분 완료
             </div>
           </div>
         </div>
@@ -1006,7 +969,7 @@ body {
         </div>
 
         <div class="node node-screen"
-          data-tooltip="전체 프로젝트 현황 + 위원회 승인 대기\nsubscribeAllChecklistItems (전체)\n통계 카드 5개 표시"
+          data-tooltip="전체 프로젝트 현황 + 위원회 승인 대기\nsubscribeAllChecklistItems (전체)\n통계 카드 3개: 프로젝트, 긴급, 알림"
           data-popup="obs-dashboard">
           대시보드 (dashboard.html)
         </div>
@@ -1016,7 +979,7 @@ body {
         </div>
 
         <div class="node node-screen"
-          data-tooltip="gate stage 작업 상세\n해당 work stage 모든 작업이 매니저 승인 완료 여부 확인"
+          data-tooltip="프로젝트 상세 Phase 뷰\n해당 work stage 모든 작업 완료 여부 확인\ngateRecords 컬렉션으로 위원회 승인 관리"
           data-popup="obs-task">
           작업 상세 (task.html)
         </div>
@@ -1026,7 +989,7 @@ body {
         </div>
 
         <div class="node node-condition"
-          data-tooltip="gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관\nwork stage의 모든 작업 승인 완료 후 진행"
+          data-tooltip="gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관\nwork stage의 모든 작업 완료 후 진행\ngateRecords로 Phase 단위 승인"
           data-popup="obs-gate-check">
           Gate Stage 승인?
         </div>
@@ -1038,7 +1001,7 @@ body {
             <span class="branch-label yes">최종 승인</span>
             <div class="arrow-down"><div class="line" style="height:16px;"></div><div class="head"></div></div>
             <div class="node node-action"
-              data-tooltip="approveTask() 호출\ngate stage 승인 시 고객 포털 알림 자동 생성\nrecalculateProjectStats() 호출"
+              data-tooltip="updateGateRecord() 호출\ngate 승인 시 고객 포털 알림 자동 생성\nrecalculateProjectStats() 호출"
               data-popup="obs-approve">
               "승인" 클릭
             </div>
@@ -1086,7 +1049,7 @@ body {
         </div>
 
         <div class="node node-screen"
-          data-tooltip="모든 탭 접근 가능\n개요, 체크리스트, 설계변경, 출시준비"
+          data-tooltip="모든 탭 접근 가능\n개요+작업, 스케줄, 병목"
           data-popup="obs-project-detail">
           프로젝트 상세 (모든 탭)
         </div>
@@ -1287,7 +1250,7 @@ body {
         <div class="arrow-down"><div class="line"></div><div class="head"></div></div>
 
         <div class="node node-condition"
-          data-tooltip="PM/매니저만 승인/반려 가능\n반려 시 사유 입력 필수"
+          data-tooltip="매니저만 승인/반려 가능\n반려 시 사유 입력 필수"
           data-popup="cr-decision">
           승인 / 반려?
         </div>
@@ -1512,7 +1475,7 @@ body {
       type: 'screen',
       typeLabel: '화면',
       desc: '실무자에게 배정된 작업 목록과 알림을 확인하는 메인 화면입니다.',
-      data: ['나의 작업 대기 목록 (마감 3일 이내)', '승인 대기 중인 작업', '최근 알림 목록', '프로젝트 수'],
+      data: ['나의 작업 대기 목록 (마감 3일 이내)', '최근 알림 목록', '통계 카드 3개: 프로젝트(지연 N건), 긴급(초과+오늘), 알림'],
       actions: ['통계 카드 클릭으로 섹션 스크롤/페이지 이동', '작업 항목 클릭으로 task.html 이동', '알림 클릭으로 해당 페이지 이동']
     },
     'task-detail': {
@@ -1559,24 +1522,16 @@ body {
       title: '"작업 완료" 클릭',
       type: 'action',
       typeLabel: '행동',
-      desc: '작업을 완료 상태로 변경하고 매니저에게 승인을 요청합니다.',
-      data: ['status: completed', 'approvalStatus: pending (자동 설정)', '완료 시간 기록'],
-      actions: ['completeTask() 호출', '매니저에게 승인 요청 알림 자동 생성', '대시보드에서 "승인 대기" 카운트 증가']
-    },
-    'approval-wait': {
-      title: '매니저 승인 대기',
-      type: 'condition',
-      typeLabel: '조건분기',
-      desc: '매니저가 work stage 작업을 검토하여 승인 또는 반려합니다.',
-      data: ['approvalStatus: pending 상태', '검토자(매니저) 이름 + 완료일 표시', 'work stage만 매니저가 승인 가능'],
-      actions: ['매니저의 승인 결과를 대기', '승인 시 -> 작업 완료', '반려 시 -> 재작업 필요']
+      desc: '작업을 완료 상태로 변경합니다. 개별 작업 승인 없이 바로 최종 완료됩니다.',
+      data: ['status: completed (최종)', '완료 시간 기록', 'approvalStatus 미사용'],
+      actions: ['completeTask() 호출', 'recalculateProjectStats() 호출']
     },
     'task-approved': {
       title: '작업 완료',
       type: 'end',
       typeLabel: '끝',
-      desc: '매니저의 승인을 받아 작업이 최종 완료되었습니다.',
-      data: ['approvalStatus: approved', 'approvedBy: 매니저 이름', 'approvedAt: 승인 시간'],
+      desc: '작업 완료 처리 = 최종 완료. 개별 작업 승인 절차가 제거되었습니다.',
+      data: ['status: completed'],
       actions: []
     },
     'task-restart': {
@@ -1601,15 +1556,15 @@ body {
       typeLabel: '화면',
       desc: '전체 프로젝트를 다양한 뷰로 확인합니다.',
       data: ['7가지 뷰: 테이블, 매트릭스, 카드, 간트, 칸반, 타임라인, 캘린더', '프로젝트 유형별 탭: 신규개발, 설계변경', '검색, 필터, 정렬 기능'],
-      actions: ['뷰 모드 전환', '프로젝트 선택하여 상세 페이지 이동', '정렬: 이름, 상태, PM, 진행률, 시작일']
+      actions: ['뷰 모드 전환', '프로젝트 선택하여 상세 페이지 이동', '정렬: 이름, 상태, 진행률, 시작일']
     },
     'project-detail': {
       title: '프로젝트 상세 (project.html)',
       type: 'screen',
       typeLabel: '화면',
       desc: '개별 프로젝트의 상세 정보와 진행 현황을 확인합니다.',
-      data: ['5개 통계 카드: 전체작업, 진행중, 지연, 매니저승인대기, 위원회승인대기', '프로젝트 상태 요약 카드', '4개 탭: 개요, 체크리스트, 설계변경, 출시준비'],
-      actions: ['통계 카드 클릭으로 체크리스트 탭 + 필터 적용', '탭 전환', '체크리스트 항목 확인']
+      data: ['3개 통계 카드: 전체작업, 진행중, 지연', 'D-Day 표시 + 지연 시 빨강 배너', '3개 탭: 개요+작업, 스케줄, 병목'],
+      actions: ['통계 카드 클릭으로 체크리스트 필터 적용', '탭 전환', '체크리스트 항목 확인']
     },
     'my-checklist': {
       title: '나의 체크리스트 확인',
@@ -1633,73 +1588,65 @@ body {
       title: '대시보드 (매니저 뷰)',
       type: 'screen',
       typeLabel: '화면',
-      desc: '매니저는 자기 부서의 승인 대기 항목과 작업 현황을 확인합니다.',
-      data: ['승인 대기 작업 목록 (자기 부서)', '부서별 작업 현황', '통계 카드 5개', 'subscribeAllChecklistItems -> 자기 부서 필터'],
-      actions: ['승인 대기 항목 클릭으로 task.html 이동', '통계 카드 클릭', '알림 확인']
+      desc: '매니저는 자기 부서의 작업 현황을 확인하고 작업을 배분합니다.',
+      data: ['부서별 작업 현황', '통계 카드 3개: 프로젝트, 긴급, 알림', 'subscribeAllChecklistItems -> 자기 부서 필터'],
+      actions: ['작업 항목 클릭으로 task.html 이동', '통계 카드 클릭', '알림 확인']
     },
     'mgr-task': {
-      title: '작업 상세 (매니저 검토)',
+      title: '작업 상세 (매니저)',
       type: 'screen',
       typeLabel: '화면',
-      desc: '실무자가 완료한 작업의 상세 내용을 검토합니다.',
-      data: ['작업 결과물 (첨부파일)', '타임라인 (작업 이력)', '코멘트 내용', '작업 완료 시간'],
-      actions: ['"승인" 버튼 클릭', '"반려" 버튼 + 사유 입력']
-    },
-    'mgr-review': {
-      title: '작업 내용 검토',
-      type: 'action',
-      typeLabel: '행동',
-      desc: 'work stage 작업의 결과물을 검토합니다.',
-      data: ['파일 첨부 내용 확인', '코멘트 확인', '체크리스트 완료 여부'],
-      actions: ['내용 확인 후 승인/반려 결정']
+      desc: '작업 상세를 확인하고 담당자를 배분/재배분합니다.',
+      data: ['작업 결과물 (첨부파일)', '타임라인 (작업 이력)', '코멘트 내용', '담당자 정보'],
+      actions: ['담당자 배분/재배분', '작업 상태 확인']
     },
     'mgr-decision': {
-      title: '승인/반려 결정',
+      title: '배분/재배분 결정',
       type: 'condition',
       typeLabel: '조건분기',
-      desc: 'work stage 작업에 대한 승인 또는 반려를 결정합니다.',
-      data: ['work stage만 매니저 승인 가능', 'GATE_STAGES 배열로 판별'],
-      actions: ['승인: approveTask() 호출', '반려: rejectTask() + 사유 입력']
+      desc: '작업을 적합한 담당자에게 배분 또는 재배분합니다. (개별 승인 권한 없음)',
+      data: ['매니저는 작업 배분만 담당', '승인 권한 없음 (completeTask = 최종 완료)'],
+      actions: ['배분: assignee 필드 변경', '재배분: 다른 담당자로 변경']
     },
-    'mgr-approve': {
-      title: '"승인" 버튼 클릭',
+    'mgr-assign': {
+      title: '담당자 배분',
       type: 'action',
       typeLabel: '행동',
-      desc: '작업을 승인 처리합니다.',
-      data: ['approvalStatus: approved', 'approvedBy: 매니저 이름', 'approvedAt: 승인 시간'],
-      actions: ['approveTask() 호출', '담당자에게 승인 알림 자동 생성', 'recalculateProjectStats() 호출']
+      desc: '적합한 실무자에게 작업을 배분합니다.',
+      data: ['assignee 필드 변경', '부서 내 실무자 목록에서 선택'],
+      actions: ['담당자 변경 저장']
     },
-    'mgr-reject': {
-      title: '"반려" + 사유 입력',
+    'mgr-reassign': {
+      title: '담당자 변경 (재배분)',
       type: 'action',
       typeLabel: '행동',
-      desc: '작업을 반려하고 사유를 기록합니다.',
-      data: ['approvalStatus: rejected', '반려 사유 필수 입력'],
-      actions: ['rejectTask() 호출', '담당자에게 반려 알림 자동 생성', '실무자에게 "재작업 시작" 버튼 활성화']
+      desc: '기존 담당자를 다른 사람으로 변경합니다.',
+      data: ['assignee 필드 업데이트'],
+      actions: ['담당자 변경 저장']
     },
     'mgr-done': {
-      title: '승인 완료',
+      title: '배분 완료',
       type: 'end',
       typeLabel: '끝',
-      desc: '작업 승인 처리가 완료되었습니다.',
-      data: ['작업 상태가 최종 승인으로 변경'],
-      actions: ['대시보드로 돌아가 다음 승인 대기 항목 처리']
+      desc: '작업 배분이 완료되었습니다.',
+      data: ['담당자에게 작업 배정됨'],
+      actions: ['대시보드로 돌아가 다른 작업 배분']
     },
-    'mgr-rejected': {
-      title: '반려 완료',
+    'mgr-reassigned': {
+      title: '재배분 완료',
       type: 'end',
       typeLabel: '끝',
-      desc: '반려 처리가 완료되었습니다.',
-      data: ['실무자에게 재작업 요청됨'],
-      actions: ['실무자가 재작업 시작 후 다시 승인 대기']
+      desc: '작업 재배분이 완료되었습니다.',
+      data: ['새 담당자에게 작업 재배정됨'],
+      actions: []
     },
     'mgr-projects': {
       title: '프로젝트 상세 (매니저)',
       type: 'screen',
       typeLabel: '화면',
       desc: '프로젝트 상세에서 체크리스트 관리와 템플릿 적용을 수행합니다.',
-      data: ['4개 탭: 개요, 체크리스트, 설계변경, 출시준비', '부서별 작업 현황'],
-      actions: ['체크리스트 탭에서 작업 관리', '개요 탭에서 템플릿 적용']
+      data: ['3개 탭: 개요+작업, 스케줄, 병목', '부서별 작업 현황'],
+      actions: ['개요+작업 탭에서 작업 관리', '템플릿 적용']
     },
     'mgr-add-task': {
       title: '작업 추가 (모달)',
@@ -1748,7 +1695,7 @@ body {
       type: 'screen',
       typeLabel: '화면',
       desc: '전체 프로젝트 현황과 위원회 승인 대기를 확인합니다.',
-      data: ['전체 프로젝트 현황', '위원회(Gate) 승인 대기 목록', '통계 카드 5개', 'subscribeAllChecklistItems (전체)'],
+      data: ['전체 프로젝트 현황', '위원회(Gate) 승인 대기 목록', '통계 카드 3개: 프로젝트, 긴급, 알림', 'subscribeAllChecklistItems (전체)'],
       actions: ['위원회 승인 대기 항목 클릭', '통계 카드 클릭', '전체 프로젝트 모니터링']
     },
     'obs-task': {
@@ -1756,7 +1703,7 @@ body {
       type: 'screen',
       typeLabel: '화면',
       desc: 'gate stage 작업의 최종 승인을 위한 검토 화면입니다.',
-      data: ['해당 work stage 모든 작업 승인 완료 여부', 'Gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관'],
+      data: ['해당 work stage 모든 작업 완료 여부', 'Gate stage: 발의승인, 기획승인, WM승인회, Tx승인회, MSG승인회, 영업이관', 'gateRecords 컬렉션으로 관리'],
       actions: ['"승인" 또는 "반려" 결정']
     },
     'obs-gate-check': {
@@ -1764,7 +1711,7 @@ body {
       type: 'condition',
       typeLabel: '조건분기',
       desc: 'gate stage(위원회) 작업에 대한 최종 승인/반려를 결정합니다.',
-      data: ['GATE_STAGES 배열로 gate stage 판별', 'observer만 gate stage 승인 가능', 'work stage 모든 작업 승인 완료 후 진행'],
+      data: ['GATE_STAGES 배열로 gate stage 판별', 'observer만 gate stage 승인 가능', 'work stage 모든 작업 완료 후 진행', 'gateRecords 컬렉션으로 Phase 단위 승인'],
       actions: ['최종 승인: 다음 phase로 진행', '반려: 해당 phase 재검토']
     },
     'obs-approve': {
@@ -1772,8 +1719,8 @@ body {
       type: 'action',
       typeLabel: '행동',
       desc: 'gate stage 작업을 최종 승인합니다.',
-      data: ['approvalStatus: approved', 'gate 승인 시 고객 포털 알림 자동 생성'],
-      actions: ['approveTask() 호출', 'recalculateProjectStats() 호출', '고객 포털에 알림 생성']
+      data: ['gateStatus: approved', 'gate 승인 시 고객 포털 알림 자동 생성'],
+      actions: ['updateGateRecord() 호출', 'recalculateProjectStats() 호출', '고객 포털에 알림 생성']
     },
     'obs-reject': {
       title: '"반려" + 사유 (Gate)',
@@ -1781,7 +1728,7 @@ body {
       typeLabel: '행동',
       desc: 'gate stage 작업을 반려합니다.',
       data: ['반려 사유 입력 필수', '해당 phase 작업 재검토 필요'],
-      actions: ['rejectTask() 호출', '관련 담당자에게 알림']
+      actions: ['updateGateRecord() 호출 (rejected)', '관련 담당자에게 알림']
     },
     'obs-done': {
       title: 'Gate 승인 완료',
@@ -1804,7 +1751,7 @@ body {
       type: 'screen',
       typeLabel: '화면',
       desc: '전체 프로젝트를 매트릭스 뷰로 한눈에 파악합니다.',
-      data: ['6 phase 열 (발의, 기획, WM, Tx, MSG, 양산/이관)', '각 셀: 작업 진행(completed/total) + 승인 상태', '부서별 현황'],
+      data: ['6 phase 열 (발의, 기획, WM, Tx, MSG, 양산/이관)', '각 셀: 동그라미 1개 (작업 completed/total)', '부서별 현황'],
       actions: ['프로젝트 선택하여 상세 이동', '전체 프로젝트 현황 모니터링']
     },
     'obs-project-detail': {
@@ -1812,7 +1759,7 @@ body {
       type: 'screen',
       typeLabel: '화면',
       desc: '기획조정실은 모든 탭에 접근할 수 있습니다.',
-      data: ['개요, 체크리스트, 설계변경, 출시준비 탭 전체', '5개 통계 카드'],
+      data: ['개요+작업, 스케줄, 병목 탭 전체', '3개 통계 카드'],
       actions: ['모든 탭 탐색', '체크리스트 전체 확인']
     },
     'obs-admin': {
@@ -1909,8 +1856,8 @@ body {
       title: '변경 요청 검토',
       type: 'action',
       typeLabel: '행동',
-      desc: 'PM 또는 매니저가 변경 요청 내용을 검토합니다.',
-      data: ['요청 내용, 영향도 분석', 'PM/매니저만 승인/반려 가능'],
+      desc: '매니저가 변경 요청 내용을 검토합니다.',
+      data: ['요청 내용, 영향도 분석', '매니저만 승인/반려 가능'],
       actions: ['내용 확인 후 승인/반려 결정']
     },
     'cr-decision': {
@@ -1918,7 +1865,7 @@ body {
       type: 'condition',
       typeLabel: '조건분기',
       desc: '변경 요청의 승인 여부를 결정합니다.',
-      data: ['PM/매니저만 권한 보유', '반려 시 사유 입력 필수'],
+      data: ['매니저만 권한 보유', '반려 시 사유 입력 필수'],
       actions: ['승인: 체크리스트 자동 생성', '반려: 사유 저장']
     },
     'cr-approve': {

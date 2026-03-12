@@ -72,53 +72,43 @@ const SECTIONS = [
     ],
   },
   {
-    id: "change-management",
-    title: "5. 설계 변경 관리",
-    children: [
-      { id: "change-request", title: "5.1 변경 요청 등록" },
-      { id: "change-review", title: "5.2 부서별 검토" },
-      { id: "change-types", title: "5.3 설계변경 유형" },
-    ],
-  },
-  {
     id: "launch-management",
-    title: "6. 출시 준비 관리",
+    title: "5. 출시 준비 관리",
     children: [
-      { id: "launch-checklist", title: "6.1 출시 준비 체크리스트" },
-      { id: "launch-dday", title: "6.2 D-Day 일정 관리" },
-      { id: "launch-alerts", title: "6.3 자동 알림 트리거" },
+      { id: "launch-checklist", title: "5.1 출시 준비 체크리스트" },
+      { id: "launch-dday", title: "5.2 D-Day 일정 관리" },
+      { id: "launch-alerts", title: "5.3 자동 알림 트리거" },
     ],
   },
   {
     id: "customer-management",
-    title: "7. 고객 관리",
+    title: "6. 고객 관리",
     children: [
-      { id: "customer-list", title: "7.1 고객 목록" },
-      { id: "customer-portal", title: "7.2 고객 포털" },
-      { id: "customer-change", title: "7.3 고객 요청 기반 설계변경" },
+      { id: "customer-list", title: "6.1 고객 목록" },
+      { id: "customer-portal", title: "6.2 고객 포털" },
     ],
   },
   {
     id: "template-admin",
-    title: "8. 체크리스트 템플릿 관리",
+    title: "7. 체크리스트 템플릿 관리",
     children: [
-      { id: "template-views", title: "8.1 3가지 뷰 모드" },
-      { id: "template-crud", title: "8.2 항목 추가/수정/삭제" },
-      { id: "template-structure", title: "8.3 단계/부서 관리" },
+      { id: "template-views", title: "7.1 3가지 뷰 모드" },
+      { id: "template-crud", title: "7.2 항목 추가/수정/삭제" },
+      { id: "template-structure", title: "7.3 단계/부서 관리" },
     ],
   },
   {
     id: "role-guides",
-    title: "9. 역할별 가이드",
+    title: "8. 역할별 가이드",
     children: [
-      { id: "guide-worker", title: "9.1 실무자 가이드" },
-      { id: "guide-manager", title: "9.2 매니저 가이드" },
-      { id: "guide-observer", title: "9.3 기획조정실 가이드" },
+      { id: "guide-worker", title: "8.1 실무자 가이드" },
+      { id: "guide-manager", title: "8.2 매니저 가이드" },
+      { id: "guide-observer", title: "8.3 기획조정실 가이드" },
     ],
   },
   {
     id: "faq",
-    title: "10. FAQ",
+    title: "9. FAQ",
     children: [],
   },
   {
@@ -152,7 +142,6 @@ const SCREENSHOT_MAP = {
   "체크리스트 매트릭스 — 단계×부서 격자": "manual-matrix.png",
   "작업 상세 — 작업 완료 버튼": "manual-task-complete.png",
   "작업 상세 — 매니저 승인/반려 버튼": "manual-task-approve.png",
-  "설계 변경 요청 등록 모달": "manual-change-request.png",
   "프로젝트 상세 — 출시 준비 탭": "manual-launch.png",
   "고객 목록 페이지": "manual-customers.png",
   "고객 포털 — 프로젝트 진행 현황": "manual-portal.png",
@@ -226,7 +215,7 @@ function getContentHtml() {
 <!-- 2. 프로젝트 관리 -->
 <section id="project-management" class="manual-section">
   <h2>2. 프로젝트 관리</h2>
-  <p>ProcessCheck에서 프로젝트는 제품 개발의 전체 수명주기를 관리하는 단위입니다. 신규개발과 설계변경 두 가지 유형을 지원합니다.</p>
+  <p>ProcessCheck에서 프로젝트는 제품 개발의 전체 수명주기를 관리하는 단위입니다.</p>
 </section>
 
 <section id="project-list" class="manual-section">
@@ -249,13 +238,12 @@ function getContentHtml() {
 
 <section id="project-detail" class="manual-section">
   <h3>2.2 프로젝트 상세</h3>
-  <p>프로젝트 상세 페이지는 <strong>4개 탭</strong>으로 구성됩니다:</p>
+  <p>프로젝트 상세 페이지는 <strong>3개 탭</strong>으로 구성됩니다:</p>
   ${screenshot("프로젝트 상세 — 체크리스트 탭")}
   <ol>
-    <li><strong>체크리스트</strong>: 단계×부서 매트릭스로 전체 항목 표시</li>
-    <li><strong>설계 변경</strong>: 해당 프로젝트의 변경 요청 목록</li>
-    <li><strong>출시 준비</strong>: D-Day 기준 출시 준비 체크리스트</li>
-    <li><strong>정보</strong>: 프로젝트 기본 정보 (일정, PM, 유형 등)</li>
+    <li><strong>개요+작업</strong>: 체크리스트와 활동 타임라인</li>
+    <li><strong>스케줄</strong>: 간트 차트와 Phase별 상세 테이블</li>
+    <li><strong>병목</strong>: Phase×부서 히트맵과 지연 원인 분석</li>
   </ol>
 </section>
 
@@ -291,9 +279,6 @@ function getContentHtml() {
     <thead><tr><th>프로젝트 유형</th><th>생성 항목</th></tr></thead>
     <tbody>
       <tr><td>신규개발</td><td>전체 193개 항목</td></tr>
-      <tr><td>설계변경 major</td><td>전체 193개 항목</td></tr>
-      <tr><td>설계변경 medium</td><td>필수 항목만 (전체 단계)</td></tr>
-      <tr><td>설계변경 minor</td><td>필수 항목 + 발의/Tx/양산만</td></tr>
     </tbody>
   </table>
 </section>
@@ -378,64 +363,23 @@ function getContentHtml() {
       <tr><td>체크리스트 열람</td><td>자기 작업</td><td>자기 부서</td><td>전체</td></tr>
       <tr><td>체크리스트 편집</td><td>—</td><td>자기 부서</td><td>전체</td></tr>
       <tr><td>단계/부서 추가·삭제</td><td>—</td><td>—</td><td>✅</td></tr>
-      <tr><td>변경 요청 승인</td><td>—</td><td>✅ (PM)</td><td>✅</td></tr>
     </tbody>
   </table>
 </section>
 
-<!-- 5. 설계 변경 관리 -->
-<section id="change-management" class="manual-section">
-  <h2>5. 설계 변경 관리</h2>
-</section>
-
-<section id="change-request" class="manual-section">
-  <h3>5.1 변경 요청 등록</h3>
-  <p>${badge("실무자")} ${badge("매니저")} ${badge("기획조정실")}</p>
-  ${screenshot("설계 변경 요청 등록 모달")}
-  <p><strong>입력 항목:</strong></p>
-  <ul>
-    <li>변경 제목 / 설명</li>
-    <li>영향 부서 (복수 선택)</li>
-    <li>변경 규모: minor / medium / major</li>
-    <li>고객 출처 (해당 시): 고객명, 담당자, 요청일, 상세</li>
-  </ul>
-</section>
-
-<section id="change-review" class="manual-section">
-  <h3>5.2 부서별 검토 프로세스</h3>
-  <div class="manual-steps">
-    <div class="manual-step"><span class="manual-step-num">1</span>변경 요청 등록 → 상태: <span class="badge badge-neutral">대기 중</span></div>
-    <div class="manual-step"><span class="manual-step-num">2</span>영향 부서에서 변경 내용 확인 → 읽음 표시</div>
-    <div class="manual-step"><span class="manual-step-num">3</span>PM 또는 기획조정실이 최종 승인/반려</div>
-  </div>
-  ${tip("고객 요청에서 비롯된 변경 요청은 🏢 아이콘과 함께 고객 정보가 표시됩니다.")}
-</section>
-
-<section id="change-types" class="manual-section">
-  <h3>5.3 설계변경 유형</h3>
-  <table class="manual-table">
-    <thead><tr><th>유형</th><th>설명</th><th>체크리스트 범위</th></tr></thead>
-    <tbody>
-      <tr><td><strong>minor</strong></td><td>기능 영향 없는 경미한 변경</td><td>필수 항목 + 발의/Tx/양산만</td></tr>
-      <tr><td><strong>medium</strong></td><td>기능 일부 영향, 검증 필요</td><td>필수 항목 + 전체 단계</td></tr>
-      <tr><td><strong>major</strong></td><td>기능 전면 변경</td><td>전체 193개 항목</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<!-- 6. 출시 준비 관리 -->
+<!-- 5. 출시 준비 관리 -->
 <section id="launch-management" class="manual-section">
-  <h2>6. 출시 준비 관리</h2>
+  <h2>5. 출시 준비 관리</h2>
 </section>
 
 <section id="launch-checklist" class="manual-section">
-  <h3>6.1 출시 준비 체크리스트</h3>
+  <h3>5.1 출시 준비 체크리스트</h3>
   ${screenshot("프로젝트 상세 — 출시 준비 탭")}
-  <p>15개 카테고리로 분류됩니다: 사진/영상, 브랜드, 인쇄물, 디지털, 가격, 영업 교육, 딜러, CS/A/S, 규제, 물류, 런칭 이벤트, 설계변경 시, KOL, 보험/수가, 출시 후</p>
+  <p>14개 카테고리로 분류됩니다: 사진/영상, 브랜드, 인쇄물, 디지털, 가격, 영업 교육, 딜러, CS/A/S, 규제, 물류, 런칭 이벤트, KOL, 보험/수가, 출시 후</p>
 </section>
 
 <section id="launch-dday" class="manual-section">
-  <h3>6.2 D-Day 일정 관리</h3>
+  <h3>5.2 D-Day 일정 관리</h3>
   <ul>
     <li><strong>D-Day</strong>: 프로젝트 종료일(출시 예정일) 기준</li>
     <li><strong>음수</strong>: 출시 전 (D-180 = 출시 180일 전)</li>
@@ -445,7 +389,7 @@ function getContentHtml() {
 </section>
 
 <section id="launch-alerts" class="manual-section">
-  <h3>6.3 자동 알림 트리거</h3>
+  <h3>5.3 자동 알림 트리거</h3>
   <table class="manual-table">
     <thead><tr><th>Gate 승인</th><th>알림 대상</th><th>알림 내용</th></tr></thead>
     <tbody>
@@ -459,11 +403,11 @@ function getContentHtml() {
 
 <!-- 7. 고객 관리 -->
 <section id="customer-management" class="manual-section">
-  <h2>7. 고객 관리</h2>
+  <h2>6. 고객 관리</h2>
 </section>
 
 <section id="customer-list" class="manual-section">
-  <h3>7.1 고객 목록</h3>
+  <h3>6.1 고객 목록</h3>
   ${screenshot("고객 목록 페이지")}
   <table class="manual-table">
     <thead><tr><th>고객 유형</th><th>설명</th></tr></thead>
@@ -477,31 +421,21 @@ function getContentHtml() {
 </section>
 
 <section id="customer-portal" class="manual-section">
-  <h3>7.2 고객 포털</h3>
+  <h3>6.2 고객 포털</h3>
   <p>거래처/법인이 프로젝트 진행 상황을 확인할 수 있는 <strong>읽기 전용</strong> 페이지입니다.</p>
   ${screenshot("고객 포털 — 프로젝트 진행 현황")}
-  <p><strong>볼 수 있는 정보:</strong> 프로젝트 Phase 진행률, 변경 요청 현황, 출시 준비 현황</p>
+  <p><strong>볼 수 있는 정보:</strong> 프로젝트 Phase 진행률, 출시 준비 현황</p>
   <p><strong>볼 수 없는 정보:</strong> 내부 체크리스트 상세, 내부 직원, 위험도, 다른 고객 정보</p>
 </section>
 
-<section id="customer-change" class="manual-section">
-  <h3>7.3 고객 요청 기반 설계변경</h3>
-  <div class="manual-steps">
-    <div class="manual-step"><span class="manual-step-num">1</span>설계 변경 등록 시 <strong>"고객 요청"</strong> 출처 선택</div>
-    <div class="manual-step"><span class="manual-step-num">2</span>고객명, 담당자, 요청일, 상세 입력</div>
-    <div class="manual-step"><span class="manual-step-num">3</span>프로젝트 상세에서 🏢 아이콘과 함께 고객 정보 표시</div>
-    <div class="manual-step"><span class="manual-step-num">4</span>고객 포털에서도 변경 요청 진행 확인 가능</div>
-  </div>
-</section>
-
-<!-- 8. 체크리스트 템플릿 관리 -->
+<!-- 7. 체크리스트 템플릿 관리 -->
 <section id="template-admin" class="manual-section">
-  <h2>8. 체크리스트 템플릿 관리</h2>
+  <h2>7. 체크리스트 템플릿 관리</h2>
   <p>${badge("기획조정실")} ${badge("매니저")}</p>
 </section>
 
 <section id="template-views" class="manual-section">
-  <h3>8.1 3가지 뷰 모드</h3>
+  <h3>7.1 3가지 뷰 모드</h3>
   ${screenshot("체크리스트 관리 — 트리 뷰")}
   <table class="manual-table">
     <thead><tr><th>뷰</th><th>설명</th><th>용도</th></tr></thead>
@@ -514,7 +448,7 @@ function getContentHtml() {
 </section>
 
 <section id="template-crud" class="manual-section">
-  <h3>8.2 항목 추가/수정/삭제</h3>
+  <h3>7.2 항목 추가/수정/삭제</h3>
   <p>${badge("기획조정실")}</p>
   <ul>
     <li><strong>추가:</strong> 트리 뷰에서 단계+부서 선택 → "+ 항목 추가" 클릭</li>
@@ -525,7 +459,7 @@ function getContentHtml() {
 </section>
 
 <section id="template-structure" class="manual-section">
-  <h3>8.3 단계/부서 관리</h3>
+  <h3>7.3 단계/부서 관리</h3>
   <p>${badge("기획조정실")}</p>
   <ul>
     <li><strong>단계 추가:</strong> 기존 6개 Phase 외 새 단계 추가 가능</li>
@@ -536,11 +470,11 @@ function getContentHtml() {
 
 <!-- 9. 역할별 가이드 -->
 <section id="role-guides" class="manual-section">
-  <h2>9. 역할별 가이드</h2>
+  <h2>8. 역할별 가이드</h2>
 </section>
 
 <section id="guide-worker" class="manual-section">
-  <h3>9.1 실무자(Worker) 가이드</h3>
+  <h3>8.1 실무자(Worker) 가이드</h3>
   <p>${badge("실무자")} — 실제 업무를 수행하는 담당자</p>
   <h4>일일 워크플로우</h4>
   <div class="manual-steps">
@@ -553,7 +487,7 @@ function getContentHtml() {
 </section>
 
 <section id="guide-manager" class="manual-section">
-  <h3>9.2 매니저(Manager) 가이드</h3>
+  <h3>8.2 매니저(Manager) 가이드</h3>
   <p>${badge("매니저")} — 부서별 관리자</p>
   <h4>일일 워크플로우</h4>
   <div class="manual-steps">
@@ -565,7 +499,7 @@ function getContentHtml() {
 </section>
 
 <section id="guide-observer" class="manual-section">
-  <h3>9.3 기획조정실(Observer) 가이드</h3>
+  <h3>8.3 기획조정실(Observer) 가이드</h3>
   <p>${badge("기획조정실")} — 전체 프로젝트 모니터링</p>
   <h4>일일 워크플로우</h4>
   <div class="manual-steps">
@@ -576,9 +510,9 @@ function getContentHtml() {
   </div>
 </section>
 
-<!-- 10. FAQ -->
+<!-- 9. FAQ -->
 <section id="faq" class="manual-section">
-  <h2>10. FAQ</h2>
+  <h2>9. FAQ</h2>
   <div class="manual-faq">
     <details class="manual-faq-item"><summary>처음 접속했는데 데이터가 없어요.</summary><p>최초 접속 시 자동으로 샘플 데이터가 생성됩니다. 로딩 스피너가 표시되며, 보통 몇 초 내에 완료됩니다.</p></details>
     <details class="manual-faq-item"><summary>다른 역할로 전환하고 싶어요.</summary><p>로그아웃 후 로그인 페이지에서 다른 역할의 사용자 카드를 클릭하면 됩니다.</p></details>
@@ -590,7 +524,6 @@ function getContentHtml() {
     <details class="manual-faq-item"><summary>다크모드는 어떻게 전환하나요?</summary><p>상단 네비게이션 바의 테마 아이콘을 클릭하면 전환됩니다. 설정은 브라우저에 저장됩니다.</p></details>
     <details class="manual-faq-item"><summary>출시 준비 체크리스트의 마감일이 맞지 않아요.</summary><p>프로젝트 종료일이 변경된 경우, 출시 준비 탭에서 "일정 재계산" 버튼을 클릭하세요.</p></details>
     <details class="manual-faq-item"><summary>고객 포털 URL은 어디서 확인하나요?</summary><p>고객 관리 페이지에서 포털이 활성화된 고객의 customer-portal.html?id=고객ID로 접근합니다.</p></details>
-    <details class="manual-faq-item"><summary>설계변경 규모에 따라 무엇이 달라지나요?</summary><p>minor는 최소 필수 항목, medium은 필수 전체, major는 신규개발과 동일한 193개 항목이 생성됩니다.</p></details>
   </div>
 </section>
 

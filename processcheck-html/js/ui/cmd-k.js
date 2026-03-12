@@ -34,7 +34,6 @@ export function buildNavActions() {
   return [
     { id: 'nav-dashboard', title: '대시보드', icon: '🏠', section: '페이지', handler: () => { window.location.href = 'home.html'; } },
     { id: 'nav-new-dev', title: '출시위원회 (신규개발)', icon: '🛡️', section: '페이지', handler: () => { window.location.href = 'projects.html?type=신규개발'; } },
-    { id: 'nav-change', title: '설계변경', icon: '✏️', section: '페이지', handler: () => { window.location.href = 'projects.html?type=설계변경'; } },
     { id: 'nav-checklist', title: '체크리스트 관리', icon: '📋', section: '페이지', handler: () => { window.location.href = 'admin-checklists.html'; } },
     { id: 'nav-sales', title: '영업 출시 준비', icon: '📊', section: '페이지', handler: () => { window.location.href = 'sales.html'; } },
     { id: 'nav-customers', title: '고객 관리', icon: '👥', section: '페이지', handler: () => { window.location.href = 'customers.html'; } },

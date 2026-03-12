@@ -22,13 +22,16 @@ style.textContent = `
   display:none; position:fixed; inset:0; z-index:9999;
   background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);
   align-items:center; justify-content:center;
+  opacity:0; transition:opacity 0.15s ease-out;
 }
-#confirm-modal-overlay.open { display:flex; }
+#confirm-modal-overlay.open { display:flex; opacity:1; }
 #confirm-modal-box {
   background:var(--surface-2); border:1px solid var(--surface-3);
   border-radius:var(--radius-xl); padding:1.5rem; max-width:24rem; width:90%;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  transform:scale(0.96) translateY(8px); transition:transform 0.2s cubic-bezier(0.16,1,0.3,1);
 }
+#confirm-modal-overlay.open #confirm-modal-box { transform:scale(1) translateY(0); }
 #confirm-modal-title {
   color:var(--text-primary); font-size:0.9375rem; line-height:1.5; margin-bottom:1.25rem;
 }
@@ -51,7 +54,8 @@ const cancelBtn = overlay.querySelector("#confirm-modal-cancel");
 function close(result) {
   overlay.classList.remove("open");
   document.removeEventListener("keydown", onKey);
-  if (resolvePromise) { resolvePromise(result); resolvePromise = null; }
+  const cb = resolvePromise; resolvePromise = null;
+  setTimeout(() => { overlay.style.display = 'none'; if (cb) cb(result); }, 150);
 }
 
 function onKey(e) {
@@ -73,8 +77,8 @@ export function confirmModal(message) {
   return new Promise((resolve) => {
     resolvePromise = resolve;
     titleEl.textContent = message;
-    overlay.classList.add("open");
-    okBtn.focus();
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => { overlay.classList.add("open"); okBtn.focus(); });
     document.addEventListener("keydown", onKey);
   });
 }

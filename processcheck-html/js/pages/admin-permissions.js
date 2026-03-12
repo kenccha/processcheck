@@ -40,7 +40,7 @@ const PERMISSION_LABELS = {
   taskComplete: { label: "작업 완료 처리", desc: "체크리스트 항목을 완료로 변경" },
   taskReassign: { label: "작업 배분/재배분", desc: "체크리스트 항목의 담당자 변경" },
   checklistEdit: { label: "체크리스트 편집", desc: "템플릿 체크리스트 항목 추가/수정/삭제" },
-  projectCreate: { label: "프로젝트 생성", desc: "신규 프로젝트 또는 설계변경 등록" },
+  projectCreate: { label: "프로젝트 생성", desc: "신규 프로젝트 등록" },
   meetingNoteAdd: { label: "회의록 등록", desc: "Phase 회의록/피드백 기록" },
 };
 

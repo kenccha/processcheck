@@ -51,7 +51,7 @@ scripts/
 processcheck-html/        # Plain HTML port (no build step)
   index.html              # Login (3 sample user cards)
   landing.html            # Marketing page
-  dashboard.html          # Role-based dashboard
+  processcheck.html       # Role-based dashboard (formerly dashboard.html)
   projects.html           # Project list (7 views)
   project.html            # Project detail (4 tabs)
   task.html               # Task detail
@@ -140,13 +140,9 @@ docs/
 ### Departments
 10 departments: 개발팀, 품질팀, 영업팀, 제조팀, 구매팀, CS팀, 경영관리팀, 글로벌임상팀, 디자인연구소, 인증팀
 
-### Project Types (프로젝트 유형) — 확정
-- **신규개발**: 연 5-6건, 장기(1년), 6 phase 전체 진행. 프로젝트 목록의 "신규개발" 탭.
-- **설계변경**: 월 ~50건, 짧은 사이클. 프로젝트 목록의 "설계변경" 탭.
-  - 규모별 차등 프로세스:
-    - 경미(minor): 접수 → 승인 (2단계)
-    - 중간(medium): 접수 → 검토 → 승인 → 적용 (4단계)
-    - 대규모(major): 기존 6 phase 전체
+### Project Types (프로젝트 유형) — 확정 (2026-03-12 변경)
+- **신규개발**: 연 5-6건, 장기(1년), 6 phase 전체 진행
+- **설계변경 기능 제거됨**: 네비, 프로젝트 유형 필터, changeRequests 컬렉션 전부 제거
 
 ### Project Stages (6 phases, 각각 작업+승인 쌍)
 스테이지는 "작업 단계"와 "승인 위원회"가 한 쌍으로 묶여 있음.
@@ -210,18 +206,18 @@ docs/
   - 제목 + Phase 뱃지 + D-Day (큰 글씨, 색상 강조) + 기간 (PM 제거됨)
   - 지연 시 사유 1줄 요약 (빨강 배너): "품질팀 WM제작 미완료로 3일 지연"
   - 정상 시 녹색 배너: "정상 진행"
-  - Phase 파이프라인 (✔완료/▶현재/미래)
-  - 우측: 전체작업/지연 숫자 (승인대기 제거됨)
+  - ~~Phase 파이프라인~~ 제거됨
+  - 우측: 전체작업/지연 숫자
 - **개요+작업 탭 (2컬럼)**:
+  - **위원회 승인 독립 카드** (최상단): 6개 Phase 그리드, 각 Phase별 승인/반려 버튼 — 모든 사용자 접근 가능
   - 좌측: 체크리스트 (max-height + 스크롤)
   - 우측: 최근 활동 타임라인 (sticky, 스크롤)
-  - 5가지 뷰: Phase/타임라인/부서/보드(칸반)/리스트
+  - 6가지 뷰: Phase/타임라인/부서/보드(칸반)/매트릭스/리스트
   - **Phase 뷰 (인라인 카드 구조)**:
     - Phase 헤더: 이름 + 진행률 + 날짜범위 + 지연표시 + 접기/펼치기
     - Phase 설명: `PHASE_DESCRIPTIONS` 1줄 텍스트
-    - **위원회 승인 인라인**: gateRecords 상태 표시 + observer일 때 승인/반려 버튼
     - **회의록 인라인**: 최근 2건 표시, "더 보기" 토글, "+ 등록" 인라인 textarea
-    - 체크리스트: max 5개 표시, 지연→진행→대기→완료 순 정렬, "더 보기" 토글
+    - 체크리스트: **고정 높이(320px) 스크롤** 영역, "더보기" 버튼 없음, 전체 항목 표시
     - 좌측 보더 컬러코딩: 완료=녹색, 진행중=파란색, 지연=빨간색, 대기=회색
     - 완료 Phase 기본 접힘, 현재/미래 Phase 펼침
   - 체크리스트 아이템: **단일 동그라미** + 인라인 상태 드롭다운
@@ -263,8 +259,8 @@ docs/
 - **위원회 승인**: gateRecords 컬렉션의 gateStatus (pending/approved/rejected) — Phase 단위
 - **Importance levels (중요도):** green(보통), yellow(중요), red(긴급)
 
-### Projects Page View Order (확정)
-뷰 탭 순서: **테이블 → 매트릭스 → 카드** → 간트 → 칸반 → 타임라인 → 캘린더 (기본 뷰 = 테이블).
+### Projects Page View Order (확정 — 2026-03-12 변경)
+뷰 탭 순서: **테이블 → 카드** (기본 뷰 = 테이블). 매트릭스/간트/칸반/타임라인/캘린더 뷰 제거됨.
 
 ## Known Gaps (To Fix)
 
@@ -303,7 +299,16 @@ docs/
 - 파일 업로드: UI만 있고 Firebase Storage 연동 없음
 - 변경 요청 부서별 개별 승인 흐름 없음
 
-### ✅ Recently Fixed (최근 수정)
+### ✅ Recently Fixed (최근 수정 — 2026-03-12)
+- ~~설계변경 기능~~ → 전체 제거 (네비, 프로젝트 유형, changeRequests 컬렉션, 관련 UI 모두)
+- ~~dashboard.html~~ → processcheck.html로 리네임 (모든 참조 업데이트)
+- ~~프로젝트 뷰 7개~~ → 테이블+카드 2개로 축소 (매트릭스/간트/칸반/타임라인/캘린더 제거)
+- ~~위원회 승인 Phase 카드 내부~~ → 별도 독립 카드로 분리 (개요+작업 탭 최상단)
+- ~~Phase 파이프라인 바~~ → 프로젝트 헤더에서 제거
+- ~~Phase 뷰 "20개 더보기"~~ → 제거, 각 Phase별 고정 높이 스크롤 영역으로 변경
+- ~~Phase 카드 row (발의~양산/이관)~~ → 제거, 위원회 승인 카드가 대체
+- ~~작업 완료 시 최근 활동 미표시~~ → completeTask/restartTask가 project-level 활동 로그 생성하도록 수정
+- ~~권한 설정 페이지 없음~~ → admin-permissions.html 신규 생성 (역할별 기능 권한 매트릭스)
 - ~~영업 준비 페이지에 프로젝트 안 나옴~~ → `launchChecklists` 생성 경로 추가: 프로젝트 상세에 "🚀 출시 준비 적용" 버튼 + 영업 페이지에서 직접 생성 가능
 - ~~영업 일괄 버튼 영구 비활성화~~ → 처리 후 버튼 re-enable + 원래 텍스트 복원
 - ~~영업 확인 처리 후 UI 갱신 없음~~ → 성공 토스트 추가 (UI는 onSnapshot 자동 갱신)
@@ -332,7 +337,8 @@ docs/
 
 ### Navigation Design (확정 — 2026-03-11 변경)
 - **로고 클릭 → 대시보드**: ProcessCheck 로고 클릭으로 이동
-- **네비 탭 순서**: 출시위원회 → 설계변경 → 체크리스트 → 리뷰(드롭다운) → | → 다른 사이트(드롭다운)
+- **네비 탭 순서**: 출시위원회 → 체크리스트 → 리뷰(드롭다운) → | → 다른 사이트(드롭다운)
+- **설계변경 제거됨** (2026-03-12): 네비, 프로젝트 유형, changeRequests 전체 제거
 - **리뷰 드롭다운**: 전체 화면 설계, 업무 흐름, 시스템 구조, 피드백 모아보기, 매뉴얼, **사용자 관리** (observer만)
 - **다른 사이트 드롭다운** (구 "관련 서비스"): 영업 출시 준비(외부↗), 고객 관리(외부↗) — 구분선(|)으로 시각적 분리
 - `components.js`의 `BASE_NAV_LINKS`와 `deliverable-nav.js`의 `MAIN_NAV` 동기화 필수

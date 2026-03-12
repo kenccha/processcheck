@@ -21,20 +21,32 @@
     .hub-wrap { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 64px); padding: 24px; }
     .hub-container { max-width: 800px; width: 100%; text-align: center; }
     .hub-header { margin-bottom: 40px; }
-    .hub-header h1 { font-size: 1.75rem; font-weight: 700; color: var(--slate-100); margin-bottom: 8px; }
-    .hub-header p { color: var(--slate-300); font-size: 0.95rem; }
+    .hub-header h1 { font-size: 1.75rem; font-weight: 700; color: var(--slate-100); margin-bottom: 8px; letter-spacing: -0.025em; }
+    .hub-header p { color: var(--slate-400); font-size: 0.95rem; letter-spacing: 0.01em; }
     .hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
     .hub-card {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 48px 32px; border-radius: 16px; text-decoration: none;
       border: 2px solid var(--surface-2); background: var(--surface-1);
-      transition: all 0.2s ease; cursor: pointer; position: relative; overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer; position: relative; overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
-    .hub-card:hover { border-color: var(--primary-400); box-shadow: 0 8px 32px rgba(6,182,212,0.12); transform: translateY(-2px); }
+    .hub-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 55%, transparent 60%);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+      pointer-events: none;
+    }
+    .hub-card:hover::after { transform: translateX(100%); }
+    .hub-card:hover { border-color: var(--primary-400); box-shadow: var(--card-hover-shadow), 0 0 0 1px rgba(6,182,212,0.1); transform: translateY(-3px); }
     .hub-card-icon {
       width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-      margin-bottom: 20px; font-size: 32px;
+      margin-bottom: 20px; font-size: 32px; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+    .hub-card:hover .hub-card-icon { transform: scale(1.05); }
     .hub-card-icon--primary { background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(6,182,212,0.05)); color: var(--primary-500); }
     .hub-card-icon--sales { background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05)); color: #f59e0b; }
     .hub-card h2 { font-size: 1.25rem; font-weight: 700; color: var(--slate-100); margin-bottom: 8px; }
@@ -61,7 +73,7 @@
           <p>사용할 서비스를 선택해 이동합니다</p>
         </div>
         <div class="hub-grid">
-          <a href="dashboard.html" class="hub-card" id="card-pc">
+          <a href="projects.html?type=신규개발" class="hub-card" id="card-pc">
             <span class="hub-card-arrow">→</span>
             <div class="hub-card-icon hub-card-icon--primary">
               <svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -69,7 +81,7 @@
               </svg>
             </div>
             <h2>ProcessCheck</h2>
-            <p>출시위원회 · 설계변경<br>프로세스 관리</p>
+            <p>출시위원회<br>프로세스 관리</p>
           </a>
           <a href="sales.html" class="hub-card" id="card-sales">
             <span class="hub-card-arrow">→</span>

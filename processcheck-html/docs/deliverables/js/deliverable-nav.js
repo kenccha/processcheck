@@ -9,19 +9,59 @@
 
   let user = null;
   try { user = JSON.parse(localStorage.getItem("pc_user")); } catch {}
-  const ROLES = { worker: "실무자", manager: "매니저", observer: "기획조정실" };
 
   const SUB_PAGES = [
     { href: "wireframes.html", label: "전체 화면 설계", icon: "📱" },
     { href: "user-flows.html", label: "업무 흐름", icon: "🔀" },
+    { href: "flow-annotations.html", label: "개선점 분석", icon: "📝" },
     { href: "diagram-viewer.html", label: "시스템 구조", icon: "📐" },
+    { href: "checklist-wireframe.html", label: "체크리스트 상세", icon: "✅" },
     { href: "feedback.html", label: "피드백 모아보기", icon: "💬", isFeedback: true },
   ];
 
-  const MAIN_NAV = [
-    { href: "projects.html?type=신규개발", label: "출시위원회" },
-    { href: "admin-checklists.html", label: "체크리스트" },
-    { href: null, label: "리뷰", isDropdown: true, children: [...SUB_PAGES, { href: "manual.html", label: "매뉴얼", icon: "📖 " }, { href: "admin-users.html", label: "사용자 관리", icon: "👥" }, { href: "admin-permissions.html", label: "권한 설정", icon: "🔐" }] },
+  // ── Load main app CSS for unified nav styling ──
+  const mainCSS = document.createElement("link");
+  mainCSS.rel = "stylesheet";
+  mainCSS.href = BASE + "css/styles.css";
+  document.head.appendChild(mainCSS);
+
+  // NAV_LINKS — identical to components.js BASE_NAV_LINKS + admin links
+  // All hrefs are relative to project root; we'll prepend BASE when rendering
+  const NAV_LINKS = [
+    {
+      href: "projects.html?type=신규개발",
+      label: "출시위원회",
+      icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`,
+    },
+    {
+      href: "admin-checklists.html",
+      label: "체크리스트",
+      icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
+    },
+    {
+      href: "docs/deliverables/wireframes.html",
+      label: "리뷰",
+      icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>`,
+      children: [
+        { href: "docs/deliverables/wireframes.html", label: "전체 화면 설계" },
+        { href: "docs/deliverables/user-flows.html", label: "업무 흐름" },
+        { href: "docs/deliverables/diagram-viewer.html", label: "시스템 구조" },
+        { href: "manual.html", label: "매뉴얼" },
+        { href: "admin-users.html", label: "사용자 관리" },
+        { href: "admin-permissions.html", label: "권한 설정" },
+        { href: "docs/deliverables/feedback.html", label: "피드백 모아보기" },
+      ],
+    },
+    {
+      href: null,
+      label: "다른 사이트",
+      icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
+      isSeparated: true,
+      children: [
+        { href: "sales.html", label: "영업 출시 준비", external: true },
+        { href: "customers.html", label: "고객 관리", external: true },
+      ],
+    },
   ];
 
   const currentFile = location.pathname.split("/").pop();
@@ -33,45 +73,78 @@
   document.head.appendChild(h2cScript);
 
   // ══════════════════════════════════
-  // 1. TOP NAV
+  // 1. TOP NAV — uses main app CSS classes (.nav, .nav-link, etc.)
   // ══════════════════════════════════
+  const currentPath = location.pathname;
+  const currentSearch = location.search;
+
+  function isLinkActive(link) {
+    if (link.children) return link.children.some(c => currentPath.endsWith(c.href));
+    if (link.href && link.href.includes("?")) {
+      const [f, q] = link.href.split("?");
+      return currentPath.endsWith(f) && currentSearch.includes(q);
+    }
+    return currentPath.endsWith(link.href);
+  }
+
+  function getThemeIcon() {
+    const isDark = (localStorage.getItem("pc-theme") || "light") === "dark";
+    return isDark
+      ? `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path stroke-linecap="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`
+      : `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>`;
+  }
+
   const topNav = document.createElement("div");
   topNav.id = "dr-topnav";
   topNav.innerHTML = `
-    <div class="dtn-inner">
-      <a href="${BASE}home.html" class="dtn-logo">
-        <div class="dtn-logo-icon">PC</div>
-        <span class="dtn-logo-text">Process<b>Check</b></span>
-      </a>
-      <div class="dtn-links">
-        ${MAIN_NAV.map(item => {
-          const sep = item.isSeparated ? '<span class="dtn-separator"></span>' : '';
-          if (item.isDropdown) {
-            const isReviewDD = !item.isExternal;
-            return `${sep}<div class="dtn-dropdown">
-              <span class="dtn-link${isReviewDD ? " dtn-link-active" : ""}${item.isSeparated ? " dtn-link-secondary" : ""}">${item.label}
-                <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:2px;opacity:.6"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-              </span>
-              <div class="dtn-dropdown-menu">
-                ${item.children.map(c => {
-                  const extIcon = c.external ? ' <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:3px;opacity:.4;vertical-align:middle"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-                  const href = c.external ? `${BASE}${c.href}` : c.href;
-                  const target = c.external ? ' target="_blank"' : '';
-                  return `<a href="${href}"${target} class="dtn-dropdown-item${currentFile === c.href ? " dtn-item-active" : ""}">${c.icon || ""}${c.label}${extIcon}</a>`;
-                }).join("")}
-              </div>
-            </div>`;
-          }
-          return `${sep}<a href="${BASE}${item.href}" class="dtn-link">${item.label}</a>`;
-        }).join("")}
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="flex items-center gap-8">
+          <button class="nav-logo" data-nav="projects.html?type=신규개발">
+            <div class="nav-logo-icon"><span>PC</span></div>
+            <span class="nav-logo-text">Process<span class="accent">Check</span></span>
+          </button>
+          <div class="nav-links">
+            ${NAV_LINKS.map(link => {
+              const isActive = isLinkActive(link);
+              const sep = link.isSeparated ? '<span class="nav-separator"></span>' : '';
+              if (link.children) {
+                return `${sep}<div class="nav-dropdown">
+                  <button class="nav-link${isActive ? " active" : ""}${link.isSeparated ? " nav-link-secondary" : ""}" data-nav="${link.href || "#"}">
+                    ${link.icon}${link.label}
+                    <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:2px;opacity:.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                  <div class="nav-dropdown-menu">
+                    ${link.children.map(child => `<button class="nav-dropdown-item${currentPath.endsWith(child.href) ? " active" : ""}" data-nav="${child.href}"${child.external ? ' data-external="true"' : ''}>${child.label}${child.external ? ' <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-left:4px;opacity:.4;vertical-align:middle"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : ''}</button>`).join("")}
+                  </div>
+                </div>`;
+              }
+              return `${sep}<button class="nav-link${isActive ? " active" : ""}" data-nav="${link.href}">
+                ${link.icon}${link.label}
+              </button>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="nav-right">
+          <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
+            ${getThemeIcon()}
+          </button>
+          <button class="nav-icon-btn" data-nav="home.html" title="홈">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+          </button>
+          <div class="nav-user">
+            <div class="nav-user-info">
+              <div class="nav-user-name">${esc(user?.name || "")}</div>
+            </div>
+            <button class="nav-logout" id="dr-logout-btn" title="로그아웃">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="dtn-right">
-        ${user ? `<span class="dtn-user">${esc(user.name)} <span class="dtn-role">${ROLES[user.role] || user.role}</span></span>` : ""}
-        <a href="${BASE}index.html" class="dtn-logout" title="로그아웃">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-        </a>
-      </div>
-    </div>
+    </nav>
   `;
 
   // ══════════════════════════════════
@@ -186,37 +259,10 @@
   // ══════════════════════════════════
   const style = document.createElement("style");
   style.textContent = `
-    /* ── Top Nav ── */
-    #dr-topnav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
-      height: ${NAV_H}px; background: #fff; color: #1e293b;
-      border-bottom: 1px solid #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
-    }
-    .dtn-inner { max-width: 100%; height: 100%; display: flex; align-items: center; gap: 24px; padding: 0 20px; }
-    .dtn-logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: #0f172a; font-size: 15px; font-weight: 600; flex-shrink: 0; }
-    .dtn-logo-icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #06b6d4, #0284c7); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; }
-    .dtn-logo-text { letter-spacing: -0.02em; }
-    .dtn-logo-text b { color: #06b6d4; }
-    .dtn-links { display: flex; align-items: center; gap: 2px; flex: 1; }
-    .dtn-link { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #64748b; text-decoration: none; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; white-space: nowrap; }
-    .dtn-link:hover { color: #0f172a; background: #f1f5f9; }
-    .dtn-link-active { color: #06b6d4; font-weight: 600; }
-    .dtn-separator { width: 1px; height: 18px; background: #e2e8f0; margin: 0 4px; flex-shrink: 0; }
-    .dtn-link-secondary { opacity: 0.7; font-size: 12px; }
-    .dtn-link-secondary:hover { opacity: 1; }
-    .dtn-dropdown { position: relative; }
-    .dtn-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; min-width: 180px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; padding-top: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10001; }
-    .dtn-dropdown-menu::before { content: ''; position: absolute; top: -10px; left: 0; right: 0; height: 10px; }
-    .dtn-dropdown:hover .dtn-dropdown-menu { display: block; }
-    .dtn-dropdown-item { display: block; width: 100%; padding: 7px 10px; border-radius: 5px; font-size: 13px; color: #334155; text-decoration: none; font-weight: 500; transition: all 0.12s; }
-    .dtn-dropdown-item:hover { background: #f1f5f9; color: #06b6d4; }
-    .dtn-dropdown-item.dtn-item-active { background: rgba(6,182,212,0.08); color: #06b6d4; }
-    .dtn-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-left: auto; }
-    .dtn-user { font-size: 13px; color: #334155; font-weight: 500; }
-    .dtn-role { font-size: 11px; color: #94a3b8; margin-left: 4px; }
-    .dtn-logout { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; color: #94a3b8; transition: all 0.15s; }
-    .dtn-logout:hover { background: #f1f5f9; color: #ef4444; }
+    /* ── Top Nav override: use main app .nav from styles.css, just pin it fixed ── */
+    #dr-topnav .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; }
+    #dr-topnav .nav-inner { max-width: 100%; }
+    body { margin-top: 0 !important; padding-top: ${NAV_H}px !important; }
 
     /* ── Sidebar ── */
     #dr-sidebar { position: fixed; top: ${NAV_H}px; left: 0; bottom: 0; width: ${SIDEBAR_W}px; z-index: 9999; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; padding: 12px 0; overflow-y: auto; border-right: 1px solid rgba(255,255,255,0.08); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; transition: transform 0.25s ease; }
@@ -248,8 +294,8 @@
       #dr-sidebar.open { transform: translateX(0); }
       body { margin-left: 0 !important; }
       #dr-toggle { display: flex; }
-      .dtn-links { display: none; }
-      .dtn-user { display: none; }
+      .nav-links { display: none; }
+      .nav-user { display: none; }
     }
 
     /* ══ Screenshot Capture Overlay ══ */
@@ -479,10 +525,39 @@
   mobOverlay.addEventListener("click", () => { sidebar.classList.remove("open"); mobOverlay.classList.remove("open"); });
 
   // Logout
-  topNav.querySelector(".dtn-logout")?.addEventListener("click", (e) => {
+  document.getElementById("dr-logout-btn")?.addEventListener("click", (e) => {
     e.preventDefault();
     localStorage.removeItem("pc_user");
     window.location.href = BASE + "index.html";
+  });
+
+  // Theme toggle
+  const themeBtn = document.getElementById("nav-theme-btn");
+  if (themeBtn) {
+    themeBtn.addEventListener("click", () => {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const newTheme = isDark ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", newTheme);
+      localStorage.setItem("pc-theme", newTheme);
+      themeBtn.innerHTML = getThemeIcon();
+    });
+  }
+
+  // data-nav click handlers — prepend BASE for navigation from docs/deliverables/
+  topNav.querySelectorAll("[data-nav]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      const href = el.dataset.nav;
+      if (!href || href === "#") return;
+      const isExternal = el.dataset.external === "true";
+      // hrefs are relative to project root; prepend BASE
+      const fullHref = BASE + href;
+      if (isExternal) {
+        window.open(fullHref, "_blank");
+      } else {
+        window.location.href = fullHref;
+      }
+    });
   });
 
   // ══════════════════════════════════
@@ -851,7 +926,8 @@
         </div>
         <div class="fp-item-actions">
           <button class="${voted ? "fp-vote-active" : ""}" data-vote="${item.id}">👍 ${item.votes || 0}</button>
-          ${uName ? `<button data-resolve="${item.id}">✅ 처리</button>` : ""}
+          ${uName && (item.status === "open" || item.status === "in_progress") ? `<button data-resolve="${item.id}">✅ 처리</button>` : ""}
+          ${uName && (item.status === "resolved" || item.status === "wontfix") ? `<button data-reopen="${item.id}" style="color:var(--warning-500);">↩ 되돌리기</button>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -877,6 +953,12 @@
         const r = prompt("처리 내용:");
         if (r === null) return;
         await updateFeedbackStatus(btn.dataset.resolve, "resolved", r, uName);
+      });
+    });
+    list.querySelectorAll("[data-reopen]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("이 피드백을 미해결 상태로 되돌리시겠습니까?")) return;
+        await updateFeedbackStatus(btn.dataset.reopen, "open", "", uName);
       });
     });
   }

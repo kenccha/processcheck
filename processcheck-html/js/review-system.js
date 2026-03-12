@@ -6,10 +6,10 @@ import { db } from "./firebase-init.js";
 import { confirmModal } from "./ui/confirm-modal.js";
 import { showToast } from "./ui/toast.js";
 import { getUser } from "./auth.js";
-import { escapeHtml, timeAgo } from "./utils.js";
-import { createNotification } from "./firestore-service.js";
+import { escapeHtml, timeAgo, getDateFormat, setDateFormat } from "./utils.js";
+import { createNotification, queueEmail, getUsers } from "./firestore-service.js";
 import {
-  collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot,
+  collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc,
   query, where, Timestamp
 } from "firebase/firestore";
 
@@ -58,7 +58,7 @@ export async function addReview({ pageId, type, content }) {
   if (user.authProvider !== "microsoft") throw new Error("MS OAuth 인증 사용자만 리뷰를 작성할 수 있습니다");
 
   const now = Timestamp.now();
-  return await addDoc(collection(db, "reviews"), {
+  const reviewRef = await addDoc(collection(db, "reviews"), {
     pageId,
     pageUrl: window.location.pathname,
     authorId: user.id,
@@ -74,6 +74,55 @@ export async function addReview({ pageId, type, content }) {
     createdAt: now,
     updatedAt: now
   });
+
+  // ── 알림 + 이메일: 새 리뷰 등록 시 observer 역할 사용자에게 알림 ──
+  _notifyNewReview(user, pageId, type, content).catch(console.error);
+
+  return reviewRef;
+}
+
+/** 새 리뷰 등록 → observer(기획조정실) 전원에게 인앱 알림 + 이메일 */
+async function _notifyNewReview(author, pageId, type, content) {
+  const typeLabel = { comment: "코멘트", issue: "이슈", approval: "승인" }[type] || type;
+  const pageLabel = pageId.replace(/-/g, " ");
+  const snippet = content.length > 50 ? content.slice(0, 50) + "…" : content;
+  const subject = `[ProcessCheck] 새 ${typeLabel}: ${pageLabel}`;
+  const htmlBody = `
+    <div style="font-family:sans-serif;max-width:600px;">
+      <h3 style="margin:0 0 8px;">새 ${typeLabel}가 등록되었습니다</h3>
+      <p style="color:#64748b;margin:4px 0;">페이지: <strong>${escapeHtml(pageLabel)}</strong></p>
+      <p style="color:#64748b;margin:4px 0;">작성자: <strong>${escapeHtml(author.name)}</strong></p>
+      <div style="background:#f8fafc;border-left:3px solid #3b82f6;padding:12px;margin:12px 0;border-radius:4px;">
+        ${escapeHtml(snippet)}
+      </div>
+      <a href="https://processsss-appp.web.app/${pageId}.html" style="color:#3b82f6;">ProcessCheck에서 확인하기 →</a>
+    </div>`;
+
+  try {
+    const allUsers = await getUsers();
+    const observers = allUsers.filter(u => u.role === "observer" && u.email && u.email !== author.email);
+
+    // 인앱 알림 — observer 전원
+    for (const obs of observers) {
+      await createNotification({
+        userId: obs.id,
+        type: "review",
+        title: `새 ${typeLabel}: ${pageLabel}`,
+        message: `${author.name}님이 ${typeLabel}를 작성했습니다: "${snippet}"`,
+        link: `${pageId}.html`,
+        read: false,
+        createdAt: new Date(),
+      });
+    }
+
+    // 이메일 — observer 전원 (Firebase Trigger Email 확장 필요)
+    const emails = observers.map(o => o.email).filter(Boolean);
+    if (emails.length > 0) {
+      await queueEmail({ to: emails, subject, html: htmlBody });
+    }
+  } catch (err) {
+    console.warn("리뷰 알림 전송 실패:", err);
+  }
 }
 
 export async function updateReviewStatus(reviewId, newStatus) {
@@ -87,6 +136,56 @@ export async function updateReviewStatus(reviewId, newStatus) {
       action: `status_${newStatus}`, by: user.name, at: now, detail: ""
     })
   });
+
+  // ── 알림 + 이메일: 해결/보류 시 작성자에게 알림 ──
+  if (newStatus === "resolved" || newStatus === "wontfix") {
+    _notifyReviewResolved(reviewId, newStatus, user).catch(console.error);
+  }
+}
+
+/** 리뷰 해결/보류 → 원 작성자에게 인앱 알림 + 이메일 */
+async function _notifyReviewResolved(reviewId, newStatus, resolver) {
+  try {
+    const reviewSnap = await getDoc(doc(db, "reviews", reviewId));
+    if (!reviewSnap.exists()) return;
+    const review = reviewSnap.data();
+
+    // 자기가 쓴 리뷰를 자기가 해결하면 알림 불필요
+    if (review.authorId === resolver.id) return;
+
+    const statusLabel = newStatus === "resolved" ? "해결됨" : "보류";
+    const snippet = (review.content || "").length > 50 ? review.content.slice(0, 50) + "…" : (review.content || "");
+    const pageLabel = (review.pageId || "").replace(/-/g, " ");
+    const subject = `[ProcessCheck] 리뷰 ${statusLabel}: ${pageLabel}`;
+    const htmlBody = `
+      <div style="font-family:sans-serif;max-width:600px;">
+        <h3 style="margin:0 0 8px;">리뷰가 ${statusLabel} 처리되었습니다</h3>
+        <p style="color:#64748b;margin:4px 0;">페이지: <strong>${escapeHtml(pageLabel)}</strong></p>
+        <p style="color:#64748b;margin:4px 0;">처리자: <strong>${escapeHtml(resolver.name)}</strong></p>
+        <div style="background:#f8fafc;border-left:3px solid ${newStatus === "resolved" ? "#22c55e" : "#94a3b8"};padding:12px;margin:12px 0;border-radius:4px;">
+          ${escapeHtml(snippet)}
+        </div>
+        <a href="https://processsss-appp.web.app/${review.pageId || ""}.html" style="color:#3b82f6;">ProcessCheck에서 확인하기 →</a>
+      </div>`;
+
+    // 인앱 알림 — 작성자에게
+    await createNotification({
+      userId: review.authorId,
+      type: "review",
+      title: `리뷰 ${statusLabel}: ${pageLabel}`,
+      message: `${resolver.name}님이 리뷰를 ${statusLabel} 처리했습니다: "${snippet}"`,
+      link: `${review.pageId || ""}.html`,
+      read: false,
+      createdAt: new Date(),
+    });
+
+    // 이메일 — 작성자에게
+    if (review.authorEmail) {
+      await queueEmail({ to: review.authorEmail, subject, html: htmlBody });
+    }
+  } catch (err) {
+    console.warn("리뷰 해결 알림 전송 실패:", err);
+  }
 }
 
 async function getUpdatedHistory(reviewId, newEntry) {
@@ -204,9 +303,25 @@ export class ReviewPanel {
             <span>리뷰</span>
             <span class="review-count-badge">${openCount}</span>
           </div>
-          <button class="review-panel-close" id="review-close-btn">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="position:relative;">
+              <button class="review-panel-close" id="review-settings-btn" title="설정" style="opacity:0.6;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <div id="review-settings-dropdown" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface-1);border:1px solid var(--surface-3);border-radius:var(--radius-md);padding:10px;z-index:100;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                <div style="font-size:0.7rem;font-weight:600;color:var(--slate-300);margin-bottom:6px;">날짜 형식</div>
+                ${["YY/MM/DD", "YYYY/MM/DD", "YYYY-MM-DD", "MM/DD/YYYY", "YYYY.MM.DD"].map(fmt => `
+                  <label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:0.75rem;color:var(--slate-300);">
+                    <input type="radio" name="date-fmt" value="${fmt}" ${getDateFormat() === fmt ? "checked" : ""} style="margin:0;">
+                    ${fmt}
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+            <button class="review-panel-close" id="review-close-btn">
+              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
 
         <div class="review-filter-bar">
@@ -321,6 +436,28 @@ export class ReviewPanel {
 
     // Close button
     panel.querySelector("#review-close-btn")?.addEventListener("click", () => this.close());
+
+    // Settings gear
+    const settingsBtn = panel.querySelector("#review-settings-btn");
+    const settingsDD = panel.querySelector("#review-settings-dropdown");
+    if (settingsBtn && settingsDD) {
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        settingsDD.style.display = settingsDD.style.display === "none" ? "block" : "none";
+      });
+      settingsDD.querySelectorAll('input[name="date-fmt"]').forEach(radio => {
+        radio.addEventListener("change", () => {
+          setDateFormat(radio.value);
+          settingsDD.style.display = "none";
+          showToast("success", `날짜 형식이 ${radio.value}로 변경되었습니다`);
+        });
+      });
+      document.addEventListener("click", (e) => {
+        if (!settingsBtn.contains(e.target) && !settingsDD.contains(e.target)) {
+          settingsDD.style.display = "none";
+        }
+      }, { once: false });
+    }
 
     // Filter buttons
     panel.querySelectorAll(".review-filter-btn").forEach(btn => {

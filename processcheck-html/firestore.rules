@@ -51,12 +51,6 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // ─── Change Requests ──────────────────────────────────────────────────
-    match /changeRequests/{requestId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
     // ─── Customers ────────────────────────────────────────────────────────
     match /customers/{customerId} {
       allow read: if true;
@@ -82,10 +76,15 @@ service cloud.firestore {
     }
 
     // ─── Activity Logs ────────────────────────────────────────────────────
-    // Written by firestore-service.js; was missing from rules (implicit deny)
     match /activityLogs/{logId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Settings (permissions, etc.) ───────────────────────────────────
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
     }
 
     // ─── Gate Records ─────────────────────────────────────────────────────
@@ -100,6 +99,14 @@ service cloud.firestore {
     match /feedbacks/{feedbackId} {
       allow read: if true;
       allow write: if isAuthenticated();
+    }
+
+    // ─── Mail Queue (Firebase Trigger Email Extension) ──────────────────
+    // Client creates docs; Extension reads & processes them
+    match /mail/{mailId} {
+      allow create: if true;
+      allow read: if false;
+      allow update, delete: if false;
     }
 
   }

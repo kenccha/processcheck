@@ -1,16 +1,14 @@
 // =============================================================================
-// Customer Portal — email-based auth, project progress, notifications, change requests
+// Customer Portal — email-based auth, project progress, notifications
 // =============================================================================
 
 import { db } from "../firebase-init.js";
 import { showToast } from "../ui/toast.js";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
 import {
   subscribeCustomers,
   subscribeProjects,
   subscribePortalNotifications,
   markPortalNotificationRead,
-  subscribeAllChangeRequests,
 } from "../firestore-service.js";
 import {
   escapeHtml,
@@ -32,9 +30,7 @@ let allCustomers = [];
 let portalProjects = [];
 let allProjects = [];
 let notifications = [];
-let changeRequests = [];
-let activeView = "projects"; // "projects" | "notifications" | "changes"
-let showNewRequestModal = false;
+let activeView = "projects"; // "projects" | "notifications"
 let loginError = "";
 const unsubs = [];
 
@@ -84,19 +80,6 @@ function loadPortalData() {
       render();
     })
   );
-
-  unsubs.push(
-    subscribeAllChangeRequests((reqs) => {
-      changeRequests = reqs.filter(
-        (r) =>
-          r.customerId === currentCustomer.id ||
-          (r.requestSource === "customer" &&
-            currentCustomer.products &&
-            currentCustomer.products.includes(r.projectId))
-      );
-      render();
-    })
-  );
 }
 
 // =============================================================================
@@ -117,24 +100,6 @@ function getProjectStatusBadge(status) {
     case "active": return "badge-primary";
     case "completed": return "badge-success";
     case "on_hold": return "badge-warning";
-    default: return "badge-neutral";
-  }
-}
-
-function getChangeStatusLabel(status) {
-  switch (status) {
-    case "in_review": return "검토 중";
-    case "approved": return "승인";
-    case "rejected": return "반려";
-    default: return status;
-  }
-}
-
-function getChangeStatusBadge(status) {
-  switch (status) {
-    case "in_review": return "badge-warning";
-    case "approved": return "badge-success";
-    case "rejected": return "badge-danger";
     default: return "badge-neutral";
   }
 }
@@ -205,17 +170,13 @@ function renderPortal() {
         <button class="tab-btn${activeView === "notifications" ? " active" : ""}" data-portal-tab="notifications">
           알림 ${unreadCount > 0 ? `<span class="badge badge-danger" style="font-size:0.625rem;margin-left:0.25rem">${unreadCount}</span>` : ""}
         </button>
-        <button class="tab-btn${activeView === "changes" ? " active" : ""}" data-portal-tab="changes">설계변경 요청</button>
       </div>
 
       <!-- Tab Content -->
       <div>
         ${activeView === "projects" ? renderProjectsView() : ""}
         ${activeView === "notifications" ? renderNotificationsView() : ""}
-        ${activeView === "changes" ? renderChangesView() : ""}
       </div>
-
-      ${showNewRequestModal ? renderNewRequestModal() : ""}
     </div>
   `;
 }
@@ -321,75 +282,6 @@ function renderNotificationsView() {
   `;
 }
 
-function renderChangesView() {
-  return `
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="section-title">설계변경 요청 (${changeRequests.length})</h3>
-      <button class="btn-primary btn-sm" id="new-change-request-btn">새 요청</button>
-    </div>
-    ${
-      changeRequests.length === 0
-        ? `<div class="card"><div class="empty-state" style="padding:3rem"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span class="empty-state-text">설계변경 요청이 없습니다</span></div></div>`
-        : `<div class="flex flex-col gap-3">${changeRequests
-            .map(
-              (r) => {
-                const proj = allProjects.find((p) => p.id === r.projectId);
-                return `
-              <div class="card p-4">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm font-semibold" style="color:var(--slate-100)">${escapeHtml(r.title)}</span>
-                  <span class="badge ${getChangeStatusBadge(r.status)}">${getChangeStatusLabel(r.status)}</span>
-                </div>
-                <div class="text-xs text-dim mb-1">프로젝트: ${escapeHtml(proj ? proj.name : r.projectId)}</div>
-                ${r.description ? `<div class="text-xs" style="color:var(--slate-400)">${escapeHtml(r.description)}</div>` : ""}
-                <div class="text-xs text-dim" style="margin-top:0.5rem">${timeAgo(r.createdAt)}</div>
-              </div>
-            `;
-              }
-            )
-            .join("")}</div>`
-    }
-  `;
-}
-
-function renderNewRequestModal() {
-  return `
-    <div class="modal-backdrop" id="cr-modal-backdrop">
-      <div class="modal" style="max-width:500px">
-        <div class="modal-header">
-          <h3 class="modal-title">새 설계변경 요청</h3>
-          <button class="modal-close" id="cr-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div style="margin-bottom:1rem">
-            <label class="text-xs font-semibold text-dim" style="display:block;margin-bottom:0.5rem">프로젝트</label>
-            <select class="input-field" id="cr-project">
-              ${portalProjects
-                .map(
-                  (p) =>
-                    `<option value="${p.id}">${escapeHtml(p.name)}</option>`
-                )
-                .join("")}
-            </select>
-          </div>
-          <div style="margin-bottom:1rem">
-            <label class="text-xs font-semibold text-dim" style="display:block;margin-bottom:0.5rem">제목</label>
-            <input type="text" class="input-field" id="cr-title" placeholder="변경 요청 제목">
-          </div>
-          <div style="margin-bottom:1rem">
-            <label class="text-xs font-semibold text-dim" style="display:block;margin-bottom:0.5rem">설명</label>
-            <textarea class="input-field" id="cr-desc" rows="4" placeholder="변경 내용을 상세히 설명해주세요"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" id="cr-cancel-btn">취소</button>
-          <button class="btn-primary" id="cr-submit-btn">요청 제출</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 // =============================================================================
 // Event binding
 // =============================================================================
@@ -435,7 +327,6 @@ function bindEvents() {
       currentCustomer = null;
       portalProjects = [];
       notifications = [];
-      changeRequests = [];
       sessionStorage.removeItem(SESSION_KEY);
       render();
     });
@@ -455,68 +346,6 @@ function bindEvents() {
       markPortalNotificationRead(el.dataset.notifMark);
     });
   });
-
-  // New change request button
-  const newCrBtn = app.querySelector("#new-change-request-btn");
-  if (newCrBtn) {
-    newCrBtn.addEventListener("click", () => {
-      showNewRequestModal = true;
-      render();
-    });
-  }
-
-  // Modal close/cancel
-  const modalClose = app.querySelector("#cr-modal-close");
-  const modalCancel = app.querySelector("#cr-cancel-btn");
-  const modalBackdrop = app.querySelector("#cr-modal-backdrop");
-  [modalClose, modalCancel].forEach((el) => {
-    if (el) {
-      el.addEventListener("click", () => {
-        showNewRequestModal = false;
-        render();
-      });
-    }
-  });
-  if (modalBackdrop) {
-    modalBackdrop.addEventListener("click", (e) => {
-      if (e.target === modalBackdrop) {
-        showNewRequestModal = false;
-        render();
-      }
-    });
-  }
-
-  // Submit change request
-  const submitBtn = app.querySelector("#cr-submit-btn");
-  if (submitBtn) {
-    submitBtn.addEventListener("click", async () => {
-      const projectId = app.querySelector("#cr-project")?.value;
-      const title = app.querySelector("#cr-title")?.value.trim();
-      const desc = app.querySelector("#cr-desc")?.value.trim();
-      if (!title) {
-        showToast('warning', "제목을 입력해주세요");
-        return;
-      }
-      try {
-        await addDoc(collection(db, "changeRequests"), {
-          projectId,
-          title,
-          description: desc,
-          requestSource: "customer",
-          customerId: currentCustomer.id,
-          customerName: currentCustomer.name,
-          customerContactName: currentCustomer.contactName || "",
-          status: "in_review",
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
-        showNewRequestModal = false;
-        render();
-      } catch (err) {
-        showToast('error', "요청 제출 실패: " + err.message);
-      }
-    });
-  }
 }
 
 // --- Initial render ---

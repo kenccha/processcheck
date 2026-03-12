@@ -63,7 +63,7 @@ function convertNotifLinkNav(link) {
   const projMatch = link.match(/^\/projects\/([^/]+)/);
   if (projMatch) return `project.html?id=${projMatch[1]}`;
   if (link === "/projects" || link === "/projects/") return "projects.html";
-  if (link === "/dashboard" || link === "/dashboard/") return "dashboard.html";
+  if (link === "/dashboard" || link === "/dashboard/") return "projects.html?type=신규개발";
   // Already an HTML path
   if (link.endsWith(".html") || link.includes(".html?")) return link;
   return null;
@@ -90,8 +90,18 @@ const BASE_NAV_LINKS = [
       { href: "docs/deliverables/wireframes.html", label: "전체 화면 설계" },
       { href: "docs/deliverables/user-flows.html", label: "업무 흐름" },
       { href: "docs/deliverables/diagram-viewer.html", label: "시스템 구조" },
-      { href: "docs/deliverables/feedback.html", label: "피드백 모아보기" },
       { href: "manual.html", label: "매뉴얼" },
+      { href: "docs/deliverables/feedback.html", label: "피드백 모아보기" },
+    ],
+  },
+  {
+    href: null,
+    label: "다른 사이트",
+    icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
+    isSeparated: true,
+    children: [
+      { href: "sales.html", label: "영업 출시 준비", external: true },
+      { href: "customers.html", label: "고객 관리", external: true },
     ],
   },
 ];
@@ -104,11 +114,16 @@ const ADMIN_USER_LINK = {
 
 function getNavLinks(userRole) {
   const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
-  // 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가 (모든 역할)
+  // 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가 (피드백 모아보기 앞에)
   const reviewMenu = links.find((l) => l.label === "리뷰");
   if (reviewMenu && reviewMenu.children) {
-    reviewMenu.children.push({ href: "admin-users.html", label: "사용자 관리" });
-    reviewMenu.children.push({ href: "admin-permissions.html", label: "권한 설정" });
+    // 피드백 모아보기를 마지막에 유지하기 위해 그 앞에 삽입
+    const fbIdx = reviewMenu.children.findIndex(c => c.label === "피드백 모아보기");
+    const insertIdx = fbIdx >= 0 ? fbIdx : reviewMenu.children.length;
+    reviewMenu.children.splice(insertIdx, 0,
+      { href: "admin-users.html", label: "사용자 관리" },
+      { href: "admin-permissions.html", label: "권한 설정" }
+    );
   }
   return links;
 }
@@ -139,7 +154,7 @@ export function renderNav(container) {
     <nav class="nav">
       <div class="nav-inner">
         <div class="flex items-center gap-8">
-          <button class="nav-logo" data-nav="dashboard.html">
+          <button class="nav-logo" data-nav="projects.html?type=신규개발">
             <div class="nav-logo-icon"><span>PC</span></div>
             <span class="nav-logo-text">Process<span class="accent">Check</span></span>
           </button>

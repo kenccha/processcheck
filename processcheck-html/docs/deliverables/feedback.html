@@ -262,8 +262,9 @@ function renderTable() {
       <td><span class="tag tag-${item.status}">${statusLabel}</span></td>
       <td class="fb-votes"><button class="${voted ? "fp-vote-active" : ""}" data-vote="${item.id}">👍 ${item.votes || 0}</button></td>
       <td class="fb-actions">
-        ${item.status !== "resolved" ? `<button data-resolve="${item.id}">처리</button>` : ""}
+        ${item.status === "open" || item.status === "in_progress" ? `<button data-resolve="${item.id}">처리</button>` : ""}
         ${item.status === "open" ? `<button data-progress="${item.id}">진행중</button>` : ""}
+        ${item.status === "resolved" || item.status === "wontfix" ? `<button data-reopen="${item.id}" style="color:#f59e0b;">↩ 되돌리기</button>` : ""}
       </td>
     </tr>`;
   }).join("");
@@ -295,6 +296,14 @@ function renderTable() {
   tbody.querySelectorAll("[data-progress]").forEach(btn => {
     btn.addEventListener("click", async () => {
       await updateFeedbackStatus(btn.dataset.progress, "in_progress", "", userName);
+    });
+  });
+
+  // Reopen handlers
+  tbody.querySelectorAll("[data-reopen]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("이 피드백을 미해결 상태로 되돌리시겠습니까?")) return;
+      await updateFeedbackStatus(btn.dataset.reopen, "open", "", userName);
     });
   });
 

@@ -40,7 +40,6 @@ const TYPE_CATEGORIES = {
   approval_completed: "approval",
   approved: "approval",
   rejected: "approval",
-  change_request: "system",
   system: "system",
   phase_completed: "system",
 };
@@ -261,7 +260,7 @@ function renderEmptyState() {
         </svg>
       </div>
       <div class="nc-empty-text">${message}</div>
-      <button class="btn btn-secondary btn-sm" onclick="window.location.href='dashboard.html'">
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='projects.html?type=신규개발'">
         대시보드로 이동
       </button>
     </div>

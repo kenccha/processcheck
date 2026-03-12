@@ -23,10 +23,14 @@ import {
   subscribeLaunchChecklists,
   subscribeGateRecords,
   updateGateRecord,
+  updateGateApprovedAt,
   addGateMeetingNote,
+  batchUpdateMultiPhaseSchedule,
   PHASE_DESCRIPTIONS,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
+import { storage } from "../firebase-init.js";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { renderSkeletonCards, renderSkeletonStats } from "../ui/skeleton.js";
 import { initSortable, guardRender } from "../ui/dnd.js";
 import {
@@ -39,6 +43,8 @@ import {
   formatStageName,
   escapeHtml,
   formatDate,
+  formatDateShort,
+  formatDateTime,
   getQueryParam,
   daysUntil,
   getRiskClass,
@@ -299,14 +305,26 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
   const activePhases = getActivePhaseGroups();
   const currentPhaseName = phaseIndex >= 0 && phaseIndex < activePhases.length ? activePhases[phaseIndex].name : formatStageName(p.currentStage);
 
-  // D-day
+  // D-day (원래 종료일 기준)
   const endDate = p.endDate ? new Date(p.endDate) : null;
   const dDays = endDate ? daysUntil(endDate) : null;
   const dDayText = dDays !== null ? (dDays < 0 ? `D+${Math.abs(dDays)}` : dDays === 0 ? "D-Day" : `D-${dDays}`) : "-";
   const dDayColor = dDays !== null ? (dDays < 0 ? "var(--danger-400)" : dDays <= 7 ? "var(--warning-400)" : "var(--success-400)") : "var(--slate-400)";
 
-  // Delay reason
+  // 스케줄 지연 계산 (현재 단계 기준 누적 지연)
+  const schedules = calculatePhaseSchedules();
+  const lastSchedule = schedules.length > 0 ? schedules[schedules.length - 1] : null;
+  const totalDelay = lastSchedule ? lastSchedule.totalDelay : 0;
+  // 현재 활성 또는 지연 중인 Phase 찾기
+  const currentSchedule = schedules.find(s => s.status === "delayed" || s.status === "active") || schedules.find(s => s.status === "pending");
+  const currentPhasDelay = currentSchedule ? currentSchedule.phaseDelay : 0;
+  const currentCumDelay = currentSchedule ? currentSchedule.totalDelay : totalDelay;
+  // 예상 종료일 = 원래 종료일 + 누적 지연
+  const projectedEndDate = endDate && totalDelay > 0 ? new Date(endDate.getTime() + totalDelay * 86400000) : null;
+
+  // Delay reason (가장 많이 지연된 작업)
   let delayReason = "";
+  let delayTaskId = "";
   if (overdueTasks > 0) {
     const overdue = checklistItems
       .filter(t => {
@@ -319,6 +337,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
       const worst = overdue[0];
       const worstDays = Math.abs(daysUntil(worst.dueDate));
       delayReason = `${worst.department} ${worst.title} (${worst.assignee || "미배정"}) — ${worstDays}일 지연`;
+      delayTaskId = worst.id;
     }
   }
 
@@ -339,13 +358,19 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
             <div style="font-size:0.8rem;color:var(--slate-400);">
               ${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}
             </div>
+            ${totalDelay > 0 ? `
+              <div style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius-full);white-space:nowrap;">
+                <span style="font-size:0.7rem;color:var(--danger-400);font-weight:600;">📅 예상 종료 ${projectedEndDate ? formatDate(projectedEndDate) : ""}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;color:var(--danger-400);">(+${totalDelay}일)</span>
+              </div>
+            ` : ""}
           </div>
 
-          ${delayReason ? `
-            <div style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-lg);margin-bottom:0.5rem;">
-              <svg width="12" height="12" fill="none" stroke="var(--danger-400)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-              <span style="font-size:0.75rem;color:var(--danger-400);">${escapeHtml(delayReason)}</span>
-            </div>
+          ${delayReason || totalDelay > 0 ? `
+            <${delayTaskId ? `a href="task.html?projectId=${encodeURIComponent(p.id)}&taskId=${encodeURIComponent(delayTaskId)}"` : "div"} style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-lg);margin-bottom:0.5rem;max-width:100%;text-decoration:none;${delayTaskId ? "cursor:pointer;" : ""}transition:background 0.15s;" ${delayTaskId ? 'onmouseover="this.style.background=\'rgba(239,68,68,0.15)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.08)\'"' : ""}>
+              <svg width="12" height="12" fill="none" stroke="var(--danger-400)" viewBox="0 0 24 24" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+              <span style="font-size:0.75rem;color:var(--danger-400);">${delayReason ? escapeHtml(delayReason) : `현재 단계 기준 누적 ${totalDelay}일 지연`}</span>
+            </${delayTaskId ? "a" : "div"}>
           ` : `
             <div style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-lg);margin-bottom:0.5rem;">
               <svg width="12" height="12" fill="none" stroke="var(--success-400)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -353,51 +378,16 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
             </div>
           `}
 
-          <!-- Phase pipeline (컴팩트, 스크롤 가능) -->
-          <div class="phase-pipeline-wrap">
-            ${activePhases.map((ph, idx) => {
-              const st = phaseStatuses[idx];
-              const isCompleted = st === "completed";
-              const isCurrent = st === "active";
-              // gateRecord 기반 승인 상태
-              const gr = gateRecords.find(r => r.phaseName === ph.name);
-              const gateStatus = gr?.gateStatus || "pending";
-              const noteCount = gr?.meetingNotes?.length || 0;
-              const statusCls = gateStatus === "approved" ? "done" : gateStatus === "rejected" ? "rejected" : isCompleted ? "done" : isCurrent ? "active" : "pending";
-              const icon = gateStatus === "approved" ? "✔" : gateStatus === "rejected" ? "✗" : isCurrent ? "▶" : "";
-              return `<div class="phase-pip-item">
-                <button class="phase-pip-badge phase-pip-${statusCls}" data-phase-panel="${idx}" title="${escapeHtml(ph.gateStage)}">
-                  ${icon ? `<span class="phase-pip-icon">${icon}</span>` : ""}${ph.name}${noteCount > 0 ? ` <span class="phase-pip-note-count">${noteCount}</span>` : ""}
-                </button>
-                ${idx < activePhases.length - 1 ? '<span class="phase-pip-arrow">→</span>' : ""}
-              </div>`;
-            }).join("")}
-          </div>
-
-          <!-- Export Buttons -->
-          <div style="margin-top:0.75rem;display:flex;gap:0.5rem;">
-            <button class="btn-ghost btn-sm" id="export-csv-btn" style="font-size:0.75rem;">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV
-            </button>
-            <button class="btn-ghost btn-sm" id="export-pdf-btn" style="font-size:0.75rem;">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>PDF
-            </button>
-            <button class="btn-ghost btn-sm" id="print-btn" data-print-hide style="font-size:0.75rem;">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>인쇄
-            </button>
-          </div>
         </div>
 
-        <!-- Right: Key stats -->
-        <div style="display:flex;gap:1.25rem;text-align:center;flex-shrink:0;">
-          <div>
-            <div style="font-size:1.75rem;font-weight:700;color:var(--slate-100);">${totalTasks}</div>
-            <div style="font-size:0.65rem;color:var(--slate-400);">전체 작업</div>
-          </div>
-          <div>
-            <div style="font-size:1.75rem;font-weight:700;color:${overdueTasks > 0 ? "var(--danger-400)" : "var(--slate-100)"};">${overdueTasks}</div>
-            <div style="font-size:0.65rem;color:var(--slate-400);">지연</div>
-          </div>
+        <!-- Right: Export Buttons -->
+        <div style="display:flex;gap:0.5rem;flex-shrink:0;align-items:flex-start;">
+          <button class="btn-ghost btn-sm" id="export-csv-btn" style="font-size:0.75rem;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>CSV
+          </button>
+          <button class="btn-ghost btn-sm" id="export-pdf-btn" style="font-size:0.75rem;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:0.25rem"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>PDF
+          </button>
         </div>
       </div>
     </div>
@@ -463,13 +453,13 @@ function renderPhaseCards() {
 
 function renderWorkTab() {
   return `
-    <!-- Phase Cards -->
-    ${renderPhaseCards()}
+    <!-- Gate Approval Card (위원회 승인 + 일정) -->
+    ${renderGateApprovalCard(getActivePhaseGroups())}
 
     <!-- View Switcher -->
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
-      ${["phase","timeline","department","board","matrix","list"].map(v => {
-        const labels = { phase: "Phase", timeline: "타임라인", department: "부서", board: "보드", matrix: "매트릭스", list: "리스트" };
+      ${["phase","timeline","board","matrix"].map(v => {
+        const labels = { phase: "Phase", timeline: "타임라인", board: "부서", matrix: "매트릭스" };
         return `<button class="btn-ghost btn-sm view-switch-btn${checklistView === v ? " active" : ""}" data-view="${v}" style="font-size:0.7rem;padding:0.3rem 0.6rem;${checklistView === v ? "background:var(--primary-500);color:white;" : ""}">${labels[v]}</button>`;
       }).join("")}
     </div>
@@ -487,14 +477,31 @@ function renderWorkTab() {
       ${checklistFilter ? `<button class="btn-ghost btn-sm" id="clear-filter-btn" style="font-size:0.7rem;">필터 해제 ✕</button>` : ""}
     </div>
 
-    <!-- Quick Add -->
-    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;align-items:stretch;">
-      <input type="text" id="quick-add-input" class="input-field" style="flex:1;font-size:0.8rem"
-        placeholder="@담당자 #부서 !긴급 작업 내용 ~마감일">
-      <button class="btn-primary btn-sm" id="quick-add-btn" style="white-space:nowrap;padding:0.4rem 0.75rem;font-size:0.75rem;">추가</button>
-      <button class="btn-secondary btn-sm" id="open-add-modal-btn" style="padding:0.4rem 0.6rem;" title="상세 입력">+</button>
-      <button class="btn-secondary btn-sm" id="apply-template-btn" style="white-space:nowrap;padding:0.4rem 0.75rem;font-size:0.75rem;">📋 템플릿 적용</button>
-      <button class="btn-secondary btn-sm" id="apply-launch-btn" style="white-space:nowrap;padding:0.4rem 0.75rem;font-size:0.75rem;${launchCount > 0 ? 'display:none;' : ''}">🚀 출시 준비 적용</button>
+    <!-- Quick Add (프로젝트 전용) -->
+    <div style="background:var(--surface-2);border:1px solid var(--surface-3);border-radius:var(--radius-lg);padding:0.75rem;margin-bottom:1rem;">
+      <p style="margin:0 0 0.5rem 0;font-size:0.7rem;color:var(--slate-400);">이 프로젝트에만 필요한 추가 작업을 등록합니다. 기본 템플릿 체크리스트와 별도로 관리됩니다.</p>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+        <input type="text" id="quick-add-title" class="input-field" style="flex:1;font-size:0.8rem;min-width:0;" placeholder="프로젝트 전용 작업 내용을 입력하세요">
+        <button class="btn-primary btn-sm" id="quick-add-btn" style="white-space:nowrap;padding:0.4rem 0.75rem;font-size:0.75rem;">추가</button>
+      </div>
+      <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+        <select id="quick-add-stage" class="input-field" style="width:auto;min-width:80px;font-size:0.7rem;padding:0.25rem 0.4rem;">
+          ${getActivePhaseGroups().map((p, i) => `<option value="${p.workStage}" ${i === 0 ? "selected" : ""}>${p.name}</option>`).join("")}
+        </select>
+        <select id="quick-add-dept" class="input-field" style="width:auto;min-width:80px;font-size:0.7rem;padding:0.25rem 0.4rem;">
+          ${departments.map(d => `<option value="${d}" ${d === (user.department || departments[0]) ? "selected" : ""}>${escapeHtml(d)}</option>`).join("")}
+        </select>
+        <select id="quick-add-importance" class="input-field" style="width:auto;min-width:60px;font-size:0.7rem;padding:0.25rem 0.4rem;">
+          <option value="green">보통</option>
+          <option value="yellow">중요</option>
+          <option value="red">긴급</option>
+        </select>
+        <input type="date" id="quick-add-due" class="input-field" style="width:auto;font-size:0.7rem;padding:0.25rem 0.4rem;" value="${new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)}">
+        <span style="flex:1;"></span>
+        <button class="btn-secondary btn-sm" id="open-add-modal-btn" style="padding:0.25rem 0.5rem;font-size:0.65rem;" title="상세 입력">상세 +</button>
+        <button class="btn-secondary btn-sm" id="apply-template-btn" style="white-space:nowrap;padding:0.25rem 0.5rem;font-size:0.65rem;">📋 템플릿</button>
+        <button class="btn-secondary btn-sm" id="apply-launch-btn" style="white-space:nowrap;padding:0.25rem 0.5rem;font-size:0.65rem;${launchCount > 0 ? 'display:none;' : ''}">🚀 출시</button>
+      </div>
     </div>
 
     <!-- 2-Column Layout -->
@@ -519,10 +526,9 @@ function renderWorkTab() {
 function renderChecklist() {
   if (checklistView === "phase") return renderPhaseView();
   if (checklistView === "timeline") return renderTimelineView();
-  if (checklistView === "department") return renderDepartmentView();
   if (checklistView === "board") return renderBoardView();
   if (checklistView === "matrix") return renderMatrixView();
-  return renderListView();
+  return renderPhaseView();
 }
 
 function getFilteredTasks() {
@@ -549,23 +555,27 @@ function getFilteredTasks() {
 function renderTaskRow(task) {
   const dd = daysUntil(task.dueDate);
   const isOverdue = task.status !== "completed" && task.status !== "rejected" && dd !== null && dd < 0;
+  const overdueStyle = isOverdue ? "color:var(--danger-400);" : "";
+  const dotColor = isOverdue ? "var(--danger-400)" :
+    task.status === "completed" ? "var(--success-400)" :
+    task.status === "in_progress" ? "var(--primary-400)" :
+    task.status === "rejected" ? "var(--danger-400)" : "var(--slate-400)";
+  const ddText = task.status !== "completed" && dd !== null ? (dd < 0 ? `D+${Math.abs(dd)}` : dd === 0 ? "D-Day" : `D-${dd}`) : "";
   return `
-    <div class="card-hover pd-task-row" data-task-id="${task.id}" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:0.625rem 0.75rem;cursor:pointer;${isOverdue ? "border-left:3px solid var(--danger-400);" : ""}">
+    <div class="card-hover pd-task-row" data-task-id="${task.id}" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:0.625rem 0.75rem;cursor:pointer;${isOverdue ? "border-left:3px solid var(--danger-400);background:rgba(239,68,68,0.04);" : ""}">
       <div style="display:flex;align-items:start;gap:0.5rem;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:0.375rem;margin-bottom:0.25rem;flex-wrap:wrap;">
-            <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${
-              task.status === "completed" ? "var(--success-400)" :
-              task.status === "in_progress" ? "var(--primary-400)" :
-              task.status === "rejected" ? "var(--danger-400)" : "var(--slate-400)"
-            };"></span>
-            <span style="font-size:0.8rem;font-weight:500;color:var(--slate-200);">${escapeHtml(task.title)}</span>
+            <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${dotColor};"></span>
+            <span style="font-size:0.8rem;font-weight:500;${isOverdue ? "color:var(--danger-400);" : "color:var(--slate-200);"}">${escapeHtml(task.title)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.65rem;color:var(--slate-400);flex-wrap:wrap;">
-            ${task.assignee ? `<span>${escapeHtml(task.assignee)}</span>` : ""}
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.65rem;${isOverdue ? "color:var(--danger-400);font-weight:600;" : "color:var(--slate-400);"};flex-wrap:wrap;">
             <span>${escapeHtml(task.department)}</span>
-            <span style="${isOverdue ? "color:var(--danger-400);font-weight:600;" : ""}">${formatDate(task.dueDate)}${task.status !== "completed" && dd !== null ? (dd < 0 ? ` D+${Math.abs(dd)}` : dd === 0 ? " D-Day" : ` D-${dd}`) : ""}</span>
+            ${task.assignee ? `<span>${escapeHtml(task.assignee)}</span>` : ""}
+            <span>${formatDate(task.dueDate)}</span>
+            ${ddText ? `<span style="font-weight:600;${isOverdue ? "color:var(--danger-400);" : ""}">${ddText}</span>` : ""}
             ${task.source === "manual" ? '<span class="peek-badge-manual">추가</span>' : ""}
+            ${(task.attachments && task.attachments.length > 0) ? `<span style="display:inline-flex;align-items:center;gap:0.15rem;color:var(--primary-400);font-weight:500;" title="${task.attachments.length}개 첨부파일"><svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>${task.attachments.length}</span>` : ""}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.25rem;">
@@ -573,9 +583,304 @@ function renderTaskRow(task) {
         <select class="inline-status-select" data-status-item="${task.id}" data-current="${task.status}" onclick="event.stopPropagation()">
           <option value="pending" ${task.status==="pending"?"selected":""}>대기</option>
           <option value="in_progress" ${task.status==="in_progress"?"selected":""}>진행</option>
+          <option value="delayed" ${isOverdue?"selected":""}>지연</option>
           <option value="completed" ${task.status==="completed"?"selected":""}>완료</option>
         </select>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// Schedule Timeline Card — Phase별 일정 지연 전파 시각화
+// =============================================================================
+
+const DEFAULT_PHASE_DURATION = 60; // days per phase
+
+// Phase별 실제 task dueDate 범위 계산
+function getPhaseTaskDates(phase) {
+  const tasks = checklistItems.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
+  let min = null, max = null;
+  for (const t of tasks) {
+    if (!t.dueDate) continue;
+    const d = t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate);
+    if (!min || d < min) min = d;
+    if (!max || d > max) max = d;
+  }
+  return { start: min, end: max, count: tasks.length };
+}
+
+function calculatePhaseSchedules() {
+  const phases = getActivePhaseGroups();
+  const p = project;
+  if (!p || !p.startDate) return [];
+
+  const projStart = new Date(p.startDate);
+  projStart.setHours(0, 0, 0, 0);
+
+  // 프로젝트에 저장된 phaseSchedules (계획 일정)
+  const savedSchedules = p.phaseSchedules || {};
+
+  const results = [];
+
+  for (let i = 0; i < phases.length; i++) {
+    const phase = phases[i];
+    const phaseId = `phase${i}`;
+    const saved = savedSchedules[phaseId] || {};
+
+    // 계획 일정: 저장된 값 우선, 없으면 고정 60일 기반 폴백
+    const fallbackStart = new Date(projStart.getTime() + i * DEFAULT_PHASE_DURATION * 86400000);
+    const fallbackEnd = new Date(projStart.getTime() + (i + 1) * DEFAULT_PHASE_DURATION * 86400000 - 86400000);
+
+    const plannedStart = saved.plannedStart ? new Date(saved.plannedStart) : fallbackStart;
+    const plannedEnd = saved.plannedEnd ? new Date(saved.plannedEnd) : fallbackEnd;
+    plannedStart.setHours(0, 0, 0, 0);
+    plannedEnd.setHours(0, 0, 0, 0);
+    const plannedDuration = Math.max(1, Math.round((plannedEnd - plannedStart) / 86400000));
+
+    // 실제 일정: 저장된 actual 값 우선, 없으면 계획 = 실제
+    const actualStart = saved.actualStart ? new Date(saved.actualStart) : new Date(plannedStart);
+    const actualEnd = saved.actualEnd ? new Date(saved.actualEnd) : new Date(plannedEnd);
+    actualStart.setHours(0, 0, 0, 0);
+    actualEnd.setHours(0, 0, 0, 0);
+
+    // 지연 계산: 실제 종료 - 계획 종료
+    const phaseDelay = Math.max(0, Math.round((actualEnd - plannedEnd) / 86400000));
+
+    // 진행 상태
+    const gr = gateRecords.find(r => r.phaseId === phaseId);
+    const gateStatus = gr?.gateStatus || "pending";
+    let status = "pending";
+
+    if (gateStatus === "approved") {
+      status = "completed";
+    } else {
+      const progress = getPhaseWorkProgress(phase.name);
+      if (progress.total > 0 && progress.completed > 0) status = "active";
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (today > actualEnd && status !== "completed") status = "delayed";
+    }
+
+    // 계획 일정이 저장된 적이 있는지
+    const hasPlanned = !!(saved.plannedStart && saved.plannedEnd);
+
+    results.push({
+      phase, phaseId, index: i,
+      plannedStart, plannedEnd, plannedDuration,
+      actualStart, actualEnd,
+      projectedStart: actualStart,    // 하위 호환
+      projectedEnd: actualEnd,        // 하위 호환
+      daysPerPhase: plannedDuration,
+      phaseDelay,
+      cumulativeDelay: 0, // 이제 각 phase별 독립 계산
+      totalDelay: phaseDelay,
+      status, gateStatus, hasPlanned,
+    });
+  }
+
+  return results;
+}
+
+function renderScheduleTimelineCard() {
+  const schedules = calculatePhaseSchedules();
+  if (schedules.length === 0) return "";
+
+  const totalDelay = schedules.length > 0 ? schedules[schedules.length - 1].totalDelay : 0;
+  const p = project;
+  const projStart = new Date(p.startDate);
+  const projEnd = p.endDate ? new Date(p.endDate) : null;
+
+  // Timeline range: from project start to max of (planned end, projected end)
+  const lastSchedule = schedules[schedules.length - 1];
+  const plannedProjectEnd = lastSchedule.plannedEnd; // 6 phases × 60 days
+  const timelineEnd = new Date(Math.max(
+    plannedProjectEnd.getTime(),
+    lastSchedule.projectedEnd.getTime(),
+    Date.now()
+  ));
+  const timelineStart = projStart;
+  const timelineRange = Math.max(1, (timelineEnd - timelineStart) / 86400000);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayPct = Math.min(100, Math.max(0, ((today - timelineStart) / 86400000 / timelineRange) * 100));
+
+  // Format helper
+  const fmtShort = (d) => formatDateShort(d);
+
+  return `
+    <div class="card mb-4" style="border:1px solid var(--surface-3);overflow:hidden;">
+      <div style="padding:0.75rem 1rem;background:var(--surface-1);border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:1rem;">📅</span>
+          <span style="font-size:0.9rem;font-weight:600;color:var(--slate-100);">일정 현황</span>
+        </div>
+        ${totalDelay > 0 ? `
+          <div style="display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0.75rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:999px;">
+            <span style="font-size:0.75rem;font-weight:700;color:var(--danger-400);">누적 지연 +${totalDelay}일</span>
+          </div>
+        ` : `
+          <div style="display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0.75rem;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:999px;">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--success-400);">일정 정상</span>
+          </div>
+        `}
+      </div>
+
+      <div style="padding:0.75rem 1rem;">
+        <!-- Legend -->
+        <div style="display:flex;gap:1rem;margin-bottom:0.75rem;font-size:0.65rem;color:var(--slate-400);flex-wrap:wrap;">
+          <span><span style="display:inline-block;width:12px;height:6px;background:var(--slate-500);opacity:0.3;border-radius:2px;vertical-align:middle;margin-right:3px;"></span>원래 일정</span>
+          <span><span style="display:inline-block;width:12px;height:6px;background:var(--success-400);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>완료</span>
+          <span><span style="display:inline-block;width:12px;height:6px;background:var(--primary-400);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>진행 중</span>
+          <span><span style="display:inline-block;width:12px;height:6px;background:var(--danger-400);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>지연</span>
+          <span><span style="display:inline-block;width:1px;height:10px;background:var(--warning-400);vertical-align:middle;margin-right:3px;border-left:1.5px dashed var(--warning-400);"></span>오늘</span>
+        </div>
+
+        <!-- Timeline bars -->
+        <div style="position:relative;">
+          ${schedules.map((s, idx) => {
+            const plannedStartPct = ((s.plannedStart - timelineStart) / 86400000 / timelineRange) * 100;
+            const plannedWidthPct = (s.daysPerPhase / timelineRange) * 100;
+            const projectedStartPct = ((s.projectedStart - timelineStart) / 86400000 / timelineRange) * 100;
+            const projectedDuration = (s.projectedEnd - s.projectedStart) / 86400000;
+            const projectedWidthPct = (projectedDuration / timelineRange) * 100;
+
+            const barColor = s.status === "completed" ? "var(--success-400)"
+              : s.status === "delayed" ? "var(--danger-400)"
+              : s.status === "active" ? "var(--primary-400)"
+              : "var(--slate-500)";
+
+            const barOpacity = s.status === "pending" ? "0.4" : "0.85";
+
+            // Show inherited delay arrow
+            const inheritedDelay = s.cumulativeDelay;
+            const ownDelay = s.phaseDelay;
+
+            return `
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:${idx < schedules.length - 1 ? "0.5rem" : "0"};">
+                <!-- Phase name -->
+                <div style="min-width:64px;font-size:0.7rem;font-weight:600;color:var(--slate-200);text-align:right;">${s.phase.name}</div>
+
+                <!-- Bar area -->
+                <div style="flex:1;position:relative;height:28px;">
+                  <!-- Planned bar (ghost) -->
+                  <div style="position:absolute;top:4px;height:8px;left:${plannedStartPct}%;width:${plannedWidthPct}%;background:var(--slate-500);opacity:0.15;border-radius:2px;" title="원래: ${fmtShort(s.plannedStart)}~${fmtShort(s.plannedEnd)}"></div>
+
+                  <!-- Projected/Actual bar -->
+                  <div style="position:absolute;top:2px;height:12px;left:${projectedStartPct}%;width:${Math.max(0.5, projectedWidthPct)}%;background:${barColor};opacity:${barOpacity};border-radius:3px;transition:width 0.3s;" title="${fmtShort(s.projectedStart)}~${fmtShort(s.projectedEnd)}"></div>
+
+                  <!-- Delay extension marker (red stripe for delay portion) -->
+                  ${(ownDelay > 0 || inheritedDelay > 0) ? `
+                    <div style="position:absolute;top:2px;height:12px;left:${plannedStartPct + plannedWidthPct}%;width:${((s.totalDelay) / timelineRange) * 100}%;background:repeating-linear-gradient(135deg,transparent,transparent 2px,rgba(239,68,68,0.15) 2px,rgba(239,68,68,0.15) 4px);border-radius:0 3px 3px 0;pointer-events:none;"></div>
+                  ` : ""}
+
+                  <!-- Date labels -->
+                  <div style="position:absolute;top:16px;left:${projectedStartPct}%;font-size:0.55rem;color:var(--slate-500);white-space:nowrap;">${fmtShort(s.projectedStart)}</div>
+                  <div style="position:absolute;top:16px;left:${projectedStartPct + Math.max(0.5, projectedWidthPct)}%;transform:translateX(-100%);font-size:0.55rem;color:var(--slate-500);white-space:nowrap;">${fmtShort(s.projectedEnd)}</div>
+                </div>
+
+                <!-- Delay badge -->
+                <div style="min-width:56px;text-align:right;">
+                  ${s.totalDelay > 0 ? `
+                    <span style="font-size:0.65rem;font-weight:700;color:var(--danger-400);background:rgba(239,68,68,0.08);padding:0.1rem 0.35rem;border-radius:var(--radius-md);">+${s.totalDelay}일</span>
+                    ${inheritedDelay > 0 && ownDelay > 0 ? `<div style="font-size:0.5rem;color:var(--slate-500);margin-top:1px;">자체 +${ownDelay} / 이전 +${inheritedDelay}</div>` : ""}
+                    ${inheritedDelay > 0 && ownDelay === 0 ? `<div style="font-size:0.5rem;color:var(--slate-500);margin-top:1px;">이전 단계 영향</div>` : ""}
+                  ` : s.status === "completed" ? `
+                    <span style="font-size:0.65rem;color:var(--success-400);">✓</span>
+                  ` : `
+                    <span style="font-size:0.65rem;color:var(--slate-500);">—</span>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join("")}
+
+          <!-- Today line (vertical dashed) -->
+          <div style="position:absolute;top:0;bottom:0;left:${todayPct}%;width:0;border-left:1.5px dashed var(--warning-400);opacity:0.7;pointer-events:none;z-index:2;"></div>
+        </div>
+
+        <!-- Summary -->
+        ${totalDelay > 0 ? `
+          <div style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius-lg);font-size:0.7rem;color:var(--slate-300);">
+            <span style="color:var(--danger-400);font-weight:600;">⚠</span>
+            ${(() => {
+              const orig = fmtShort(plannedProjectEnd);
+              const newEnd = fmtShort(lastSchedule.projectedEnd);
+              const delayedPhases = schedules.filter(s => s.phaseDelay > 0);
+              const delayChain = delayedPhases.map(s => `${s.phase.name}(+${s.phaseDelay}일)`).join(" → ");
+              return `원래 완료일 <strong>${orig}</strong> → 예상 완료일 <strong style="color:var(--danger-400);">${newEnd}</strong>` +
+                (delayChain ? ` · 지연 원인: ${delayChain}` : "");
+            })()}
+          </div>
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderGateApprovalCard(phases) {
+  const schedules = calculatePhaseSchedules();
+  const totalDelay = schedules.length > 0 ? schedules[schedules.length - 1].totalDelay : 0;
+  const fmtShort = (d) => formatDateShort(d);
+
+  return `
+    <div class="card mb-4" style="border:1px solid var(--surface-3);overflow:hidden;">
+      <div style="padding:0.75rem 1rem;background:var(--surface-1);border-bottom:1px solid var(--surface-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:1rem;">🔒</span>
+          <span style="font-size:0.9rem;font-weight:600;color:var(--slate-100);">위원회 승인</span>
+        </div>
+        ${totalDelay > 0 ? `
+          <div style="display:flex;align-items:center;gap:0.375rem;padding:0.2rem 0.6rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:999px;">
+            <span style="font-size:0.7rem;font-weight:700;color:var(--danger-400);">누적 지연 +${totalDelay}일</span>
+          </div>
+        ` : ""}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:0;">
+        ${phases.map((phase, idx) => {
+          const phaseId = `phase${idx}`;
+          const gr = gateRecords.find(r => r.phaseId === phaseId) || null;
+          const gateStatus = gr?.gateStatus || "pending";
+          const bgColor = gateStatus === "approved" ? "rgba(34,197,94,0.06)" : gateStatus === "rejected" ? "rgba(239,68,68,0.06)" : "transparent";
+
+          // Schedule info
+          const sched = schedules[idx];
+          const plannedEndStr = sched ? fmtShort(sched.plannedEnd) : "";
+          const projectedEndStr = sched ? fmtShort(sched.projectedEnd) : "";
+          const ownDelay = sched?.phaseDelay || 0;
+          const inherited = sched?.cumulativeDelay || 0;
+          const totalPhaseDelay = sched?.totalDelay || 0;
+          const isDelayed = totalPhaseDelay > 0;
+
+          const noteCount = gr?.meetingNotes?.length || 0;
+          return `
+            <div data-gate-panel="${idx}" style="padding:0.75rem;border-right:1px solid var(--surface-3);border-bottom:1px solid var(--surface-3);background:${bgColor};text-align:center;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-2)'" onmouseleave="this.style.background='${bgColor}'">
+              <div style="font-size:0.75rem;font-weight:600;color:var(--slate-200);margin-bottom:0.25rem;">${phase.name}</div>
+
+              <!-- Schedule: due date + delay -->
+              ${sched ? `
+                <div style="margin-bottom:0.375rem;">
+                  <div style="font-size:0.6rem;color:var(--slate-500);">예정 ~${plannedEndStr}</div>
+                  ${isDelayed ? `
+                    <div style="display:inline-flex;align-items:center;gap:0.2rem;margin-top:0.15rem;padding:0.1rem 0.35rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-md);">
+                      <span style="font-size:0.6rem;font-weight:700;color:var(--danger-400);">→ ${projectedEndStr} (+${totalPhaseDelay}일)</span>
+                    </div>
+                    ${inherited > 0 ? `<div style="font-size:0.5rem;color:var(--slate-500);margin-top:0.1rem;">${ownDelay > 0 ? `자체+${ownDelay} · 이전+${inherited}` : `이전 단계 +${inherited}일 영향`}</div>` : ""}
+                  ` : gateStatus === "approved" ? `
+                    <div style="font-size:0.55rem;color:var(--success-400);margin-top:0.1rem;">정상 완료</div>
+                  ` : ""}
+                </div>
+              ` : ""}
+
+              <div style="font-size:0.7rem;margin-bottom:0.25rem;color:${gateStatus === "approved" ? "var(--success-400)" : gateStatus === "rejected" ? "var(--danger-400)" : "var(--slate-400)"};">
+                ${gateStatus === "approved" ? "✅ 승인" : gateStatus === "rejected" ? "❌ 반려" : "⏳ 대기"}
+              </div>
+              ${gr?.approvedBy ? `<div style="font-size:0.6rem;color:var(--slate-400);margin-bottom:0.25rem;">${escapeHtml(gr.approvedBy)} · ${gr.approvedAt ? formatDate(gr.approvedAt) : ""}</div>` : ""}
+              ${noteCount > 0 ? `<div style="font-size:0.6rem;color:var(--primary-400);">💬 회의록 (${noteCount})</div>` : ""}
+            </div>
+          `;
+        }).join("")}
       </div>
     </div>
   `;
@@ -586,7 +891,6 @@ function renderPhaseView() {
   if (filtered.length === 0) return renderEmptyState();
 
   const phases = getActivePhaseGroups();
-  const MAX_VISIBLE_TASKS = 5;
 
   // Find active phase (first with incomplete tasks)
   const activePhaseIdx = phases.findIndex(phase => {
@@ -656,8 +960,7 @@ function renderPhaseView() {
       };
       return order(a) - order(b);
     });
-    const visibleTasks = sortedTasks.slice(0, MAX_VISIBLE_TASKS);
-    const hiddenTasks = sortedTasks.slice(MAX_VISIBLE_TASKS);
+    // All tasks shown with scroll (no "더보기" pagination)
 
     return `
       <div class="phase-card ${borderCls} mb-3" id="phase-card-${idx}" data-phase-idx="${idx}">
@@ -667,9 +970,10 @@ function renderPhaseView() {
             <span class="phase-card-chevron ${defaultOpen ? 'open' : ''}">▶</span>
             <span class="phase-card-name">${phase.name}</span>
             <span class="phase-card-count">${completed}/${total}</span>
-            ${minDate && maxDate ? `<span class="phase-card-dates">🗓 ${(minDate.getMonth()+1)}/${minDate.getDate()}~${(maxDate.getMonth()+1)}/${maxDate.getDate()}</span>` : ""}
+            ${minDate && maxDate ? `<span class="phase-card-dates">🗓 ${formatDateShort(minDate)}~${formatDateShort(maxDate)}</span>` : ""}
             ${statusBadge}
           </div>
+          <button class="btn-ghost btn-sm phase-edit-dates-btn" data-phase-edit="${idx}" title="기간 편집" style="font-size:0.6rem;padding:2px 6px;opacity:0.5;" onclick="event.stopPropagation()">✏️</button>
         </div>
 
         <!-- Body (collapsible) -->
@@ -677,75 +981,66 @@ function renderPhaseView() {
           <!-- 1. Description -->
           ${desc ? `<div class="phase-section phase-desc-section"><span class="phase-section-icon">📋</span><span class="phase-desc-text">${escapeHtml(desc)}</span></div>` : ""}
 
-          <!-- 2. Gate approval (위원회 승인) — 모든 사용자에게 표시 -->
-          <div class="phase-section phase-gate-section">
-            <div class="phase-gate-header">
-              <span class="phase-section-icon">🔒</span>
-              <span class="phase-gate-label">위원회 승인:</span>
-              <span class="phase-gate-status ${gateStatus === "approved" ? "gate-approved" : gateStatus === "rejected" ? "gate-rejected" : "gate-pending"}">
-                ${gateStatus === "approved" ? "✅ 승인 완료" : gateStatus === "rejected" ? "❌ 반려" : "⏳ 대기"}
-              </span>
-              ${gr?.approvedBy ? `<span class="phase-gate-meta">(${escapeHtml(gr.approvedBy)}, ${gr.approvedAt ? new Date(gr.approvedAt).toLocaleDateString("ko-KR") : ""})</span>` : ""}
-            </div>
-            <div class="phase-gate-actions">
-              <button class="btn-sm phase-gate-btn phase-gate-btn-approve" data-inline-gate="${idx}" data-gate-action="approved" ${gateStatus === "approved" ? "disabled" : ""}>✅ 승인</button>
-              <button class="btn-sm phase-gate-btn phase-gate-btn-reject" data-inline-gate="${idx}" data-gate-action="rejected" ${gateStatus === "rejected" ? "disabled" : ""}>❌ 반려</button>
-              ${gateStatus !== "pending" ? `<button class="btn-sm phase-gate-btn phase-gate-btn-reset" data-inline-gate="${idx}" data-gate-action="pending">↩ 초기화</button>` : ""}
-            </div>
-          </div>
+          <!-- Inline date editor removed — uses slide-over panel now -->
 
-          <!-- 3. Meeting notes -->
-          <div class="phase-section phase-notes-section">
-            <div class="phase-notes-header">
-              <span class="phase-section-icon">💬</span>
-              <span class="phase-notes-title">회의록 <span class="phase-notes-count">${notes.length}건</span></span>
-              <button class="btn-sm phase-note-add-btn" data-note-toggle="${idx}">+ 등록</button>
-            </div>
-            ${notes.length > 0 ? `
-              <div class="phase-notes-list">
-                ${notes.slice(0, 2).map(n => `
-                  <div class="phase-note-item">
-                    <span class="phase-note-author">${escapeHtml(n.author)}</span>
-                    <span class="phase-note-date">${n.createdAt ? new Date(n.createdAt).toLocaleDateString("ko-KR") : ""}</span>
-                    <span class="phase-note-content">${escapeHtml(n.content)}</span>
+          <!-- Checklist tasks split by work/gate stage -->
+          ${(() => {
+            const workTasks = sortedTasks.filter(t => t.stage === phase.workStage);
+            const gateTasks = sortedTasks.filter(t => t.stage === phase.gateStage);
+            const renderStageSection = (label, icon, tasks) => {
+              if (tasks.length === 0) return "";
+              const done = tasks.filter(t => t.status === "completed").length;
+              const od = tasks.filter(t => t.status !== "completed" && t.status !== "rejected" && daysUntil(t.dueDate) !== null && daysUntil(t.dueDate) < 0).length;
+              // Group by dept
+              const deptGroups = {};
+              tasks.forEach(t => { const dept = t.department || "미지정"; if (!deptGroups[dept]) deptGroups[dept] = []; deptGroups[dept].push(t); });
+              return `
+                <div class="phase-section phase-tasks-section" style="margin-bottom:0.5rem;">
+                  <div class="phase-tasks-header">
+                    <span class="phase-section-icon">${icon}</span>
+                    <span>${label} (${done}/${tasks.length} 완료${od > 0 ? `, <span style="color:var(--danger-400)">${od}건 지연</span>` : ""})</span>
                   </div>
-                `).join("")}
-                ${notes.length > 2 ? `
-                  <div class="phase-notes-hidden" data-notes-more="${idx}" style="display:none;">
-                    ${notes.slice(2).map(n => `
-                      <div class="phase-note-item">
-                        <span class="phase-note-author">${escapeHtml(n.author)}</span>
-                        <span class="phase-note-date">${n.createdAt ? new Date(n.createdAt).toLocaleDateString("ko-KR") : ""}</span>
-                        <span class="phase-note-content">${escapeHtml(n.content)}</span>
-                      </div>
-                    `).join("")}
+                  <div class="phase-tasks-list" style="max-height:320px;overflow-y:auto;">
+                    ${Object.entries(deptGroups).map(([dept, dTasks]) => {
+                      const dDone = dTasks.filter(t => t.status === "completed").length;
+                      return `
+                        <div class="phase-dept-group" style="margin-bottom:0.25rem;">
+                          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.75rem;background:var(--surface-1);border-bottom:1px solid var(--surface-3);position:sticky;top:0;z-index:1;">
+                            <span style="font-size:0.7rem;font-weight:600;color:var(--slate-300);">${escapeHtml(dept)}</span>
+                            <span style="font-size:0.6rem;color:var(--slate-400);">${dDone}/${dTasks.length}</span>
+                          </div>
+                          ${dTasks.map(t => renderTaskRow(t)).join("")}
+                        </div>
+                      `;
+                    }).join("")}
                   </div>
-                  <button class="phase-notes-more-btn" data-notes-expand="${idx}">${notes.length - 2}건 더 보기 ▼</button>
-                ` : ""}
-              </div>
-            ` : '<div class="phase-notes-empty">등록된 회의록이 없습니다</div>'}
-            <div class="phase-note-form" data-note-form="${idx}" style="display:none;">
-              <textarea class="phase-note-input" data-note-input="${idx}" placeholder="회의 내용, 피드백, 결정 사항 등을 기록하세요..." rows="2"></textarea>
-              <button class="btn-primary btn-sm phase-note-submit" data-note-submit="${idx}">등록</button>
-            </div>
-          </div>
+                </div>
+              `;
+            };
+            return renderStageSection("작업 체크리스트", "📝", workTasks) + renderStageSection("승인 체크리스트", "🔒", gateTasks);
+          })()}
 
-          <!-- 4. Checklist tasks -->
-          <div class="phase-section phase-tasks-section">
+          <!-- Meeting notes inline -->
+          ${notes.length > 0 ? `
+          <div class="phase-section" style="margin-top:0.25rem;">
             <div class="phase-tasks-header">
-              <span class="phase-section-icon">📝</span>
-              <span>체크리스트 (${completed}/${total} 완료${overdueTasks.length > 0 ? `, <span style="color:var(--danger-400)">${overdueTasks.length}건 지연</span>` : ""})</span>
+              <span class="phase-section-icon">💬</span>
+              <span>회의록 (${notes.length}건)</span>
             </div>
-            <div class="phase-tasks-list">
-              ${visibleTasks.map(t => renderTaskRow(t)).join("")}
+            <div style="max-height:200px;overflow-y:auto;padding:0.25rem 0.75rem;">
+              ${notes.slice().reverse().slice(0, 3).map(n => `
+                <div style="padding:0.5rem;background:var(--surface-1);border-radius:var(--radius-md);margin-bottom:0.375rem;font-size:0.75rem;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;">
+                    <span style="font-weight:600;color:var(--slate-200);">${escapeHtml(n.author || "")}</span>
+                    <span style="font-size:0.6rem;color:var(--slate-400);">${n.createdAt ? formatDate(n.createdAt) : ""}</span>
+                  </div>
+                  <div style="color:var(--slate-300);white-space:pre-wrap;">${escapeHtml(n.content || "")}</div>
+                  ${n.files && n.files.length > 0 ? `<div style="margin-top:0.25rem;font-size:0.65rem;color:var(--primary-400);">📎 ${n.files.length}개 파일</div>` : ""}
+                </div>
+              `).join("")}
+              ${notes.length > 3 ? `<div style="text-align:center;"><button class="btn-ghost btn-sm" data-gate-notes="${phaseId}" style="font-size:0.65rem;color:var(--primary-400);">전체 보기 (${notes.length}건) →</button></div>` : ""}
             </div>
-            ${hiddenTasks.length > 0 ? `
-              <div class="phase-tasks-hidden" data-tasks-more="${idx}" style="display:none;">
-                ${hiddenTasks.map(t => renderTaskRow(t)).join("")}
-              </div>
-              <button class="phase-tasks-toggle-btn" data-tasks-expand="${idx}">${hiddenTasks.length}개 항목 더 보기 ▼</button>
-            ` : ""}
-          </div>
+          </div>` : ""}
         </div>
       </div>
     `;
@@ -846,12 +1141,29 @@ function renderBoardView() {
     });
   }
 
+  // Phase 매핑 (stage name → phase name)
+  const stageToPhase = {};
+  for (const p of getActivePhaseGroups()) {
+    stageToPhase[p.workStage] = p.name;
+    stageToPhase[p.gateStage] = p.name;
+  }
+
   function renderKanbanCard(t) {
     const isUrgent = t.importance === "red";
     const urgentBorder = isUrgent ? "border-left:3px solid var(--danger-400);" : "";
+    const phaseName = stageToPhase[t.stage] || "";
+    const isGate = getActivePhaseGroups().some(p => p.gateStage === t.stage);
+    const dd = daysUntil(t.dueDate);
+    const ddText = dd === null ? "" : dd < 0 ? `D+${Math.abs(dd)}` : dd === 0 ? "D-Day" : `D-${dd}`;
+    const ddColor = dd === null ? "" : dd < 0 ? "var(--danger-400)" : dd <= 3 ? "var(--warning-400)" : "var(--slate-400)";
     return `
       <div class="card-hover pd-task-row kanban-card" data-task-id="${t.id}" data-status="${t.status}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;${urgentBorder}">
-        ${isUrgent ? '<span style="font-size:0.55rem;color:var(--danger-400);font-weight:700;">긴급</span>' : ''}
+        <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.25rem;flex-wrap:wrap;">
+          ${phaseName ? `<span style="font-size:0.55rem;font-weight:600;padding:0.1rem 0.3rem;border-radius:var(--radius-sm);background:var(--primary-500);color:white;opacity:0.85;">${phaseName}</span>` : ""}
+          ${isGate ? `<span style="font-size:0.55rem;font-weight:600;padding:0.1rem 0.3rem;border-radius:var(--radius-sm);background:var(--warning-500);color:white;">승인</span>` : ""}
+          ${isUrgent ? '<span style="font-size:0.55rem;color:var(--danger-400);font-weight:700;">긴급</span>' : ''}
+          ${ddText && t.status !== "completed" ? `<span style="font-size:0.55rem;font-weight:600;color:${ddColor};margin-left:auto;">${ddText}</span>` : ""}
+        </div>
         <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);margin-bottom:0.25rem;">${escapeHtml(t.title)}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:0.6rem;color:var(--slate-400);">${escapeHtml(t.assignee || "미배정")}</span>
@@ -960,9 +1272,15 @@ function renderMatrixView() {
         <thead>
           <tr style="border-bottom:1px solid var(--surface-3);">
             <th style="padding:0.625rem 0.75rem;text-align:left;font-weight:600;color:var(--slate-300);min-width:100px;">부서</th>
-            ${activePhases.map(phase => `<th style="padding:0.625rem 0.5rem;text-align:center;font-weight:600;color:var(--slate-300);min-width:80px;">
-              ${escapeHtml(phase.name)}
-            </th>`).join("")}
+            ${activePhases.map(phase => {
+              const gs = getPhaseGateStatus(phase.name);
+              const gsIcon = gs === "approved" ? "✅" : gs === "rejected" ? "❌" : gs === "pending" ? "⏳" : "";
+              const gsLabel = gs === "approved" ? "승인" : gs === "rejected" ? "반려" : gs === "pending" ? "대기" : "";
+              return `<th style="padding:0.5rem 0.5rem;text-align:center;font-weight:600;color:var(--slate-300);min-width:80px;">
+                <div>${escapeHtml(phase.name)}</div>
+                ${gsIcon ? `<div style="font-size:0.55rem;margin-top:2px;font-weight:500;">${gsIcon} ${gsLabel}</div>` : ""}
+              </th>`;
+            }).join("")}
           </tr>
         </thead>
         <tbody>
@@ -992,6 +1310,7 @@ function renderMatrixView() {
         <span style="display:flex;align-items:center;gap:0.25rem"><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--primary-400);display:inline-block"></span> 진행</span>
         <span style="display:flex;align-items:center;gap:0.25rem"><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--danger-400);display:inline-block"></span> 지연</span>
         <span style="display:flex;align-items:center;gap:0.25rem"><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--slate-500);display:inline-block"></span> 대기</span>
+        <span style="margin-left:0.5rem;border-left:1px solid var(--surface-4);padding-left:0.75rem;">✅ 승인  ⏳ 대기  ❌ 반려</span>
       </div>
     </div>
   `;
@@ -1031,6 +1350,7 @@ const ACTION_LABELS = {
   complete_task: "작업 완료", approve_task: "승인", reject_task: "반려",
   restart_task: "재작업 시작", create_task: "작업 생성", assign_task: "담당자 지정",
   add_comment: "코멘트 작성", upload_file: "파일 업로드",
+  gate_approved: "위원회 승인", gate_rejected: "위원회 반려", gate_reset: "위원회 초기화",
 };
 
 function renderRecentActivity() {
@@ -1044,9 +1364,9 @@ function renderRecentActivity() {
           const ts = log.timestamp ? timeAgo(log.timestamp) : "";
           return `
             <div class="timeline-item" style="padding-bottom:0.625rem;">
-              <div class="timeline-dot ${log.action?.includes("complete") || log.action?.includes("approve") ? "completed" : "active"}"></div>
+              <div class="timeline-dot ${log.action?.includes("complete") || log.action?.includes("approved") || log.action?.includes("approve") ? "completed" : log.action?.includes("reject") ? "overdue" : "active"}"></div>
               <div>
-                <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(actor)} 님이 ${escapeHtml(label)}</div>
+                <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(actor)} 님이 ${escapeHtml(label)}${log.details?.taskTitle ? ` — ${escapeHtml(log.details.taskTitle)}` : ""}${log.details?.phaseName ? ` — ${escapeHtml(log.details.phaseName)}` : ""}</div>
                 <div style="font-size:0.6rem;color:var(--slate-400);margin-top:0.125rem;">${ts}</div>
               </div>
             </div>
@@ -1103,110 +1423,183 @@ function renderScheduleTab() {
   today.setHours(0, 0, 0, 0);
   const todayOffset = Math.ceil((today - projectStart) / 86400000);
   const todayPct = Math.min(100, Math.max(0, (todayOffset / totalDays) * 100));
+  const elapsed = Math.min(totalDays, Math.max(0, todayOffset));
+  const remaining = Math.max(0, totalDays - elapsed);
 
-  // Phase bars
-  const phaseDuration = totalDays / 6;
+  const phases = getActivePhaseGroups();
+
+  // 전체 진행률: 작업 완료 기준 (시간 기준 X)
+  const totalTasks = checklistItems.length;
+  const completedTasks = checklistItems.filter(t => t.status === "completed").length;
+  const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const timePct = Math.min(100, Math.round((elapsed / totalDays) * 100));
+
+  // Calculate actual date range per phase from task dueDates
+  function getPhaseActualDates(phase) {
+    const phaseTasks = checklistItems.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
+    let earliest = null, latest = null;
+    for (const t of phaseTasks) {
+      if (!t.dueDate) continue;
+      const d = t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate);
+      if (!earliest || d < earliest) earliest = d;
+      if (!latest || d > latest) latest = d;
+    }
+    return { start: earliest, end: latest, count: phaseTasks.length };
+  }
+
+  // Generate month labels
+  const months = [];
+  const cursor = new Date(projectStart);
+  cursor.setDate(1);
+  if (cursor < projectStart) cursor.setMonth(cursor.getMonth() + 1);
+  while (cursor <= projectEnd) {
+    const off = Math.ceil((cursor - projectStart) / 86400000);
+    const pct = (off / totalDays) * 100;
+    if (pct >= 0 && pct <= 100) {
+      months.push({ label: `${cursor.getFullYear()}.${String(cursor.getMonth() + 1).padStart(2, "0")}`, pct });
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  const ROW_H = 40;
+  const LABEL_W = 100;
 
   return `
+    <!-- Schedule Overview -->
     <div class="card p-5">
-      <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin-bottom:1rem;">프로젝트 스케줄</h3>
-
-      <!-- Timeline header -->
-      <div style="position:relative;margin-bottom:0.5rem;padding-left:100px;">
-        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--slate-400);">
-          <span>${formatDate(projectStart)}</span>
-          <span>${formatDate(projectEnd)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
+        <div>
+          <h3 style="font-size:1rem;font-weight:700;color:var(--slate-100);margin:0 0 0.25rem;">프로젝트 일정 현황</h3>
+          <p style="font-size:0.75rem;color:var(--slate-400);margin:0;">각 Phase의 실제 작업 일정과 진행 상태를 보여줍니다. Phase를 클릭하면 기간을 수정할 수 있습니다.</p>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.7rem;color:var(--slate-400);">${formatDate(projectStart)} ~ ${formatDate(projectEnd)}</div>
+          <div style="font-size:0.8rem;font-weight:600;color:${remaining <= 0 && progressPct < 100 ? "var(--danger-400)" : "var(--primary-400)"};margin-top:0.25rem;">${elapsed}일 경과 / ${remaining > 0 ? remaining + "일 남음" : "기한 초과"}</div>
         </div>
       </div>
 
-      <!-- Gantt rows -->
-      <div style="position:relative;">
-        ${getActivePhaseGroups().map((phase, idx) => {
+      <!-- Overall progress: task-based -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--slate-400);margin-bottom:0.25rem;">
+          <span>작업 진행률 (${completedTasks}/${totalTasks})</span>
+          <span>${progressPct}%</span>
+        </div>
+        <div style="height:6px;background:var(--surface-3);border-radius:var(--radius-full);overflow:hidden;">
+          <div style="height:100%;width:${progressPct}%;background:${progressPct === 100 ? "var(--success-500)" : "var(--primary-500)"};border-radius:var(--radius-full);transition:width 0.3s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--slate-500);margin-top:0.25rem;">
+          <span>일정 소진 ${timePct}%</span>
+          ${timePct > progressPct + 10 ? `<span style="color:var(--danger-400);">일정 대비 작업 지연</span>` : ""}
+        </div>
+      </div>
+
+      <!-- Timeline header -->
+      <div style="position:relative;margin-left:${LABEL_W}px;height:18px;margin-bottom:2px;border-bottom:1px solid var(--surface-3);">
+        ${months.map(m => `<span style="position:absolute;left:${m.pct}%;transform:translateX(-50%);font-size:0.55rem;color:var(--slate-400);white-space:nowrap;top:0;">${m.label}</span>`).join("")}
+      </div>
+
+      <!-- Gantt area -->
+      <div style="position:relative;min-height:${phases.length * (ROW_H + 6)}px;">
+        <!-- Month grid lines -->
+        ${months.map(m => `<div style="position:absolute;left:calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${m.pct / 100});top:0;bottom:0;width:1px;background:var(--surface-3);opacity:0.4;pointer-events:none;"></div>`).join("")}
+
+        <!-- Today marker -->
+        ${todayPct > 0 && todayPct < 100 ? `
+          <div style="position:absolute;left:calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${todayPct / 100});top:-20px;bottom:0;width:2px;background:var(--danger-400);z-index:3;pointer-events:none;">
+            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);background:var(--danger-400);color:white;font-size:0.5rem;font-weight:700;padding:1px 5px;border-radius:6px;white-space:nowrap;">오늘</div>
+          </div>
+        ` : ""}
+
+        <!-- Phase rows -->
+        ${phases.map((phase, idx) => {
           const progress = getPhaseWorkProgress(phase.name);
           const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-          const startPct = (idx * phaseDuration / totalDays) * 100;
-          const widthPct = (phaseDuration / totalDays) * 100;
+          const dates = getPhaseActualDates(phase);
           const gateStatus = getPhaseGateStatus(phase.name);
+          const top = idx * (ROW_H + 6);
+
+          // Calculate bar position from actual task dates
+          let startPct = (idx / 6) * 100;
+          let widthPct = (1 / 6) * 100;
+          if (dates.start && dates.end) {
+            const sOff = Math.max(0, Math.ceil((dates.start - projectStart) / 86400000));
+            const eOff = Math.ceil((dates.end - projectStart) / 86400000);
+            startPct = (sOff / totalDays) * 100;
+            widthPct = Math.max(2, ((eOff - sOff) / totalDays) * 100);
+          }
 
           const barColor = pct === 100 ? "var(--success-500)" :
                            progress.overdue > 0 ? "var(--danger-500)" :
                            pct > 0 ? "var(--primary-500)" : "var(--surface-4)";
 
+          const gateIcon = gateStatus === "approved" ? "✅" : gateStatus === "rejected" ? "❌" : gateStatus === "pending" ? "⏳" : "";
+          const dateLabel = dates.start && dates.end ? `${formatDateShort(dates.start)}~${formatDateShort(dates.end)}` : "미설정";
+
           return `
-            <div style="display:flex;align-items:center;margin-bottom:0.375rem;">
-              <div style="width:100px;flex-shrink:0;font-size:0.7rem;font-weight:500;color:var(--slate-300);padding-right:0.5rem;">${phase.name}</div>
-              <div style="flex:1;position:relative;height:28px;background:var(--surface-2);border-radius:var(--radius-sm);overflow:hidden;">
-                <!-- Phase bar background -->
-                <div style="position:absolute;left:${startPct}%;width:${widthPct}%;height:100%;background:rgba(100,116,139,0.15);"></div>
-                <!-- Progress fill -->
-                <div style="position:absolute;left:${startPct}%;width:${widthPct * pct / 100}%;height:100%;background:${barColor};opacity:0.7;transition:width 0.3s;"></div>
-                <!-- Label -->
-                <div style="position:absolute;left:${startPct + 0.5}%;top:50%;transform:translateY(-50%);font-size:0.6rem;color:white;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.5);z-index:1;white-space:nowrap;">
+            <div class="schedule-phase-row" data-schedule-phase="${phase.name}" style="position:absolute;top:${top}px;left:0;right:0;height:${ROW_H}px;display:flex;align-items:center;cursor:pointer;border-radius:var(--radius-md);transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-2)'" onmouseleave="this.style.background='transparent'">
+              <!-- Label -->
+              <div style="width:${LABEL_W}px;flex-shrink:0;padding-right:0.5rem;">
+                <div style="font-size:0.75rem;font-weight:600;color:var(--slate-200);display:flex;align-items:center;gap:4px;">
+                  ${gateIcon} ${phase.name}
+                </div>
+                <div style="font-size:0.55rem;color:var(--slate-400);">${dateLabel}</div>
+              </div>
+              <!-- Track -->
+              <div style="flex:1;position:relative;height:${ROW_H - 8}px;">
+                <div style="position:absolute;left:${startPct}%;width:${widthPct}%;height:100%;background:var(--surface-3);border-radius:var(--radius-sm);opacity:0.5;"></div>
+                <div style="position:absolute;left:${startPct}%;width:${widthPct * pct / 100}%;height:100%;background:${barColor};border-radius:var(--radius-sm);opacity:0.85;transition:width 0.3s;"></div>
+                <div style="position:absolute;left:${startPct + 1}%;top:50%;transform:translateY(-50%);font-size:0.6rem;color:white;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.6);z-index:1;white-space:nowrap;">
                   ${pct}%${progress.overdue > 0 ? ` (${progress.overdue}건 지연)` : ""}
                 </div>
-                <!-- Gate status indicator -->
-                <div style="position:absolute;right:${100 - startPct - widthPct + 0.5}%;top:50%;transform:translateY(-50%);font-size:0.65rem;z-index:1;" title="${phase.gateStage}">
-                  ${gateStatus === "approved" ? "✅" : gateStatus === "rejected" ? "❌" : gateStatus === "pending" ? "⏳" : ""}
+                <div style="position:absolute;left:${startPct + widthPct + 0.5}%;top:50%;transform:translateY(-50%);font-size:0.6rem;color:var(--slate-400);white-space:nowrap;z-index:1;">
+                  ${progress.completed}/${progress.total}
                 </div>
               </div>
             </div>
           `;
         }).join("")}
-
-        <!-- Today marker -->
-        ${todayPct > 0 && todayPct < 100 ? `
-          <div style="position:absolute;left:calc(100px + ${todayPct}% * (100% - 100px) / 100%);left:calc(100px + ${todayPct / 100 * (100)}%);top:0;bottom:0;width:2px;background:var(--danger-400);z-index:2;pointer-events:none;">
-            <div style="position:absolute;top:-16px;left:-12px;font-size:0.55rem;color:var(--danger-400);font-weight:600;white-space:nowrap;">오늘</div>
-          </div>
-        ` : ""}
       </div>
 
       <!-- Legend -->
-      <div style="display:flex;gap:1rem;margin-top:1rem;font-size:0.6rem;color:var(--slate-400);flex-wrap:wrap;">
+      <div style="display:flex;gap:1rem;margin-top:0.75rem;font-size:0.6rem;color:var(--slate-400);flex-wrap:wrap;padding-top:0.5rem;border-top:1px solid var(--surface-3);">
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:10px;border-radius:2px;background:var(--success-500);"></span> 완료</span>
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary-500);"></span> 진행중</span>
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:10px;border-radius:2px;background:var(--danger-500);"></span> 지연</span>
-        <span style="display:flex;align-items:center;gap:0.25rem;">✅ 완료</span>
+        <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:4px;height:14px;background:var(--danger-400);border-radius:1px;"></span> 오늘</span>
+        <span>💡 Phase 클릭 → 기간 수정</span>
       </div>
     </div>
 
-    <!-- Phase Detail Table -->
-    <div class="card p-5" style="margin-top:1rem;">
-      <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin-bottom:0.75rem;">단계별 상세</h3>
-      <div class="table-responsive">
-        <table class="data-table" style="font-size:0.75rem;">
-          <thead>
-            <tr>
-              <th>단계</th>
-              <th>전체</th>
-              <th>완료</th>
-              <th>진행중</th>
-              <th>대기</th>
-              <th>지연</th>
-              <th>승인위원회</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${getActivePhaseGroups().map(phase => {
-              const prog = getPhaseWorkProgress(phase.name);
-              const gs = getPhaseGateStatus(phase.name);
-              const gsLabel = { approved: "✓ 승인", rejected: "✗ 반려", pending: "⏳ 대기", not_reached: "— 미도달", none: "-" }[gs];
-              const gsColor = { approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--warning-400)", not_reached: "var(--slate-400)", none: "var(--slate-400)" }[gs];
-              return `
-                <tr>
-                  <td style="font-weight:600;color:var(--slate-200);">${phase.name}</td>
-                  <td>${prog.total}</td>
-                  <td style="color:var(--success-400);">${prog.completed}</td>
-                  <td style="color:var(--primary-400);">${prog.inProgress}</td>
-                  <td>${prog.pending}</td>
-                  <td style="color:${prog.overdue > 0 ? "var(--danger-400)" : "inherit"};font-weight:${prog.overdue > 0 ? "600" : "normal"};">${prog.overdue}</td>
-                  <td style="color:${gsColor};font-weight:500;">${gsLabel}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
+    <!-- Phase Detail Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;margin-top:1rem;">
+      ${phases.map(phase => {
+        const prog = getPhaseWorkProgress(phase.name);
+        const gs = getPhaseGateStatus(phase.name);
+        const gsLabel = { approved: "✅ 승인", rejected: "❌ 반려", pending: "⏳ 대기", not_reached: "— 미도달", none: "-" }[gs];
+        const gsColor = { approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--warning-400)", not_reached: "var(--slate-400)", none: "var(--slate-400)" }[gs];
+        const dates = getPhaseActualDates(phase);
+        const pct = prog.total > 0 ? Math.round((prog.completed / prog.total) * 100) : 0;
+        const barColor = pct === 100 ? "var(--success-500)" : prog.overdue > 0 ? "var(--danger-500)" : "var(--primary-500)";
+
+        return `
+          <div class="card p-4 schedule-phase-row" data-schedule-phase="${phase.name}" style="cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;" onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <span style="font-size:0.85rem;font-weight:700;color:var(--slate-100);">${phase.name}</span>
+              <span style="font-size:0.7rem;color:${gsColor};font-weight:500;">${gsLabel}</span>
+            </div>
+            <!-- Progress bar -->
+            <div style="height:5px;background:var(--surface-3);border-radius:var(--radius-full);overflow:hidden;margin-bottom:0.5rem;">
+              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:var(--radius-full);"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem;font-size:0.7rem;">
+              <div><span style="color:var(--slate-400);">기간</span> <span style="color:var(--slate-200);font-weight:500;">${dates.start ? formatDate(dates.start) : "-"} ~ ${dates.end ? formatDate(dates.end) : "-"}</span></div>
+              <div style="text-align:right;"><span style="color:var(--slate-400);">진행</span> <span style="color:var(--slate-200);font-weight:600;">${pct}%</span> <span style="color:var(--slate-400);">(${prog.completed}/${prog.total})</span></div>
+              <div><span style="color:var(--slate-400);">진행중</span> <span style="color:var(--primary-400);">${prog.inProgress}</span></div>
+              <div style="text-align:right;">${prog.overdue > 0 ? `<span style="color:var(--danger-400);font-weight:600;">지연 ${prog.overdue}건</span>` : `<span style="color:var(--slate-400);">지연 없음</span>`}</div>
+            </div>
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
 }
@@ -1399,6 +1792,25 @@ function bindEvents() {
     });
   });
 
+  // Phase date edit → slide-over panel (also from schedule tab)
+  app.querySelectorAll("[data-phase-edit]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.phaseEdit);
+      openPhaseScheduleSlideOver(idx);
+    });
+  });
+
+  // Schedule tab phase rows → slide-over
+  app.querySelectorAll("[data-schedule-phase]").forEach(el => {
+    el.addEventListener("click", () => {
+      const phaseName = el.dataset.schedulePhase;
+      const phases = getActivePhaseGroups();
+      const idx = phases.findIndex(p => p.name === phaseName);
+      if (idx >= 0) openPhaseScheduleSlideOver(idx);
+    });
+  });
+
   // Meeting note toggle (+ 등록 버튼)
   app.querySelectorAll("[data-note-toggle]").forEach(btn => {
     btn.addEventListener("click", (e) => {
@@ -1433,26 +1845,18 @@ function bindEvents() {
     });
   });
 
-  // Inline gate approval/rejection buttons (위원회 승인)
-  app.querySelectorAll("[data-inline-gate]").forEach(btn => {
-    btn.addEventListener("click", async (e) => {
+  // Gate panel open (회의록 버튼)
+  app.querySelectorAll("[data-gate-panel]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const idx = parseInt(btn.dataset.inlineGate);
-      const action = btn.dataset.gateAction;
+      const idx = parseInt(btn.dataset.gatePanel);
       const phases = getActivePhaseGroups();
       const phase = phases[idx];
-      if (!phase) return;
-      const phaseId = `phase${idx}`;
-      try {
-        btn.disabled = true;
-        await updateGateRecord(projectId, phaseId, phase.name, action, user?.name || "");
-        showToast("success", action === "approved" ? "승인 완료" : action === "rejected" ? "반려 처리" : "초기화 완료");
-      } catch (err) {
-        showToast("error", "처리 실패: " + err.message);
-        btn.disabled = false;
-      }
+      if (phase) openPhasePanel(phase, idx);
     });
   });
+
+  // Inline gate buttons removed — approval is now only in slide-over panel
 
   // Notes "더 보기" toggle
   app.querySelectorAll("[data-notes-expand]").forEach(btn => {
@@ -1493,8 +1897,8 @@ function bindEvents() {
   // Quick Add
   const quickAddBtn = app.querySelector("#quick-add-btn");
   if (quickAddBtn) quickAddBtn.addEventListener("click", handleQuickAdd);
-  const quickAddInput = app.querySelector("#quick-add-input");
-  if (quickAddInput) quickAddInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handleQuickAdd(); });
+  const quickAddTitle = app.querySelector("#quick-add-title");
+  if (quickAddTitle) quickAddTitle.addEventListener("keydown", (e) => { if (e.key === "Enter") handleQuickAdd(); });
   const openModalBtn = app.querySelector("#open-add-modal-btn");
   if (openModalBtn) openModalBtn.addEventListener("click", showAddTaskModal);
 
@@ -1528,18 +1932,21 @@ function bindEvents() {
       const itemId = sel.dataset.statusItem;
       const newStatus = sel.value;
       const prevStatus = sel.dataset.current;
-      if (newStatus === prevStatus) return; // no change
+      // "delayed" is display-only — maps to "in_progress" in DB
+      const actualStatus = newStatus === "delayed" ? "in_progress" : newStatus;
+      if (actualStatus === prevStatus && newStatus !== "delayed") return; // no change
       try {
         sel.disabled = true;
-        if (newStatus === "completed") {
+        if (actualStatus === "completed") {
           // Use completeTask for proper stats recalculation
           const { completeTask } = await import("../firestore-service.js");
           await completeTask(itemId);
         } else {
-          await updateChecklistItemStatus(itemId, newStatus);
+          await updateChecklistItemStatus(itemId, actualStatus);
         }
-        sel.dataset.current = newStatus;
-        showToast("success", `상태가 '${newStatus === "pending" ? "대기" : newStatus === "in_progress" ? "진행" : "완료"}'(으)로 변경되었습니다.`);
+        sel.dataset.current = actualStatus;
+        const statusLabels = { pending: "대기", in_progress: "진행", delayed: "지연", completed: "완료" };
+        showToast("success", `상태가 '${statusLabels[newStatus] || newStatus}'(으)로 변경되었습니다.`);
       } catch (err) {
         console.error("상태 변경 실패:", err);
         showToast("error", "상태 변경에 실패했습니다: " + (err.message || "알 수 없는 오류"));
@@ -1618,12 +2025,14 @@ function bindEvents() {
   const csvBtn = app.querySelector("#export-csv-btn");
   if (csvBtn) {
     csvBtn.addEventListener("click", () => {
-      const headers = ["제목", "단계", "부서", "담당자", "상태", "마감일", "승인상태"];
+      const headers = ["제목", "단계", "부서", "담당자", "상태", "마감일"];
       const data = checklistItems.map(t => [
         t.title, t.stage, t.department, t.assignee || "", getStatusLabel(t.status),
-        formatDate(t.dueDate)
+        t.dueDate ? new Date(t.dueDate).toLocaleString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }) : "-"
       ]);
-      exportToCSV(data, headers, `${project.name}_체크리스트.csv`);
+      const now = new Date();
+      const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}_${String(now.getHours()).padStart(2,"0")}${String(now.getMinutes()).padStart(2,"0")}`;
+      exportToCSV(data, headers, `${project.name}_체크리스트_${ts}.csv`);
     });
   }
 
@@ -1685,8 +2094,190 @@ function bindEvents() {
 }
 
   // Print button
-  const printBtn = app.querySelector("#print-btn");
-  if (printBtn) printBtn.addEventListener("click", () => window.print());
+  // Print button removed
+
+// ─── Phase Schedule Slide-Over ───────────────────────────────────────────────
+
+function openPhaseScheduleSlideOver(phaseIdx) {
+  const phases = getActivePhaseGroups();
+  const phase = phases[phaseIdx];
+  if (!phase) return;
+
+  // 항상 실제 task dueDate 기준으로 날짜 표시
+  const allTaskDates = phases.map(p => getPhaseTaskDates(p));
+  const taskDates = allTaskDates[phaseIdx];
+  const savedSchedules = project.phaseSchedules || {};
+
+  const startVal = taskDates.start ? taskDates.start.toISOString().slice(0, 10) : "";
+  const endVal = taskDates.end ? taskDates.end.toISOString().slice(0, 10) : "";
+
+  // 전체 Phase 요약 (실제 task 날짜 기준)
+  const allPhaseSummary = phases.map((p, i) => {
+    const td = allTaskDates[i];
+    const isCurrent = i === phaseIdx;
+    const saved = savedSchedules[`phase${i}`];
+    const hasPlanned = saved && saved.plannedStart && saved.plannedEnd;
+    // 지연 표시: 계획 대비 실제가 늦은 경우
+    let delayBadge = "";
+    if (hasPlanned && td.end) {
+      const plannedEnd = new Date(saved.plannedEnd);
+      const delay = Math.round((td.end - plannedEnd) / 86400000);
+      if (delay > 0) delayBadge = `<span style="font-size:0.6rem;color:var(--danger-400);font-weight:600;">+${delay}일</span>`;
+    }
+    return `
+      <div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.5rem;border-radius:var(--radius-md);${isCurrent ? "background:var(--surface-2);border:1px solid var(--primary-400);" : "background:var(--surface-1);"}">
+        <span style="font-size:0.75rem;font-weight:${isCurrent ? "700" : "500"};color:${isCurrent ? "var(--primary-400)" : "var(--slate-300)"};min-width:60px;">${p.name}</span>
+        <span style="font-size:0.7rem;color:var(--slate-400);flex:1;">${td.start ? formatDate(td.start) : "-"} ~ ${td.end ? formatDate(td.end) : "-"}</span>
+        ${delayBadge}
+        <span style="font-size:0.65rem;color:var(--slate-400);">${td.count}건</span>
+      </div>
+    `;
+  }).join("");
+
+  // 계획 일정 표시 (이미 세팅된 경우)
+  const saved = savedSchedules[`phase${phaseIdx}`];
+  const hasPlanned = saved && saved.plannedStart && saved.plannedEnd;
+  let plannedInfo = "";
+  if (hasPlanned) {
+    const pStart = new Date(saved.plannedStart);
+    const pEnd = new Date(saved.plannedEnd);
+    const delay = taskDates.end ? Math.max(0, Math.round((taskDates.end - pEnd) / 86400000)) : 0;
+    plannedInfo = `<div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.5rem;padding:0.375rem 0.5rem;background:var(--surface-1);border-radius:var(--radius-md);">
+      계획: ${formatDate(pStart)} ~ ${formatDate(pEnd)}
+      ${delay > 0 ? `<span style="color:var(--danger-400);font-weight:600;"> (${delay}일 지연)</span>` : `<span style="color:var(--success-400);"> (정상)</span>`}
+    </div>`;
+  }
+
+  const modeLabel = hasPlanned ? "실제 일정 조정" : "계획 일정 설정";
+  const modeDesc = hasPlanned
+    ? "계획 일정은 유지되고, 변경된 일정은 실제 일정으로 저장됩니다."
+    : "처음 설정하는 일정은 계획(Baseline)으로 저장됩니다.";
+
+  const body = `
+    <div>
+      <div style="margin-bottom:1rem;">
+        <span class="peek-label" style="margin-bottom:0.5rem;display:block;">전체 Phase 일정 (실제 작업 기준)</span>
+        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+          ${allPhaseSummary}
+        </div>
+      </div>
+
+      ${plannedInfo}
+
+      <div style="background:var(--surface-1);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem;">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--slate-200);margin-bottom:0.25rem;">📅 ${phase.name} — ${modeLabel}</div>
+        <div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.75rem;">${modeDesc}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+          <div>
+            <label style="font-size:0.65rem;color:var(--slate-400);display:block;margin-bottom:0.25rem;">시작일</label>
+            <input type="date" id="so-phase-start" class="input-field" style="font-size:0.8rem;padding:0.5rem;" value="${startVal}">
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--slate-400);display:block;margin-bottom:0.25rem;">종료일</label>
+            <input type="date" id="so-phase-end" class="input-field" style="font-size:0.8rem;padding:0.5rem;" value="${endVal}">
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-1);border-radius:var(--radius-lg);padding:0.75rem 1rem;margin-bottom:1rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+          <input type="checkbox" id="so-cascade" checked style="accent-color:var(--primary-400);">
+          <span style="font-size:0.75rem;color:var(--slate-300);">후속 Phase 일정도 자동 조정</span>
+        </label>
+        <div style="font-size:0.65rem;color:var(--slate-400);margin-top:0.25rem;margin-left:1.5rem;">
+          이 Phase의 종료일 이후로 다음 Phase들의 시작일/종료일이 순차적으로 밀려납니다.
+        </div>
+      </div>
+
+      <div style="font-size:0.7rem;color:var(--slate-400);margin-bottom:0.75rem;">
+        이 Phase의 <strong style="color:var(--slate-200);">${taskDates.count}개</strong> 작업 마감일이 새 기간 내에 균등 분배됩니다.
+      </div>
+
+      <button class="btn-primary" id="so-phase-apply" style="width:100%;border-radius:var(--radius-xl);padding:0.625rem;">적용</button>
+    </div>
+  `;
+
+  openSlideOver(`${phase.name} 일정 편집`, body);
+
+  // Bind apply — batchUpdateMultiPhaseSchedule (task dueDate + project phaseSchedules 원자적 업데이트)
+  const applyBtn = document.getElementById("so-phase-apply");
+  if (applyBtn) {
+    applyBtn.addEventListener("click", async () => {
+      const startStr = document.getElementById("so-phase-start")?.value;
+      const endStr = document.getElementById("so-phase-end")?.value;
+      if (!startStr || !endStr) { showToast("warning", "시작일과 종료일을 모두 입력해주세요"); return; }
+
+      const startDate = new Date(startStr + "T00:00:00");
+      const endDate = new Date(endStr + "T00:00:00");
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) { showToast("warning", "유효하지 않은 날짜입니다"); return; }
+      if (endDate < startDate) { showToast("warning", "종료일이 시작일보다 앞설 수 없습니다"); return; }
+
+      const cascade = document.getElementById("so-cascade")?.checked;
+
+      applyBtn.disabled = true;
+      applyBtn.textContent = "적용 중...";
+
+      try {
+        // Build phaseUpdates array for batchUpdateMultiPhaseSchedule
+        const phaseUpdates = [];
+
+        function buildPhaseUpdate(ph, pIdx, sDate, eDate) {
+          const tasks = checklistItems.filter(t => t.stage === ph.workStage || t.stage === ph.gateStage);
+          const days = Math.max(1, Math.ceil((eDate - sDate) / 86400000));
+          const taskUpdates = tasks.map((t, i) => {
+            const offset = tasks.length > 1 ? (i / (tasks.length - 1)) * days : 0;
+            return { id: t.id, dueDate: new Date(sDate.getTime() + offset * 86400000) };
+          });
+
+          const existing = (project.phaseSchedules || {})[`phase${pIdx}`];
+          const isFirst = !existing || !existing.plannedStart;
+
+          return {
+            phaseKey: `phase${pIdx}`,
+            plannedStart: isFirst ? sDate : null,
+            plannedEnd: isFirst ? eDate : null,
+            actualStart: sDate,
+            actualEnd: eDate,
+            taskUpdates,
+          };
+        }
+
+        // 현재 Phase
+        phaseUpdates.push(buildPhaseUpdate(phase, phaseIdx, startDate, endDate));
+
+        // Cascade: 후속 Phase 자동 조정
+        if (cascade && phaseIdx < phases.length - 1) {
+          let prevEnd = endDate;
+          for (let j = phaseIdx + 1; j < phases.length; j++) {
+            const nextPhase = phases[j];
+            const nd = getPhaseTaskDates(nextPhase);
+            let dur = 30;
+            if (nd.start && nd.end) dur = Math.max(1, Math.ceil((nd.end - nd.start) / 86400000));
+
+            const newStart = new Date(prevEnd.getTime() + 86400000);
+            const newEnd = new Date(newStart.getTime() + dur * 86400000);
+
+            phaseUpdates.push(buildPhaseUpdate(nextPhase, j, newStart, newEnd));
+            prevEnd = newEnd;
+          }
+        }
+
+        const totalTasks = phaseUpdates.reduce((sum, pu) => sum + pu.taskUpdates.length, 0);
+        await batchUpdateMultiPhaseSchedule(projectId, phaseUpdates);
+
+        const cascadeMsg = cascade ? " (후속 Phase 포함)" : "";
+        showToast("success", `${phase.name} 일정이 변경되었습니다${cascadeMsg} — ${totalTasks}개 작업 업데이트`);
+        closeSlideOver();
+      } catch (err) {
+        console.error("Phase schedule update failed:", err);
+        showToast("error", "일정 변경 실패: " + err.message);
+      } finally {
+        applyBtn.disabled = false;
+        applyBtn.textContent = "적용";
+      }
+    });
+  }
+}
 
 // ─── UXA-05: Task Peek Slide-Over ───────────────────────────────────────────
 
@@ -1704,11 +2295,37 @@ function openTaskPeek(task) {
     .map(d => `<option value="${escapeHtml(d)}" ${task.department === d ? "selected" : ""}>${escapeHtml(d)}</option>`).join("");
 
   const files = task.attachments || [];
+
+  // File icon helper (used in initial render & dynamic updates)
+  function _getFileIcon(fileName) {
+    const ext = (fileName || "").split(".").pop().toLowerCase();
+    const icons = { doc: "primary", docx: "primary", hwp: "primary", txt: "primary", xls: "#22c55e", xlsx: "#22c55e", csv: "#22c55e", ppt: "#f97316", pptx: "#f97316", pdf: "#ef4444", png: "#8b5cf6", jpg: "#8b5cf6", jpeg: "#8b5cf6" };
+    const color = icons[ext] || "var(--slate-300)";
+    if (["doc","docx","hwp","hwpx","txt","rtf"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-400)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+    if (["xls","xlsx","csv"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>`;
+    if (["ppt","pptx"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+    if (ext === "pdf") return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+    if (["png","jpg","jpeg","gif","bmp","svg","webp"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--slate-300)" stroke-width="1.5"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>`;
+  }
+  function _fmtSize(b) { if (!b) return ""; if (b < 1024) return b+" B"; if (b < 1048576) return (b/1024).toFixed(1)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+
   const filesHtml = files.length > 0
-    ? files.map(f => `<div class="peek-file-item">
-        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-        <span>${escapeHtml(f.name || f)}</span>
-      </div>`).join("")
+    ? files.map((f, fi) => {
+        const fn = f.name || f;
+        const hasUrl = !!f.url;
+        const sz = f.size ? ` (${_fmtSize(f.size)})` : "";
+        return `<div class="peek-file-item" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.375rem 0.5rem;background:var(--surface-1);border-radius:var(--radius-md);margin-bottom:0.25rem;transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-2)'" onmouseleave="this.style.background='var(--surface-1)'">
+          <${hasUrl ? `a href="${f.url}" target="_blank" rel="noopener"` : "div"} style="display:flex;align-items:center;gap:0.5rem;min-width:0;text-decoration:none;color:inherit;flex:1;cursor:${hasUrl ? "pointer" : "default"};" ${hasUrl ? `title="클릭하여 파일 열기"` : ""}>
+            ${_getFileIcon(fn)}
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:0.78rem;font-weight:500;color:${hasUrl ? "var(--primary-400)" : "var(--slate-200)"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${hasUrl ? "text-decoration:underline;text-underline-offset:2px;" : ""}">${escapeHtml(fn)}</div>
+              ${sz ? `<div style="font-size:0.6rem;color:var(--slate-400);margin-top:0.1rem;">${sz}</div>` : ""}
+            </div>
+          </${hasUrl ? "a" : "div"}>
+          <button class="peek-file-delete" data-file-idx="${fi}" title="삭제" style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--slate-400);cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem;padding:0;transition:all 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.15)';this.style.color='var(--danger-400)';" onmouseleave="this.style.background='transparent';this.style.color='var(--slate-400)';">✕</button>
+        </div>`;
+      }).join("")
     : `<span style="font-size:0.75rem;color:var(--slate-400);">첨부 파일 없음</span>`;
 
   const isManual = task.source === "manual";
@@ -1839,27 +2456,111 @@ function openTaskPeek(task) {
     });
   }
 
-  // File input (store filenames only since Firebase Storage not connected)
+  // Helper: render file list with delete buttons and download links (reuses _getFileIcon, _fmtSize)
+  function renderFileListHtml(fileList) {
+    if (fileList.length === 0) return `<span style="font-size:0.75rem;color:var(--slate-400);">첨부 파일 없음</span>`;
+    return fileList.map((f, fi) => {
+      const fn = f.name || f;
+      const hasUrl = !!f.url;
+      const sz = f.size ? ` (${_fmtSize(f.size)})` : "";
+      return `<div class="peek-file-item" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.375rem 0.5rem;background:var(--surface-1);border-radius:var(--radius-md);margin-bottom:0.25rem;transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-2)'" onmouseleave="this.style.background='var(--surface-1)'">
+        <${hasUrl ? `a href="${f.url}" target="_blank" rel="noopener"` : "div"} style="display:flex;align-items:center;gap:0.5rem;min-width:0;text-decoration:none;color:inherit;flex:1;cursor:${hasUrl ? "pointer" : "default"};" ${hasUrl ? `title="클릭하여 파일 열기"` : ""}>
+          ${_getFileIcon(fn)}
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:0.78rem;font-weight:500;color:${hasUrl ? "var(--primary-400)" : "var(--slate-200)"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${hasUrl ? "text-decoration:underline;text-underline-offset:2px;" : ""}">${escapeHtml(fn)}</div>
+            ${sz ? `<div style="font-size:0.6rem;color:var(--slate-400);margin-top:0.1rem;">${sz}</div>` : ""}
+          </div>
+        </${hasUrl ? "a" : "div"}>
+        <button class="peek-file-delete" data-file-idx="${fi}" title="삭제" style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--slate-400);cursor:pointer;border-radius:var(--radius-sm);font-size:0.8rem;padding:0;transition:all 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.15)';this.style.color='var(--danger-400)';" onmouseleave="this.style.background='transparent';this.style.color='var(--slate-400)';">✕</button>
+      </div>`;
+    }).join("");
+  }
+
+  // Helper: bind file delete buttons
+  function bindFileDeleteButtons(taskId, currentFiles) {
+    const filesDiv = document.getElementById("peek-files");
+    if (!filesDiv) return;
+    filesDiv.querySelectorAll(".peek-file-delete").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.fileIdx);
+        const fileName = currentFiles[idx]?.name || currentFiles[idx];
+        if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?`)) return;
+        const updated = currentFiles.filter((_, i) => i !== idx);
+        try {
+          await updateChecklistItem(taskId, { attachments: updated });
+          // Update task object in memory
+          task.attachments = updated;
+          filesDiv.innerHTML = renderFileListHtml(updated);
+          bindFileDeleteButtons(taskId, updated);
+          showToast("파일이 삭제되었습니다", "success");
+        } catch (err) {
+          showToast("파일 삭제 실패: " + err.message, "error");
+        }
+      });
+    });
+  }
+
+  // Bind initial file delete buttons
+  bindFileDeleteButtons(task.id, files);
+
+  // File input — upload to Firebase Storage
   const fileInput = document.getElementById("peek-file-input");
   if (fileInput) {
     fileInput.addEventListener("change", async () => {
-      const fileNames = [...fileInput.files].map(f => ({ name: f.name, size: f.size, addedAt: new Date().toISOString() }));
+      const rawFiles = [...fileInput.files];
+      if (rawFiles.length === 0) return;
+
+      const filesDiv = document.getElementById("peek-files");
+      const uploadLabel = fileInput.closest("label");
+      if (uploadLabel) { uploadLabel.style.opacity = "0.5"; uploadLabel.style.pointerEvents = "none"; }
+
+      // Show uploading state
+      const progressId = "upload-progress-" + Date.now();
+      if (filesDiv) {
+        filesDiv.insertAdjacentHTML("beforeend", `<div id="${progressId}" style="padding:0.375rem 0.5rem;background:var(--surface-1);border-radius:var(--radius-md);margin-bottom:0.25rem;font-size:0.75rem;color:var(--primary-400);display:flex;align-items:center;gap:0.5rem;">
+          <svg width="14" height="14" class="spin" style="animation:spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.49-8.49l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M6.34 6.34L3.51 3.51"/></svg>
+          <span>업로드 중... (0/${rawFiles.length})</span>
+        </div>`);
+      }
+
+      const uploaded = [];
+      let count = 0;
+      for (const file of rawFiles) {
+        try {
+          const fileId = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+          const path = `attachments/${projectId}/${task.id}/${fileId}_${file.name}`;
+          const ref = storageRef(storage, path);
+          const snapshot = await uploadBytesResumable(ref, file);
+          const url = await getDownloadURL(snapshot.ref);
+          uploaded.push({ name: file.name, size: file.size, url, path, addedAt: new Date().toISOString() });
+          count++;
+          const prog = document.getElementById(progressId);
+          if (prog) prog.querySelector("span").textContent = `업로드 중... (${count}/${rawFiles.length})`;
+        } catch (err) {
+          console.error("Upload error:", err);
+          // Fallback: save without URL
+          uploaded.push({ name: file.name, size: file.size, addedAt: new Date().toISOString() });
+          count++;
+        }
+      }
+
       const existing = task.attachments || [];
-      const merged = [...existing, ...fileNames];
+      const merged = [...existing, ...uploaded];
       try {
         await updateChecklistItem(task.id, { attachments: merged });
-        showToast(`${fileNames.length}개 파일 기록 저장`, "success");
-        // Update display
-        const filesDiv = document.getElementById("peek-files");
+        task.attachments = merged;
+        showToast(`${uploaded.length}개 파일 업로드 완료`, "success");
         if (filesDiv) {
-          filesDiv.innerHTML = merged.map(f => `<div class="peek-file-item">
-            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-            <span>${escapeHtml(f.name || f)}</span>
-          </div>`).join("");
+          filesDiv.innerHTML = renderFileListHtml(merged);
+          bindFileDeleteButtons(task.id, merged);
         }
       } catch (e) {
-        showToast("파일 저장 실패", "error");
+        showToast("파일 저장 실패: " + e.message, "error");
       }
+
+      if (uploadLabel) { uploadLabel.style.opacity = "1"; uploadLabel.style.pointerEvents = ""; }
+      fileInput.value = "";
     });
   }
 }
@@ -1919,8 +2620,7 @@ async function handleApplyTemplate() {
   if (btn) { btn.disabled = true; btn.textContent = "생성 중..."; }
   try {
     const projectType = project?.projectType || "신규개발";
-    const changeScale = project?.changeScale || "major";
-    const count = await applyTemplateToProject(projectId, projectType, changeScale);
+    const count = await applyTemplateToProject(projectId, projectType);
     if (count > 0) {
       showToast("success", `${count}개 체크리스트 항목이 생성되었습니다.`);
     } else {
@@ -1939,9 +2639,8 @@ async function handleApplyLaunch() {
   if (btn) { btn.disabled = true; btn.textContent = "생성 중..."; }
   try {
     const projectType = project?.projectType || "신규개발";
-    const changeScale = project?.changeScale || "major";
     const endDate = project?.endDate || new Date();
-    const count = await applyLaunchChecklistToProject(projectId, projectType, changeScale, endDate);
+    const count = await applyLaunchChecklistToProject(projectId, projectType, endDate);
     if (count > 0) {
       showToast("success", `${count}개 출시 준비 체크리스트가 생성되었습니다.`);
       if (btn) btn.style.display = "none";
@@ -1991,7 +2690,13 @@ function openPhasePanel(phase, phaseIdx) {
       <div class="gate-section">
         <div class="gate-section-title">🔒 위원회 승인</div>
         <div class="gate-status ${statusCls}">${statusLabel}</div>
-        ${gr?.approvedBy ? `<div class="gate-meta">승인자: ${escapeHtml(gr.approvedBy)} · ${gr.approvedAt ? new Date(gr.approvedAt).toLocaleDateString("ko-KR") : ""}</div>` : ""}
+        ${gr?.approvedBy ? `<div class="gate-meta" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <span>승인자: ${escapeHtml(gr.approvedBy)}</span>
+          <span style="color:var(--slate-400);">·</span>
+          <span class="gate-date-display" style="display:inline-flex;align-items:center;gap:0.25rem;">
+            <input type="date" class="gate-date-input" value="${gr.approvedAt ? new Date(gr.approvedAt).toISOString().slice(0,10) : ""}" style="font-size:0.75rem;padding:0.15rem 0.3rem;border:1px solid var(--surface-4);border-radius:var(--radius-sm);background:var(--surface-1);color:var(--text-primary);cursor:pointer;width:auto;" title="날짜 클릭하여 수정">
+          </span>
+        </div>` : ""}
         <div class="gate-actions">
           <button class="btn-sm gate-btn-approve" data-gate-action="approved" ${gateStatus === "approved" ? "disabled" : ""}>✅ 승인</button>
           <button class="btn-sm gate-btn-reject" data-gate-action="rejected" ${gateStatus === "rejected" ? "disabled" : ""}>❌ 반려</button>
@@ -2008,16 +2713,32 @@ function openPhasePanel(phase, phaseIdx) {
               <div class="gate-note">
                 <div class="gate-note-header">
                   <span class="gate-note-author">${escapeHtml(n.author)}</span>
-                  <span class="gate-note-date">${n.createdAt ? new Date(n.createdAt).toLocaleDateString("ko-KR") : ""}</span>
+                  <span class="gate-note-date">${n.createdAt ? formatDate(n.createdAt) : ""}</span>
                 </div>
                 <div class="gate-note-content">${escapeHtml(n.content)}</div>
+                ${(n.files && n.files.length > 0) ? `
+                  <div class="gate-note-files" style="margin-top:0.375rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
+                    ${n.files.map(f => `
+                      <a href="${f.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-sm);font-size:0.65rem;color:var(--primary-400);text-decoration:none;">
+                        📎 ${escapeHtml(f.name)}
+                      </a>
+                    `).join("")}
+                  </div>
+                ` : ""}
               </div>
             `).join("")
           }
         </div>
         <div class="gate-note-form">
           <textarea class="gate-note-input" placeholder="회의 내용, 피드백, 결정 사항 등을 기록하세요..." rows="3"></textarea>
-          <button class="btn-primary btn-sm gate-note-submit">등록</button>
+          <div class="gate-note-file-area" style="margin-top:0.375rem;">
+            <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.3rem 0.6rem;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-sm);font-size:0.7rem;color:var(--slate-300);cursor:pointer;">
+              📎 파일 첨부
+              <input type="file" class="gate-note-file-input" multiple style="display:none;">
+            </label>
+            <div class="gate-note-file-list" style="margin-top:0.25rem;font-size:0.65rem;color:var(--slate-400);"></div>
+          </div>
+          <button class="btn-primary btn-sm gate-note-submit" style="margin-top:0.375rem;">등록</button>
         </div>
       </div>
     </div>
@@ -2035,27 +2756,88 @@ function openPhasePanel(phase, phaseIdx) {
       btn.addEventListener("click", async () => {
         const action = btn.dataset.gateAction;
         try {
+          btn.disabled = true;
+          btn.style.opacity = "0.5";
           await updateGateRecord(projectId, phaseId, phase.name, action, user?.name || "");
           showToast("success", action === "approved" ? "승인 완료" : action === "rejected" ? "반려 처리" : "초기화 완료");
-          // 패널 갱신 (gateRecords 구독이 자동으로 render() 호출 → 하지만 패널은 수동 갱신)
-          setTimeout(() => openPhasePanel(phase, phaseIdx), 300);
+          // Optimistic update: immediately patch local gateRecords so panel re-renders with new status
+          const existingIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
+          const now = new Date().toISOString();
+          if (existingIdx >= 0) {
+            gateRecords[existingIdx].gateStatus = action;
+            if (action === "approved" || action === "rejected") {
+              gateRecords[existingIdx].approvedBy = user?.name || "";
+              gateRecords[existingIdx].approvedAt = now;
+            }
+            if (action === "pending") {
+              gateRecords[existingIdx].approvedBy = "";
+              gateRecords[existingIdx].approvedAt = null;
+            }
+          } else {
+            gateRecords.push({ phaseId, phaseName: phase.name, gateStatus: action, approvedBy: action !== "pending" ? (user?.name || "") : "", approvedAt: action !== "pending" ? now : null, meetingNotes: [] });
+          }
+          // Re-open panel immediately with updated data
+          openPhasePanel(phase, phaseIdx);
         } catch (err) {
           showToast("error", "처리 실패: " + err.message);
+          btn.disabled = false;
+          btn.style.opacity = "1";
         }
       });
     });
 
-    // 회의록 등록
+    // 승인 날짜 수정
+    const dateInput = panel.querySelector(".gate-date-input");
+    if (dateInput) {
+      dateInput.addEventListener("change", async () => {
+        const newDate = dateInput.value;
+        if (!newDate) return;
+        try {
+          await updateGateApprovedAt(projectId, phaseId, newDate);
+          // Optimistic update
+          const idx = gateRecords.findIndex(r => r.phaseId === phaseId);
+          if (idx >= 0) gateRecords[idx].approvedAt = new Date(newDate).toISOString();
+          showToast("success", "승인 날짜가 수정되었습니다");
+        } catch (err) {
+          showToast("error", "날짜 수정 실패: " + err.message);
+        }
+      });
+    }
+
+    // 파일 첨부 미리보기
+    const fileInput = panel.querySelector(".gate-note-file-input");
+    const fileListEl = panel.querySelector(".gate-note-file-list");
+    if (fileInput && fileListEl) {
+      fileInput.addEventListener("change", () => {
+        const names = Array.from(fileInput.files).map(f => f.name);
+        fileListEl.textContent = names.length > 0 ? names.join(", ") : "";
+      });
+    }
+
+    // 회의록 등록 (파일 첨부 포함)
     const submitBtn = panel.querySelector(".gate-note-submit");
     const textarea = panel.querySelector(".gate-note-input");
     if (submitBtn && textarea) {
       submitBtn.addEventListener("click", async () => {
         const content = textarea.value.trim();
-        if (!content) { showToast("warning", "내용을 입력해주세요"); return; }
+        const files = fileInput ? Array.from(fileInput.files) : [];
+        if (!content && files.length === 0) { showToast("warning", "내용 또는 파일을 입력해주세요"); return; }
         try {
           submitBtn.disabled = true;
-          submitBtn.textContent = "등록 중...";
-          await addGateMeetingNote(projectId, phaseId, phase.name, user?.name || "익명", content);
+          submitBtn.textContent = files.length > 0 ? "업로드 중..." : "등록 중...";
+
+          // Upload files to Storage
+          const uploadedFiles = [];
+          for (const file of files) {
+            const fileId = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+            const path = `gateNotes/${projectId}/${phaseId}/${fileId}_${file.name}`;
+            const ref = storageRef(storage, path);
+            const snap = await uploadBytesResumable(ref, file);
+            const url = await getDownloadURL(snap.ref);
+            uploadedFiles.push({ name: file.name, url, size: file.size, type: file.type });
+          }
+
+          await addGateMeetingNote(projectId, phaseId, phase.name, user?.name || "익명", content || "(파일 첨부)", uploadedFiles);
           showToast("success", "회의록이 등록되었습니다");
           setTimeout(() => openPhasePanel(phase, phaseIdx), 300);
         } catch (err) {
@@ -2071,22 +2853,22 @@ function openPhasePanel(phase, phaseIdx) {
 let isCreating = false;
 async function handleQuickAdd() {
   if (isCreating) return;
-  const input = document.getElementById("quick-add-input");
-  if (!input || !input.value.trim()) return;
-  const parsed = parseQuickInput(input.value);
-  if (!parsed.title) { showToast('warning', "작업 내용을 입력해주세요"); return; }
-  if (!parsed.department) parsed.department = user.department || departments[0];
-  if (!parsed.assignee) {
-    const suggestions = getSmartAssigneeSuggestions(parsed.department);
-    parsed.assignee = suggestions.length > 0 ? suggestions[0].name : user.name;
-  }
-  if (!parsed.dueDate) parsed.dueDate = new Date(Date.now() + 14 * 86400000);
+  const titleInput = document.getElementById("quick-add-title");
+  if (!titleInput || !titleInput.value.trim()) { showToast('warning', "작업 내용을 입력해주세요"); return; }
+  const title = titleInput.value.trim();
+  const stage = document.getElementById("quick-add-stage")?.value || getActivePhaseGroups()[0]?.workStage || "";
+  const dept = document.getElementById("quick-add-dept")?.value || user.department || departments[0];
+  const importance = document.getElementById("quick-add-importance")?.value || "green";
+  const dueDateStr = document.getElementById("quick-add-due")?.value;
+  const dueDate = dueDateStr ? new Date(dueDateStr) : new Date(Date.now() + 14 * 86400000);
+  const suggestions = getSmartAssigneeSuggestions(dept);
+  const assignee = suggestions.length > 0 ? suggestions[0].name : user.name;
   isCreating = true;
   const btn = document.getElementById("quick-add-btn");
   if (btn) btn.disabled = true;
   try {
-    await createChecklistItem({ projectId, title: parsed.title, assignee: parsed.assignee, department: parsed.department, stage: parsed.stage, importance: parsed.importance, dueDate: parsed.dueDate, status: "pending", source: "manual" });
-    input.value = "";
+    await createChecklistItem({ projectId, title, assignee, department: dept, stage, importance, dueDate, status: "pending", source: "manual" });
+    titleInput.value = "";
   } catch (err) { showToast('error', "작업 생성 실패: " + err.message); }
   finally { isCreating = false; if (btn) btn.disabled = false; }
 }

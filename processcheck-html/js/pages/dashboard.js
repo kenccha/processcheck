@@ -818,7 +818,7 @@ function convertNotifLink(link) {
   const projMatch = link.match(/^\/projects\/([^/]+)/);
   if (projMatch) return `project.html?id=${projMatch[1]}`;
   if (link === "/projects" || link === "/projects/") return "projects.html";
-  if (link === "/dashboard" || link === "/dashboard/") return "dashboard.html";
+  if (link === "/dashboard" || link === "/dashboard/") return "projects.html?type=신규개발";
   return null;
 }
 

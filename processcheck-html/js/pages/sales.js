@@ -1,10 +1,10 @@
 // =============================================================================
-// Sales Dashboard — 영업 출시 준비 대시보드 (멀티뷰 + 실무자 기능 강화)
-// 6가지 뷰: 제품별 카드 | 카테고리 매트릭스 | D-Day 타임라인 | 거래처 현황 | 테이블 | 준비현황
-// + 오늘의 브리핑, 담당자별 워크로드, 일괄 상태 변경, 완료 예측, 거래처 응답 강화
+// Sales Dashboard — 영업 출시 준비 대시보드 (마케팅 실행 워크플로우)
+// 5가지 뷰: 커맨드센터 | 실행보드 | D-Day 타임라인 | 거래처 현황 | 준비현황
+// 5단계 파이프라인: 제품정보 → 자료제작 → 거래처배포 → 교육행사 → 출시확인
 // =============================================================================
 
-import { initTheme, renderNav, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
+import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
 import { guardPage, getUser, logout } from "../auth.js";
 import { showToast } from "../ui/toast.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
@@ -29,16 +29,34 @@ const app = document.getElementById("app");
 const navRoot = document.getElementById("nav-root");
 
 // =============================================================================
+// 5-Stage Execution Pipeline
+// =============================================================================
+
+const EXEC_STAGES = [
+  { key: "product_info", label: "제품 정보", icon: "📋", categories: ["pricing", "regulatory"] },
+  { key: "materials",    label: "자료 제작", icon: "📸", categories: ["brand", "photo", "print", "digital", "design_change"] },
+  { key: "distribution", label: "거래처 배포", icon: "📢", categories: ["dealer_notify", "sales_training"] },
+  { key: "education",    label: "교육/행사", icon: "🎓", categories: ["launch_event", "kol"] },
+  { key: "launch_check", label: "출시 확인", icon: "✅", categories: ["cs", "logistics", "insurance", "post_launch"] },
+];
+
+function getExecStageForCategory(category) {
+  for (const stage of EXEC_STAGES) {
+    if (stage.categories.includes(category)) return stage;
+  }
+  return EXEC_STAGES[4]; // default: 출시확인
+}
+
+// =============================================================================
 // View Modes
 // =============================================================================
 
 const VIEW_MODES = [
-  { key: "product",   label: "제품별" },
-  { key: "matrix",    label: "카테고리" },
-  { key: "timeline",  label: "D-Day" },
-  { key: "customer",  label: "거래처" },
-  { key: "table",     label: "테이블" },
-  { key: "readiness", label: "준비현황" },
+  { key: "command",   label: "커맨드센터", icon: "🎯" },
+  { key: "execute",   label: "실행보드",   icon: "📋" },
+  { key: "timeline",  label: "D-Day",     icon: "⏰" },
+  { key: "customer",  label: "거래처",     icon: "🏢" },
+  { key: "readiness", label: "준비현황",   icon: "🚦" },
 ];
 
 // =============================================================================
@@ -48,7 +66,7 @@ const VIEW_MODES = [
 let allItems = [];
 let projects = [];
 let customers = [];
-let viewMode = "product";
+let viewMode = "command";
 let filterProject = "all";
 let filterCategory = "all";
 let filterStatus = "all";
@@ -57,13 +75,12 @@ let searchQuery = "";
 let showAllCategories = false;
 let dataLoaded = { projects: false, items: false };
 
-// Table view
-let collapsedProjects = new Set();
-// Product card view
+// Expand/collapse state
 let expandedProducts = new Set();
-// Customer board view
 let expandedCustomers = new Set();
-// Timeline view
+let expandedExecStages = new Set(["product_info", "materials", "distribution", "education", "launch_check"]);
+
+// Timeline
 let timelineShowCompleted = false;
 let timelineShowLater = false;
 
@@ -72,68 +89,81 @@ let pendingConfirmId = null;
 
 // Bulk selection
 let selectedItems = new Set();
-let bulkMode = false;
 
 // 영업 핵심 카테고리
 const SALES_CORE_CATEGORIES = ["pricing", "sales_training", "dealer_notify"];
 const SALES_DEPT_KEYWORDS = ["영업"];
 
 // =============================================================================
-// Sales Nav — independent navigation (logo → home, title, theme, user, logout)
+// Sales Nav — independent amber-branded navigation with embedded view tabs
 // =============================================================================
 
 function renderSalesNav(container) {
   const u = getUser();
   if (!u) return;
 
+  const viewTabsHtml = VIEW_MODES.map(vm =>
+    `<button class="sales-nav-tab${viewMode === vm.key ? " active" : ""}" data-view="${vm.key}" title="${vm.label}">
+      <span class="sales-nav-tab-icon">${vm.icon}</span>
+      <span class="sales-nav-tab-label">${vm.label}</span>
+    </button>`
+  ).join("");
+
   container.innerHTML = `
-    <nav class="nav">
-      <div class="nav-inner">
-        <div class="flex items-center gap-8">
-          <button class="nav-logo" data-nav="home.html">
-            <div class="nav-logo-icon" style="background:linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.1));color:#f59e0b"><span>SL</span></div>
-            <span class="nav-logo-text" style="color:var(--slate-100)">영업<span class="accent" style="color:#f59e0b">출시준비</span></span>
+    <nav class="sales-nav">
+      <div class="sales-nav-inner">
+        <div class="sales-nav-left">
+          <button class="sales-nav-logo" id="sales-home-btn" title="ProcessCheck 홈으로">
+            <div class="sales-nav-logo-icon"><span>SL</span></div>
+            <span class="sales-nav-logo-text">영업<span class="sales-accent">출시준비</span></span>
           </button>
+          <div class="sales-nav-divider"></div>
+          <div class="sales-nav-tabs">
+            ${viewTabsHtml}
+          </div>
         </div>
-        <div class="nav-right">
-          <button class="nav-theme-toggle" id="nav-theme-btn" title="테마 전환">
+        <div class="sales-nav-right">
+          <button class="sales-nav-icon-btn" id="sales-theme-btn" title="테마 전환">
             ${getThemeIcon()}
           </button>
-          <button class="nav-link" data-nav="home.html" style="font-size:0.8rem;padding:6px 12px;gap:4px;opacity:0.7" title="허브로 돌아가기">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
-            홈
+          <button class="sales-nav-icon-btn" id="sales-hub-btn" title="ProcessCheck 허브">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
           </button>
-          <div class="nav-user">
-            <div class="nav-user-info">
-              <div class="nav-user-name">${escapeHtml(u.name)}</div>
-              <div class="nav-user-role">${getRoleName(u.role)}</div>
-            </div>
-            <button class="nav-logout" id="nav-logout-btn" title="로그아웃">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-              </svg>
-            </button>
+          <div class="sales-nav-user">
+            <span class="sales-nav-user-name">${escapeHtml(u.name)}</span>
+            <span class="sales-nav-user-role">${getRoleName(u.role)}</span>
           </div>
+          <button class="sales-nav-icon-btn" id="sales-logout-btn" title="로그아웃">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+          </button>
         </div>
       </div>
     </nav>
   `;
 
-  container.querySelector(".nav-logo").addEventListener("click", () => {
-    window.location.href = "home.html";
+  // Nav event listeners
+  container.querySelector("#sales-home-btn").addEventListener("click", () => window.location.href = "home.html");
+  container.querySelector("#sales-hub-btn").addEventListener("click", () => window.location.href = "home.html");
+  container.querySelector("#sales-logout-btn").addEventListener("click", logout);
+  container.querySelector("#sales-theme-btn").addEventListener("click", toggleTheme);
+
+  // View tab clicks
+  container.querySelectorAll("[data-view]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      viewMode = btn.dataset.view;
+      renderSalesNav(container); // re-render nav for active state
+      render();
+    });
   });
-  container.querySelector("[data-nav='home.html']:not(.nav-logo)").addEventListener("click", () => {
-    window.location.href = "home.html";
-  });
-  container.querySelector("#nav-logout-btn").addEventListener("click", logout);
-  container.querySelector("#nav-theme-btn").addEventListener("click", toggleTheme);
 
   // Load global feedback widget
   import("../feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
 }
 
 // =============================================================================
-// Init — with loading state and error handling
+// Init
 // =============================================================================
 
 let unsubProjects = null;
@@ -141,18 +171,16 @@ let unsubItems = null;
 let unsubCustomers = null;
 
 function init() {
-  renderNav(navRoot);
+  renderSalesNav(navRoot);
   app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
   unsubProjects = subscribeProjects((data) => {
-    console.log("[Sales] projects received:", data.length);
     projects = data;
     dataLoaded.projects = true;
     render();
   });
 
   unsubItems = subscribeAllLaunchChecklists((data) => {
-    console.log("[Sales] launch checklists received:", data.length);
     allItems = data;
     dataLoaded.items = true;
     render();
@@ -233,13 +261,10 @@ function getDueDateDisplay(item) {
   return `${formatDate(item.dueDate)} (D-${days})`;
 }
 
-function getDDayBadge(item) {
-  if (!item.dueDate) return "";
-  const days = daysUntil(item.dueDate);
-  if (days === null) return "";
-  if (days < 0) return `<span class="badge badge-danger">D+${Math.abs(days)}</span>`;
-  if (days <= 7) return `<span class="badge badge-warning">D-${days}</span>`;
-  return `<span class="badge badge-neutral">D-${days}</span>`;
+function getActionButtons(item) {
+  if (item.status === "pending") return `<button class="btn btn-sm btn-secondary start-btn" data-id="${item.id}" title="시작">&#9654;</button>`;
+  if (item.status === "in_progress") return `<button class="btn btn-sm btn-primary complete-btn" data-id="${item.id}" title="완료">&#10003;</button>`;
+  return "";
 }
 
 function getCheckedDisplay(item) {
@@ -253,395 +278,31 @@ function getCheckedDisplay(item) {
   return `<span class="text-xs text-soft">—</span>`;
 }
 
-function getActionButtons(item) {
-  if (item.status === "pending") return `<button class="btn btn-sm btn-secondary start-btn" data-id="${item.id}" title="시작">&#9654;</button>`;
-  if (item.status === "in_progress") return `<button class="btn btn-sm btn-primary complete-btn" data-id="${item.id}" title="완료">&#10003;</button>`;
-  return "";
-}
-
 function renderEmpty() {
   return `<div class="card" style="padding:3rem;text-align:center;"><p class="text-soft">표시할 항목이 없습니다</p></div>`;
 }
 
-function renderItemRow(item, opts = {}) {
-  const showProject = opts.showProject !== false;
-  const showCategory = opts.showCategory !== false;
-  const showCustomer = opts.showCustomer !== false;
-  const showChecked = opts.showChecked !== false;
-  const showCheckbox = opts.showCheckbox === true;
-  const isOverdue = item.status !== "completed" && item.dueDate && daysUntil(item.dueDate) !== null && daysUntil(item.dueDate) < 0;
-  return `
-    <tr${isOverdue ? ' style="background:rgba(239,68,68,0.06);"' : ""} class="cursor-pointer row-hover" data-navigate-project="${item.projectId}">
-      ${showCheckbox ? `<td style="width:32px;"><input type="checkbox" class="bulk-check" data-item-id="${item.id}" ${selectedItems.has(item.id) ? "checked" : ""} ${item.status === "completed" ? "disabled" : ""}></td>` : ""}
-      <td><code class="text-sm">${escapeHtml(item.code || "")}</code></td>
-      <td>
-        ${escapeHtml(item.title)}
-        ${item.isRequired ? '<span class="badge badge-danger" style="margin-left:4px;font-size:10px;">필수</span>' : ""}
-      </td>
-      ${showProject ? `<td class="text-sm"><a href="project.html?id=${item.projectId}" style="color:var(--primary-400);text-decoration:none;" title="프로젝트 상세 보기">${escapeHtml(getProjectName(item.projectId))}</a></td>` : ""}
-      ${showCategory ? `<td class="text-sm">${getCategoryBadge(item.category)}</td>` : ""}
-      <td class="text-sm">${escapeHtml(item.assignee || item.department || "")}</td>
-      <td>${getStatusBadge(item.status)}</td>
-      <td class="text-sm">${getDueDateDisplay(item)}</td>
-      ${showCustomer ? `<td class="text-sm">${item.customerName ? `<span class="badge badge-neutral">${escapeHtml(item.customerName)}</span>` : "—"}</td>` : ""}
-      ${showChecked ? `<td class="text-sm">${getCheckedDisplay(item)}</td>` : ""}
-      <td>${getActionButtons(item)}</td>
-    </tr>`;
-}
-
-function renderItemTable(items, opts = {}) {
-  const showProject = opts.showProject !== false;
-  const showCategory = opts.showCategory !== false;
-  const showCustomer = opts.showCustomer !== false;
-  const showChecked = opts.showChecked !== false;
-  const showCheckbox = opts.showCheckbox === true;
-  return `
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            ${showCheckbox ? '<th style="width:32px;"><input type="checkbox" class="bulk-check-all"></th>' : ""}
-            <th style="width:70px;">코드</th>
-            <th>항목</th>
-            ${showProject ? '<th>프로젝트</th>' : ''}
-            ${showCategory ? '<th>카테고리</th>' : ''}
-            <th>담당</th>
-            <th>상태</th>
-            <th>마감일</th>
-            ${showCustomer ? '<th>고객</th>' : ''}
-            ${showChecked ? '<th>확인</th>' : ''}
-            <th style="width:60px;">액션</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map(item => renderItemRow(item, opts)).join("")}
-        </tbody>
-      </table>
-    </div>`;
-}
-
 // =============================================================================
-// Today's Briefing
+// Pipeline Stats for a project
 // =============================================================================
 
-function renderTodayBriefing() {
-  const salesItems = showAllCategories ? allItems : allItems.filter(isSalesRelevant);
-  const active = salesItems.filter(i => i.status !== "completed");
-
-  const overdue = active.filter(i => { const d = daysUntil(i.dueDate); return d !== null && d < 0; });
-  const todayDue = active.filter(i => { const d = daysUntil(i.dueDate); return d === 0; });
-  const weekDue = active.filter(i => { const d = daysUntil(i.dueDate); return d !== null && d >= 0 && d <= 7; });
-
-  // Yesterday completed count
-  const now = new Date();
-  const yesterday = new Date(now.getTime() - 86400000);
-  const yesterdayCompleted = salesItems.filter(i => {
-    if (i.status !== "completed" || !i.completedDate) return false;
-    const cd = i.completedDate instanceof Date ? i.completedDate : new Date(i.completedDate);
-    return cd >= yesterday && cd <= now;
-  }).length;
-
-  // Urgent items (overdue + today, max 5)
-  const urgent = [...overdue, ...todayDue].sort((a, b) => {
-    const da = daysUntil(a.dueDate) ?? 999;
-    const db = daysUntil(b.dueDate) ?? 999;
-    return da - db;
-  }).slice(0, 5);
-
-  if (overdue.length === 0 && todayDue.length === 0 && weekDue.length === 0) return "";
-
-  return `
-    <div class="sales-briefing animate-fade-in">
-      <div class="flex items-center justify-between mb-2">
-        <strong style="color: var(--slate-100); font-size: 0.9375rem;">오늘의 할 일</strong>
-        ${renderProjectionInline(salesItems)}
-      </div>
-      <div class="sales-briefing-stats">
-        ${overdue.length > 0 ? `<span class="sales-briefing-stat" style="color: var(--danger-400)"><strong>${overdue.length}</strong> 초과</span>` : ""}
-        ${todayDue.length > 0 ? `<span class="sales-briefing-stat" style="color: var(--warning-400)">오늘 <strong>${todayDue.length}</strong></span>` : ""}
-        <span class="sales-briefing-stat">이번 주 <strong style="color: var(--primary-400)">${weekDue.length}</strong></span>
-        ${yesterdayCompleted > 0 ? `<span class="sales-briefing-stat" style="color: var(--success-400)">어제 완료 <strong>${yesterdayCompleted}</strong></span>` : ""}
-      </div>
-      ${urgent.length > 0 ? urgent.map(item => {
-        const d = daysUntil(item.dueDate);
-        const dLabel = d !== null && d < 0 ? `D+${Math.abs(d)}` : d === 0 ? "D-Day" : `D-${d}`;
-        const dColor = d !== null && d < 0 ? "var(--danger-400)" : "var(--warning-400)";
-        return `
-          <div class="sales-briefing-item">
-            <div class="flex items-center gap-2 flex-1" style="min-width: 0;">
-              <span class="font-mono text-xs font-semibold" style="color: ${dColor}; min-width: 2.5rem;">${dLabel}</span>
-              <span class="text-sm truncate" style="color: var(--slate-200)">${escapeHtml(item.title)}</span>
-              ${item.customerName ? `<span class="text-xs text-soft">${escapeHtml(item.customerName)}</span>` : ""}
-            </div>
-            <div class="flex items-center gap-1">
-              ${item.status === "pending" ? `<button class="btn btn-sm btn-secondary briefing-start-btn" data-id="${item.id}" style="font-size:11px;padding:2px 8px;">시작</button>` : ""}
-              ${item.status === "in_progress" ? `<button class="btn btn-sm btn-primary briefing-complete-btn" data-id="${item.id}" style="font-size:11px;padding:2px 8px;">완료</button>` : ""}
-            </div>
-          </div>`;
-      }).join("") : ""}
-    </div>
-  `;
-}
-
-// =============================================================================
-// Projected Completion (inline)
-// =============================================================================
-
-function renderProjectionInline(salesItems) {
-  const completed = salesItems.filter(i => i.status === "completed");
-  const remaining = salesItems.length - completed.length;
-  if (remaining === 0 || completed.length === 0) return "";
-
-  // Calculate daily velocity (last 7 days)
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
-  const recentCompleted = completed.filter(i => {
-    if (!i.completedDate) return false;
-    const cd = i.completedDate instanceof Date ? i.completedDate : new Date(i.completedDate);
-    return cd >= sevenDaysAgo;
-  }).length;
-
-  const dailyVelocity = recentCompleted / 7;
-  if (dailyVelocity <= 0) return `<span class="text-xs text-soft">남은 ${remaining}건</span>`;
-
-  const daysNeeded = Math.ceil(remaining / dailyVelocity);
-
-  // Find earliest project end date for D-Day reference
-  const activeProjects = projects.filter(p => p.status === "active" && p.endDate);
-  let dDayDays = null;
-  if (activeProjects.length > 0) {
-    const earliest = activeProjects.reduce((a, b) => {
-      const da = new Date(a.endDate);
-      const db = new Date(b.endDate);
-      return da < db ? a : b;
-    });
-    dDayDays = daysUntil(new Date(earliest.endDate));
-  }
-
-  let statusIcon = "";
-  let statusText = `일 ${dailyVelocity.toFixed(1)}건 · ${daysNeeded}일 소요`;
-  if (dDayDays !== null && dDayDays > 0) {
-    if (daysNeeded <= dDayDays - 5) statusIcon = `<span style="color: var(--success-400)">&#10003;</span>`;
-    else if (daysNeeded <= dDayDays) statusIcon = `<span style="color: var(--warning-400)">&#9888;</span>`;
-    else statusIcon = `<span style="color: var(--danger-400)">&#10007;</span>`;
-  }
-
-  return `<span class="text-xs text-soft">${statusIcon} ${statusText}</span>`;
-}
-
-// =============================================================================
-// Workload Chart
-// =============================================================================
-
-function renderWorkloadChart() {
-  const salesItems = showAllCategories ? allItems : allItems.filter(isSalesRelevant);
-  const assigneeMap = {};
-
-  for (const item of salesItems) {
-    const name = item.assignee || item.department || "미지정";
-    if (!assigneeMap[name]) assigneeMap[name] = { total: 0, done: 0, overdue: 0, todayDue: 0 };
-    assigneeMap[name].total++;
-    if (item.status === "completed") assigneeMap[name].done++;
-    if (item.status !== "completed") {
-      const d = daysUntil(item.dueDate);
-      if (d !== null && d < 0) assigneeMap[name].overdue++;
-      if (d === 0) assigneeMap[name].todayDue++;
-    }
-  }
-
-  const entries = Object.entries(assigneeMap)
-    .filter(([, d]) => d.total > 0)
-    .sort((a, b) => (a[1].done / a[1].total) - (b[1].done / b[1].total));
-
-  if (entries.length === 0) return "";
-
-  return `
-    <div class="card mb-4" style="padding: 0.75rem 1rem; overflow: hidden;">
-      <div class="flex items-center justify-between mb-2">
-        <strong class="text-sm" style="color: var(--slate-300)">담당자별 현황</strong>
-        <span class="text-xs text-soft">${entries.length}명</span>
-      </div>
-      ${entries.slice(0, 8).map(([name, d]) => {
-        const pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0;
-        const color = pct >= 80 ? "var(--success-400)" : pct >= 50 ? "var(--primary-400)" : "var(--warning-400)";
-        const warnings = [];
-        if (d.overdue > 0) warnings.push(`<span style="color: var(--danger-400)">${d.overdue} 초과</span>`);
-        if (d.todayDue > 0) warnings.push(`<span style="color: var(--warning-400)">${d.todayDue} 오늘</span>`);
-        return `
-          <div class="sales-workload-item" data-filter-assignee="${escapeHtml(name)}">
-            <span class="sales-workload-name">${escapeHtml(name.length > 5 ? name.slice(0, 5) + "…" : name)}</span>
-            <div class="sales-workload-bar">
-              <div class="sales-workload-fill" style="width: ${pct}%; background: ${color};"></div>
-            </div>
-            <span class="sales-workload-stats">
-              ${d.done}/${d.total} (${pct}%) ${warnings.join(" ")}
-            </span>
-          </div>`;
-      }).join("")}
-      ${entries.length > 8 ? `<div class="text-xs text-soft" style="margin-top: 0.25rem;">외 ${entries.length - 8}명</div>` : ""}
-    </div>
-  `;
-}
-
-// =============================================================================
-// Customer Response Summary
-// =============================================================================
-
-function renderCustomerResponseSummary(filtered) {
-  const customerItems = filtered.filter(i => i.customerId);
-  if (customerItems.length === 0) return "";
-
-  const byCustomer = {};
-  for (const item of customerItems) {
-    const key = item.customerId;
-    if (!byCustomer[key]) byCustomer[key] = { name: item.customerName || "알 수 없음", items: [] };
-    byCustomer[key].items.push(item);
-  }
-
-  const customers = Object.entries(byCustomer).sort((a, b) => {
-    const uncA = a[1].items.filter(i => !i.checkedBy).length;
-    const uncB = b[1].items.filter(i => !i.checkedBy).length;
-    return uncB - uncA;
+function getProjectPipelineStats(projectItems) {
+  return EXEC_STAGES.map(stage => {
+    const items = projectItems.filter(i => stage.categories.includes(i.category));
+    const total = items.length;
+    const completed = items.filter(i => i.status === "completed").length;
+    const inProgress = items.filter(i => i.status === "in_progress").length;
+    const overdue = items.filter(i => {
+      if (i.status === "completed") return false;
+      const d = daysUntil(i.dueDate);
+      return d !== null && d < 0;
+    }).length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    let status = "pending";
+    if (total > 0 && completed === total) status = "completed";
+    else if (inProgress > 0 || completed > 0) status = "in_progress";
+    return { ...stage, total, completed, inProgress, overdue, pct, status };
   });
-
-  return `
-    <div class="sales-customer-summary">
-      ${customers.map(([custId, cust]) => {
-        const checked = cust.items.filter(i => i.checkedBy).length;
-        const total = cust.items.length;
-        const pct = Math.round((checked / total) * 100);
-        const unchecked = total - checked;
-        // Last response time
-        const lastChecked = cust.items.filter(i => i.checkedAt).sort((a, b) => {
-          const ta = a.checkedAt instanceof Date ? a.checkedAt : new Date(a.checkedAt);
-          const tb = b.checkedAt instanceof Date ? b.checkedAt : new Date(b.checkedAt);
-          return tb - ta;
-        })[0];
-        const lastTime = lastChecked ? timeAgo(lastChecked.checkedAt) : null;
-        const statusColor = pct >= 100 ? "var(--success-400)" : pct >= 50 ? "var(--warning-400)" : "var(--danger-400)";
-
-        return `
-          <div class="sales-customer-card" data-filter-customer="${custId}">
-            <div class="flex items-center justify-between mb-1">
-              <strong class="text-sm" style="color: var(--slate-200)">${escapeHtml(cust.name)}</strong>
-              <span class="text-xs" style="color: ${statusColor}">${checked}/${total}</span>
-            </div>
-            <div class="progress-bar mb-1" style="height: 4px;">
-              <div class="progress-fill" style="width: ${pct}%; background: ${statusColor};"></div>
-            </div>
-            <div class="text-xs text-soft">
-              ${unchecked > 0 ? `미응답 ${unchecked}건` : "전체 확인 완료"}
-              ${lastTime ? ` · ${lastTime}` : ""}
-            </div>
-          </div>`;
-      }).join("")}
-    </div>
-  `;
-}
-
-// =============================================================================
-// Bulk Action Bar
-// =============================================================================
-
-function renderBulkActionBar() {
-  if (selectedItems.size === 0) return "";
-  return `
-    <div class="sales-bulk-bar" id="bulk-bar">
-      <div class="flex items-center gap-2">
-        <span class="text-sm" style="color: var(--slate-200)">
-          <strong>${selectedItems.size}</strong>건 선택
-        </span>
-        <button class="btn btn-sm btn-secondary" id="bulk-deselect">선택 해제</button>
-      </div>
-      <div class="flex items-center gap-2">
-        <button class="btn btn-sm btn-secondary" id="bulk-start">일괄 시작</button>
-        <button class="btn btn-sm btn-primary" id="bulk-complete">일괄 완료</button>
-      </div>
-    </div>
-  `;
-}
-
-// =============================================================================
-// View 6: Readiness Scorecard (RAG)
-// =============================================================================
-
-function renderReadinessView(filtered) {
-  // Group by projectId × department
-  const projectIds = [...new Set(filtered.map(i => i.projectId))];
-  const departments = [...new Set(filtered.map(i => i.department).filter(Boolean))].sort();
-
-  if (projectIds.length === 0 || departments.length === 0) return renderEmpty();
-
-  // Build matrix data
-  const matrix = {};
-  for (const pid of projectIds) {
-    matrix[pid] = {};
-    for (const dept of departments) {
-      const items = filtered.filter(i => i.projectId === pid && i.department === dept);
-      const total = items.length;
-      const completed = items.filter(i => i.status === "completed").length;
-      const overdue = items.filter(i => {
-        if (i.status === "completed") return false;
-        const d = daysUntil(i.dueDate);
-        return d !== null && d < 0;
-      }).length;
-      const pct = total > 0 ? Math.round((completed / total) * 100) : -1;
-      matrix[pid][dept] = { total, completed, overdue, pct };
-    }
-  }
-
-  // RAG determination: overdue → red, <50% → red, 50-79% → amber, 80%+ → green, no items → gray
-  function getRagClass(cell) {
-    if (cell.total === 0) return "rag-gray";
-    if (cell.overdue > 0) return "rag-red";
-    if (cell.pct >= 80) return "rag-green";
-    if (cell.pct >= 50) return "rag-amber";
-    return "rag-red";
-  }
-
-  // Department short names
-  function shortDept(d) {
-    return d.length > 4 ? d.replace(/팀$/, "").replace(/부$/, "").slice(0, 4) : d;
-  }
-
-  return `
-    <div class="card" style="padding: 0; overflow: hidden;">
-      <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--surface-3);">
-        <strong style="color: var(--slate-200)">부서별 준비 현황 (RAG)</strong>
-        <span class="text-xs text-soft" style="margin-left: 8px;">셀 클릭 → 상세 보기</span>
-      </div>
-      <div style="overflow-x: auto;">
-        <table style="font-size: 0.8125rem; border-collapse: collapse; width: 100%;">
-          <thead>
-            <tr>
-              <th style="padding: 0.5rem 0.75rem; text-align: left; min-width: 120px;">프로젝트</th>
-              ${departments.map(d => `<th style="padding: 0.5rem 0.375rem; text-align: center; font-size: 0.6875rem;" title="${escapeHtml(d)}">${escapeHtml(shortDept(d))}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${projectIds.map(pid => `
-              <tr>
-                <td style="padding: 0.5rem 0.75rem; color: var(--slate-300);">${escapeHtml(getProjectName(pid))}</td>
-                ${departments.map(dept => {
-                  const cell = matrix[pid][dept];
-                  if (cell.total === 0) return `<td class="sales-rag-cell"><span class="sales-rag-dot rag-gray"></span></td>`;
-                  return `<td class="sales-rag-cell" data-rag-project="${pid}" data-rag-dept="${escapeHtml(dept)}" title="${dept}: ${cell.completed}/${cell.total} (${cell.pct}%)${cell.overdue > 0 ? " / 초과 " + cell.overdue + "건" : ""}">
-                    <span class="sales-rag-dot ${getRagClass(cell)}"></span>
-                  </td>`;
-                }).join("")}
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
-      <div style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--surface-3); display: flex; gap: 1rem; font-size: 0.75rem; color: var(--slate-300);">
-        <span><span class="sales-rag-dot rag-green" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> 80%+</span>
-        <span><span class="sales-rag-dot rag-amber" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> 50-79%</span>
-        <span><span class="sales-rag-dot rag-red" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> <50% 또는 초과</span>
-        <span><span class="sales-rag-dot rag-gray" style="display: inline-block; width: 8px; height: 8px; vertical-align: middle;"></span> 해당 없음</span>
-      </div>
-    </div>
-  `;
 }
 
 // =============================================================================
@@ -649,237 +310,184 @@ function renderReadinessView(filtered) {
 // =============================================================================
 
 function render() {
-  // Still loading
   if (!dataLoaded.items) return;
 
-  // Empty data guidance — show project list with generate buttons
+  // Empty data — show project list with generate buttons
   if (allItems.length === 0) {
-    const activeProjects = projects.filter(p => p.status === "active");
-    const projectRows = activeProjects.length > 0
-      ? activeProjects.map(p => `
-          <tr>
-            <td><a href="project.html?id=${p.id}" style="color:var(--primary-400);text-decoration:none;">${escapeHtml(p.name)}</a></td>
-            <td class="text-sm">${escapeHtml(p.projectType || "")}</td>
-            <td class="text-sm">${p.endDate ? formatDate(p.endDate) : "—"}</td>
-            <td>
-              <button class="btn btn-sm btn-primary generate-launch-btn" data-project-id="${p.id}" data-project-type="${p.projectType || "신규개발"}" data-change-scale="${p.changeScale || "major"}" data-end-date="${p.endDate ? p.endDate.toISOString() : ""}" style="font-size:11px;padding:4px 10px;">
-                출시 준비 생성
-              </button>
-            </td>
-          </tr>`).join("")
-      : `<tr><td colspan="4" class="text-sm text-soft" style="text-align:center;padding:1.5rem;">등록된 프로젝트가 없습니다. <a href="projects.html" style="color:var(--primary-400);">프로젝트 등록</a>을 먼저 해주세요.</td></tr>`;
-
-    app.innerHTML = `
-      <div class="container animate-fade-in">
-        <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
-          <div>
-            <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">영업 출시 준비 대시보드</h1>
-            <p class="text-sm text-soft mt-1">전체 프로젝트의 영업 관련 출시 체크리스트를 한 눈에 확인</p>
-          </div>
-        </div>
-        <div class="card" style="padding: 2rem;">
-          <h2 class="text-lg font-semibold mb-2" style="color: var(--slate-200)">출시 준비 체크리스트가 없습니다</h2>
-          <p class="text-sm text-soft mb-4">아래 프로젝트 목록에서 출시 준비 체크리스트를 생성할 수 있습니다.</p>
-          <div style="overflow-x:auto;">
-            <table>
-              <thead><tr><th>프로젝트</th><th>유형</th><th>종료일</th><th>작업</th></tr></thead>
-              <tbody>${projectRows}</tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Bind generate buttons
-    app.querySelectorAll(".generate-launch-btn").forEach(btn => {
-      btn.addEventListener("click", async (e) => {
-        const el = e.currentTarget;
-        const pId = el.dataset.projectId;
-        const pType = el.dataset.projectType;
-        const cScale = el.dataset.changeScale;
-        const endDateStr = el.dataset.endDate;
-        const endDate = endDateStr ? new Date(endDateStr) : new Date();
-        el.disabled = true;
-        el.textContent = "생성 중...";
-        try {
-          const custList = customers.map(c => ({ id: c.id, name: c.name }));
-          const count = await applyLaunchChecklistToProject(pId, pType, cScale, endDate, custList);
-          if (count > 0) {
-            showToast("success", `${getProjectName(pId)}: ${count}개 출시 준비 체크리스트 생성 완료`);
-            el.textContent = "완료";
-            el.classList.remove("btn-primary");
-            el.classList.add("btn-secondary");
-          } else {
-            showToast("warning", "생성할 항목이 없습니다.");
-            el.disabled = false;
-            el.textContent = "출시 준비 생성";
-          }
-        } catch (err) {
-          console.error("출시 준비 생성 오류:", err);
-          showToast("error", "생성 실패: " + err.message);
-          el.disabled = false;
-          el.textContent = "출시 준비 생성";
-        }
-      });
-    });
+    renderEmptyState();
     return;
   }
 
   const filtered = getFiltered();
+  const salesItems = showAllCategories ? allItems : allItems.filter(isSalesRelevant);
 
   // Stats
-  const salesItems = showAllCategories ? allItems : allItems.filter(isSalesRelevant);
-  const customerItems = salesItems.filter(i => i.customerId);
-  const uncheckedCount = customerItems.filter(i => !i.checkedBy).length;
   const stats = {
     total: salesItems.length,
-    completed: salesItems.filter((i) => i.status === "completed").length,
-    unchecked: uncheckedCount,
-    overdue: salesItems.filter((i) => {
+    completed: salesItems.filter(i => i.status === "completed").length,
+    overdue: salesItems.filter(i => {
       if (i.status === "completed") return false;
       const d = daysUntil(i.dueDate);
       return d !== null && d < 0;
     }).length,
+    projects: [...new Set(salesItems.map(i => i.projectId))].length,
   };
+  const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
-  const projectIds = [...new Set(allItems.map((i) => i.projectId))];
+  // Assignees + projectIds for filters
+  const projectIds = [...new Set(allItems.map(i => i.projectId))];
+  const assignees = [...new Set(allItems.map(i => i.assignee).filter(Boolean))].sort();
   const categories = showAllCategories
     ? Object.keys(LAUNCH_CATEGORY_LABELS)
     : [...SALES_CORE_CATEGORIES];
 
-  // Assignees for filter
-  const assignees = [...new Set(allItems.map(i => i.assignee).filter(Boolean))].sort();
-
   app.innerHTML = `
     <div class="container animate-fade-in">
-      <!-- 헤더 -->
-      <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight" style="color:var(--slate-100)">영업 출시 준비 대시보드</h1>
-          <p class="text-sm text-soft mt-1">전체 프로젝트의 영업 관련 출시 체크리스트를 한 눈에 확인</p>
+      <!-- Stats bar -->
+      <div class="sales-stats-bar">
+        <div class="sales-stat-item">
+          <div class="sales-stat-value">${stats.projects}</div>
+          <div class="sales-stat-label">출시 제품</div>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;" class="text-sm text-soft">
+        <div class="sales-stat-item">
+          <div class="sales-stat-value">${pct}<span class="sales-stat-unit">%</span></div>
+          <div class="sales-stat-label">전체 준비율</div>
+        </div>
+        <div class="sales-stat-item clickable" data-stat-action="overdue">
+          <div class="sales-stat-value ${stats.overdue > 0 ? 'text-danger' : 'text-success'}">${stats.overdue}</div>
+          <div class="sales-stat-label">지연 항목</div>
+        </div>
+        <div class="sales-stat-item">
+          <div class="sales-stat-value text-success">${stats.completed}<span class="sales-stat-unit">/${stats.total}</span></div>
+          <div class="sales-stat-label">완료</div>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="sales-filter-bar">
+        <input type="text" class="input-field" id="search-input" placeholder="검색..." value="${escapeHtml(searchQuery)}" style="flex:1;min-width:140px;max-width:240px;">
+        <select class="input-field" id="filter-project" style="width:auto;max-width:160px;">
+          <option value="all">전체 프로젝트</option>
+          ${projectIds.map(pid => `<option value="${pid}" ${filterProject === pid ? "selected" : ""}>${escapeHtml(getProjectName(pid))}</option>`).join("")}
+        </select>
+        <select class="input-field" id="filter-status" style="width:auto;">
+          <option value="all">전체 상태</option>
+          <option value="pending" ${filterStatus === "pending" ? "selected" : ""}>대기</option>
+          <option value="in_progress" ${filterStatus === "in_progress" ? "selected" : ""}>진행중</option>
+          <option value="completed" ${filterStatus === "completed" ? "selected" : ""}>완료</option>
+        </select>
+        ${assignees.length > 0 ? `
+          <select class="input-field" id="filter-assignee" style="width:auto;max-width:120px;">
+            <option value="all">전체 담당자</option>
+            ${assignees.map(a => `<option value="${escapeHtml(a)}" ${filterAssignee === a ? "selected" : ""}>${escapeHtml(a)}</option>`).join("")}
+          </select>
+        ` : ""}
+        <label class="sales-toggle-label">
           <input type="checkbox" id="toggle-all-categories" ${showAllCategories ? "checked" : ""}>
-          전체 카테고리 보기
+          <span>전체</span>
         </label>
       </div>
 
-      <!-- 오늘의 브리핑 -->
-      ${renderTodayBriefing()}
-
-      <!-- Stat 카드 -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div class="stat-card card-hover cursor-pointer" data-stat-action="all">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-card-label">전체 항목</div>
-        </div>
-        <div class="stat-card card-hover cursor-pointer" data-stat-action="completed">
-          <div class="stat-value text-success">${stats.completed}</div>
-          <div class="stat-card-label">완료</div>
-        </div>
-        <div class="stat-card card-hover cursor-pointer" data-stat-action="unchecked">
-          <div class="stat-value" style="color:var(--warning)">${stats.unchecked}</div>
-          <div class="stat-card-label">미확인 (거래처)</div>
-        </div>
-        <div class="stat-card card-hover cursor-pointer" data-stat-action="overdue">
-          <div class="stat-value" style="color:var(--danger)">${stats.overdue}</div>
-          <div class="stat-card-label">마감 초과</div>
-        </div>
-      </div>
-
-      <!-- 담당자별 워크로드 -->
-      ${renderWorkloadChart()}
-
-      <!-- 필터 바 -->
-      <div class="card mb-4" style="padding: 0.75rem 1rem;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <input type="text" class="input-field" id="search-input" placeholder="검색 (제목, 코드, 부서, 고객명)" value="${escapeHtml(searchQuery)}" style="flex:1;min-width:180px;">
-          <select class="input-field" id="filter-project" style="width:auto;">
-            <option value="all">전체 프로젝트</option>
-            ${projectIds.map((pid) => `<option value="${pid}" ${filterProject === pid ? "selected" : ""}>${escapeHtml(getProjectName(pid))}</option>`).join("")}
-          </select>
-          <select class="input-field" id="filter-category" style="width:auto;">
-            <option value="all">전체 카테고리</option>
-            ${categories.map((cat) => `<option value="${cat}" ${filterCategory === cat ? "selected" : ""}>${LAUNCH_CATEGORY_LABELS[cat] || cat}</option>`).join("")}
-          </select>
-          <select class="input-field" id="filter-status" style="width:auto;">
-            <option value="all">전체 상태</option>
-            <option value="pending" ${filterStatus === "pending" ? "selected" : ""}>대기</option>
-            <option value="in_progress" ${filterStatus === "in_progress" ? "selected" : ""}>진행중</option>
-            <option value="completed" ${filterStatus === "completed" ? "selected" : ""}>완료</option>
-          </select>
-          ${assignees.length > 0 ? `
-            <select class="input-field" id="filter-assignee" style="width:auto;">
-              <option value="all">전체 담당자</option>
-              ${assignees.map(a => `<option value="${escapeHtml(a)}" ${filterAssignee === a ? "selected" : ""}>${escapeHtml(a)}</option>`).join("")}
-            </select>
-          ` : ""}
-        </div>
-      </div>
-
-      <!-- 거래처 응답 요약 (거래처 뷰일 때) -->
-      ${viewMode === "customer" ? renderCustomerResponseSummary(filtered) : ""}
-
-      <!-- 뷰 스위처 -->
-      <div class="flex items-center justify-between mb-4">
-        <div class="view-switcher">
-          ${VIEW_MODES.map(vm =>
-            `<button class="view-switcher-btn${viewMode === vm.key ? " active" : ""}" data-view="${vm.key}">${vm.label}</button>`
-          ).join("")}
-        </div>
-        <span class="text-sm text-soft">${filtered.length}개 항목</span>
-      </div>
-
-      <!-- 뷰 콘텐츠 -->
+      <!-- View content -->
       <div id="view-content">
         ${renderViewContent(filtered)}
       </div>
 
-      <!-- 확인 모달 -->
-      <div class="modal-overlay hidden" id="confirm-modal">
-        <div class="modal" style="max-width:400px;">
-          <div class="modal-header">
-            <h3 class="modal-title">거래처 확인 처리</h3>
-            <button class="modal-close" id="confirm-modal-close">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-4">
-              <label class="text-sm font-medium" style="color:var(--slate-300)">확인자 이름 *</label>
-              <input type="text" class="input-field" id="confirm-name" placeholder="확인한 담당자 이름" style="margin-top:4px;">
-            </div>
-            <div class="mb-4">
-              <label class="text-sm font-medium" style="color:var(--slate-300)">메모 (선택)</label>
-              <input type="text" class="input-field" id="confirm-note" placeholder="확인 메모" style="margin-top:4px;">
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" id="confirm-cancel">취소</button>
-            <button class="btn btn-primary" id="confirm-submit">확인 처리</button>
-          </div>
-        </div>
-      </div>
-
+      <!-- Confirm modal -->
+      ${renderConfirmModal()}
     </div>
   `;
 
-  // Bulk action bar — render outside transformed container so position:fixed works
-  let bulkBarEl = document.getElementById("bulk-bar-root");
-  if (!bulkBarEl) {
-    bulkBarEl = document.createElement("div");
-    bulkBarEl.id = "bulk-bar-root";
-    document.body.appendChild(bulkBarEl);
-  }
-  bulkBarEl.innerHTML = renderBulkActionBar();
+  bindCommonEvents();
+  bindViewEvents();
+}
 
-  bindEvents();
+function renderConfirmModal() {
+  return `
+    <div class="modal-overlay hidden" id="confirm-modal">
+      <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+          <h3 class="modal-title">거래처 확인 처리</h3>
+          <button class="modal-close" id="confirm-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-4">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">확인자 이름 *</label>
+            <input type="text" class="input-field" id="confirm-name" placeholder="확인한 담당자 이름" style="margin-top:4px;">
+          </div>
+          <div class="mb-4">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">메모 (선택)</label>
+            <input type="text" class="input-field" id="confirm-note" placeholder="확인 메모" style="margin-top:4px;">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="confirm-cancel">취소</button>
+          <button class="btn btn-primary" id="confirm-submit">확인 처리</button>
+        </div>
+      </div>
+    </div>`;
+}
 
-  if (searchQuery) {
-    const input = app.querySelector("#search-input");
-    if (input) {
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-    }
-  }
+function renderEmptyState() {
+  const activeProjects = projects.filter(p => p.status === "active");
+  const projectRows = activeProjects.length > 0
+    ? activeProjects.map(p => `
+        <tr>
+          <td><a href="project.html?id=${p.id}" style="color:var(--primary-400);text-decoration:none;">${escapeHtml(p.name)}</a></td>
+          <td class="text-sm">${escapeHtml(p.projectType || "")}</td>
+          <td class="text-sm">${p.endDate ? formatDate(p.endDate) : "—"}</td>
+          <td>
+            <button class="btn btn-sm btn-primary generate-launch-btn" data-project-id="${p.id}" data-project-type="${p.projectType || "신규개발"}" data-end-date="${p.endDate ? p.endDate.toISOString() : ""}">
+              출시 준비 생성
+            </button>
+          </td>
+        </tr>`).join("")
+    : `<tr><td colspan="4" class="text-sm text-soft" style="text-align:center;padding:1.5rem;">등록된 프로젝트가 없습니다. <a href="projects.html" style="color:var(--primary-400);">프로젝트 등록</a>을 먼저 해주세요.</td></tr>`;
+
+  app.innerHTML = `
+    <div class="container animate-fade-in">
+      <div class="card" style="padding: 2rem;">
+        <h2 class="text-lg font-semibold mb-2" style="color: var(--slate-200)">출시 준비 체크리스트가 없습니다</h2>
+        <p class="text-sm text-soft mb-4">아래 프로젝트에서 출시 준비 체크리스트를 생성하세요.</p>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>프로젝트</th><th>유형</th><th>종료일</th><th>작업</th></tr></thead>
+            <tbody>${projectRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  app.querySelectorAll(".generate-launch-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const el = e.currentTarget;
+      const pId = el.dataset.projectId;
+      const pType = el.dataset.projectType;
+      const endDateStr = el.dataset.endDate;
+      const endDate = endDateStr ? new Date(endDateStr) : new Date();
+      el.disabled = true;
+      el.textContent = "생성 중...";
+      try {
+        const custList = customers.map(c => ({ id: c.id, name: c.name }));
+        const count = await applyLaunchChecklistToProject(pId, pType, endDate, custList);
+        if (count > 0) {
+          showToast("success", `${getProjectName(pId)}: ${count}개 출시 준비 체크리스트 생성 완료`);
+          el.textContent = "완료";
+          el.classList.replace("btn-primary", "btn-secondary");
+        } else {
+          showToast("warning", "생성할 항목이 없습니다.");
+          el.disabled = false;
+          el.textContent = "출시 준비 생성";
+        }
+      } catch (err) {
+        console.error("출시 준비 생성 오류:", err);
+        showToast("error", "생성 실패: " + err.message);
+        el.disabled = false;
+        el.textContent = "출시 준비 생성";
+      }
+    });
+  });
 }
 
 // =============================================================================
@@ -888,49 +496,29 @@ function render() {
 
 function renderViewContent(filtered) {
   switch (viewMode) {
-    case "product":   return renderProductCards(filtered);
-    case "matrix":    return renderCategoryMatrix(filtered);
+    case "command":   return renderCommandCenter(filtered);
+    case "execute":   return renderExecuteBoard(filtered);
     case "timeline":  return renderTimelineView(filtered);
     case "customer":  return renderCustomerBoard(filtered);
-    case "table":     return renderTableView(filtered);
     case "readiness": return renderReadinessView(filtered);
-    default:          return renderProductCards(filtered);
+    default:          return renderCommandCenter(filtered);
   }
 }
 
 // =============================================================================
-// View 1: 제품별 카드뷰 (신호등 + D-Day)
+// View 1: Command Center — product pipeline overview
 // =============================================================================
 
-// Traffic light status for a category group
-function getCategorySignal(items, category) {
-  const catItems = items.filter(i => i.category === category);
-  if (catItems.length === 0) return null;
-  const done = catItems.filter(i => i.status === "completed").length;
-  const hasOverdue = catItems.some(i => {
-    if (i.status === "completed") return false;
-    const d = daysUntil(i.dueDate);
-    return d !== null && d < 0;
-  });
-  const pct = Math.round((done / catItems.length) * 100);
-  if (hasOverdue) return { color: "var(--danger)", label: "지연", pct, done, total: catItems.length };
-  if (pct >= 80) return { color: "var(--success)", label: "양호", pct, done, total: catItems.length };
-  if (pct >= 40) return { color: "var(--warning)", label: "진행", pct, done, total: catItems.length };
-  return { color: "var(--danger)", label: "미시작", pct, done, total: catItems.length };
-}
-
-function renderProductCards(filtered) {
+function renderCommandCenter(filtered) {
+  // Group by project
   const grouped = {};
   for (const item of filtered) {
     if (!grouped[item.projectId]) grouped[item.projectId] = [];
     grouped[item.projectId].push(item);
   }
 
-  // Sort: overdue first, then by D-Day (soonest first)
+  // Sort by D-Day urgency
   const sortedGroups = Object.entries(grouped).sort((a, b) => {
-    const overdueA = a[1].filter(i => i.status !== "completed" && i.dueDate && daysUntil(i.dueDate) !== null && daysUntil(i.dueDate) < 0).length;
-    const overdueB = b[1].filter(i => i.status !== "completed" && i.dueDate && daysUntil(i.dueDate) !== null && daysUntil(i.dueDate) < 0).length;
-    if (overdueB !== overdueA) return overdueB - overdueA;
     const projA = projects.find(p => p.id === a[0]);
     const projB = projects.find(p => p.id === b[0]);
     const dA = projA?.endDate ? daysUntil(projA.endDate) ?? 9999 : 9999;
@@ -940,312 +528,218 @@ function renderProductCards(filtered) {
 
   if (sortedGroups.length === 0) return renderEmpty();
 
-  let html = `<div class="grid grid-cols-1 gap-4" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr));">`;
+  let html = `<div class="sales-command-grid">`;
 
   for (const [projectId, items] of sortedGroups) {
     const proj = projects.find(p => p.id === projectId);
-    const pName = getProjectName(projectId);
-
-    // All items stats
-    const completedCount = items.filter(i => i.status === "completed").length;
+    const pipeline = getProjectPipelineStats(items);
+    const totalCompleted = items.filter(i => i.status === "completed").length;
     const totalCount = items.length;
-    const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const pct = totalCount > 0 ? Math.round((totalCompleted / totalCount) * 100) : 0;
     const overdueCount = items.filter(i => {
       if (i.status === "completed") return false;
       const d = daysUntil(i.dueDate);
       return d !== null && d < 0;
     }).length;
-    const custItems = items.filter(i => i.customerId);
-    const unchecked = custItems.filter(i => !i.checkedBy).length;
-    const isExpanded = expandedProducts.has(projectId);
 
-    // D-Day from project.endDate
+    // D-Day
     const projectDDay = proj?.endDate ? daysUntil(proj.endDate) : null;
     let dDayText = "—";
     let dDayColor = "var(--slate-400)";
+    let dDayClass = "";
     if (projectDDay !== null) {
-      if (projectDDay < 0) {
-        dDayText = `D+${Math.abs(projectDDay)}`;
-        dDayColor = "var(--danger)";
-      } else if (projectDDay === 0) {
-        dDayText = "D-Day";
-        dDayColor = "var(--danger)";
-      } else if (projectDDay <= 14) {
-        dDayText = `D-${projectDDay}`;
-        dDayColor = "var(--warning)";
-      } else {
-        dDayText = `D-${projectDDay}`;
-        dDayColor = "var(--success)";
-      }
+      if (projectDDay < 0) { dDayText = `D+${Math.abs(projectDDay)}`; dDayColor = "var(--danger)"; dDayClass = "danger"; }
+      else if (projectDDay === 0) { dDayText = "D-Day"; dDayColor = "var(--danger)"; dDayClass = "danger"; }
+      else if (projectDDay <= 14) { dDayText = `D-${projectDDay}`; dDayColor = "var(--warning)"; dDayClass = "warning"; }
+      else { dDayText = `D-${projectDDay}`; dDayColor = "var(--success)"; dDayClass = "success"; }
     }
 
-    // Card left border color
-    let borderColor = "var(--surface-3)";
-    if (overdueCount > 0) borderColor = "var(--danger)";
-    else if (pct >= 80) borderColor = "var(--success)";
-    else if (projectDDay !== null && projectDDay <= 14) borderColor = "var(--warning)";
+    // Bottleneck: find most delayed stage
+    const bottleneck = pipeline.filter(s => s.total > 0 && s.status !== "completed").sort((a, b) => a.pct - b.pct)[0];
+    const bottleneckItems = bottleneck ? items.filter(i => bottleneck.categories.includes(i.category) && i.status !== "completed") : [];
+    const bottleneckText = bottleneck && bottleneck.pct < 100
+      ? bottleneckItems.slice(0, 2).map(i => i.title).join(", ")
+      : "";
 
-    // Traffic light signals for SALES_CORE_CATEGORIES
-    const signals = SALES_CORE_CATEGORIES.map(cat => {
-      const sig = getCategorySignal(items, cat);
-      const label = LAUNCH_CATEGORY_LABELS[cat] || cat;
-      return { cat, label, sig };
-    });
-
-    // Non-core items for expanded detail
-    const catMap = {};
-    for (const item of items) {
-      if (!catMap[item.category]) catMap[item.category] = { total: 0, done: 0 };
-      catMap[item.category].total++;
-      if (item.status === "completed") catMap[item.category].done++;
-    }
-    const catEntries = Object.entries(catMap).sort((a, b) => {
-      const pctA = a[1].total > 0 ? a[1].done / a[1].total : 1;
-      const pctB = b[1].total > 0 ? b[1].done / b[1].total : 1;
-      return pctA - pctB;
-    });
+    const isExpanded = expandedProducts.has(projectId);
 
     html += `
-      <div class="card card-hover cursor-pointer" data-product-card="${projectId}"
-        style="padding:0;overflow:hidden;border-left:4px solid ${borderColor};${isExpanded ? 'outline:2px solid var(--primary);' : ''}">
-
-        <!-- Card Header -->
-        <div style="padding:1rem 1.25rem 0.75rem;">
-          <!-- Top row: project name + D-Day -->
-          <div class="flex items-start justify-between gap-2 mb-1">
-            <div style="min-width:0;">
-              <a href="project.html?id=${projectId}" class="project-link"
-                style="color:var(--slate-100);font-size:1rem;font-weight:700;text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                title="프로젝트 상세 보기" onclick="event.stopPropagation();">${escapeHtml(pName)}</a>
-              <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                ${proj?.currentStage ? `<span class="badge badge-neutral" style="font-size:10px;">${escapeHtml(proj.currentStage)}</span>` : ""}
-                ${proj?.endDate ? `<span class="text-xs text-soft">${formatDate(proj.endDate)}</span>` : ""}
-              </div>
-            </div>
-            <!-- D-Day badge -->
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:1.5rem;font-weight:800;line-height:1;color:${dDayColor};font-family:monospace;">${dDayText}</div>
-              <div class="text-xs text-soft" style="margin-top:2px;">출시일</div>
+      <div class="sales-command-card${isExpanded ? " expanded" : ""}" data-product-card="${projectId}">
+        <!-- Header: Name + D-Day -->
+        <div class="sales-command-header">
+          <div class="sales-command-title-area">
+            <a href="project.html?id=${projectId}" class="sales-command-title" onclick="event.stopPropagation();">${escapeHtml(getProjectName(projectId))}</a>
+            <div class="sales-command-meta">
+              ${proj?.currentStage ? `<span class="badge badge-neutral" style="font-size:10px;">${escapeHtml(proj.currentStage)}</span>` : ""}
+              ${proj?.endDate ? `<span class="text-xs text-soft">${formatDate(proj.endDate)}</span>` : ""}
             </div>
           </div>
-
-          <!-- Overall progress bar -->
-          <div style="margin:0.5rem 0 0.75rem;">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs text-soft">전체 진행률</span>
-              <span class="text-xs font-mono" style="color:${pct >= 80 ? 'var(--success)' : pct >= 40 ? 'var(--primary-400)' : 'var(--warning)'};">${pct}% (${completedCount}/${totalCount})</span>
-            </div>
-            <div class="progress-bar" style="height:5px;">
-              <div class="progress-fill" style="width:${pct}%;${pct >= 80 ? 'background:var(--success)' : pct >= 40 ? '' : 'background:var(--warning)'}"></div>
-            </div>
-          </div>
-
-          <!-- Traffic lights: SALES_CORE_CATEGORIES -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:0.75rem;">
-            ${signals.map(({ cat, label, sig }) => {
-              if (!sig) {
-                return `
-                  <div style="background:var(--surface-2);border-radius:8px;padding:8px 6px;text-align:center;opacity:0.4;">
-                    <div style="width:10px;height:10px;border-radius:50%;background:var(--slate-600);margin:0 auto 4px;"></div>
-                    <div class="text-xs text-soft" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(label)}</div>
-                    <div class="text-xs text-soft" style="font-size:9px;">—</div>
-                  </div>`;
-              }
-              return `
-                <div style="background:var(--surface-2);border-radius:8px;padding:8px 6px;text-align:center;border:1px solid ${sig.color}22;">
-                  <div style="width:10px;height:10px;border-radius:50%;background:${sig.color};margin:0 auto 4px;box-shadow:0 0 6px ${sig.color}66;"></div>
-                  <div class="text-xs font-medium" style="font-size:10px;color:var(--slate-300);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(label)}">${escapeHtml(label.length > 6 ? label.slice(0,6)+'…' : label)}</div>
-                  <div class="text-xs" style="font-size:9px;color:${sig.color};">${sig.done}/${sig.total} · ${sig.pct}%</div>
-                </div>`;
-            }).join("")}
-          </div>
-
-          <!-- Warning badges -->
-          <div class="flex items-center gap-2 flex-wrap" style="min-height:18px;">
-            ${overdueCount > 0 ? `<span class="badge badge-danger" style="font-size:10px;">${overdueCount}건 지연</span>` : ""}
-            ${unchecked > 0 ? `<span class="badge badge-warning" style="font-size:10px;">${unchecked}건 미확인</span>` : ""}
-            ${overdueCount === 0 && unchecked === 0 && pct >= 80 ? `<span class="badge badge-success" style="font-size:10px;">✓ 준비 완료</span>` : ""}
-          </div>
-
-          <div class="text-xs text-soft text-center" style="margin-top:0.625rem;">
-            ${isExpanded ? "▲ 접기" : "▼ 전체 항목 보기"}
+          <div class="sales-command-dday ${dDayClass}">
+            <div class="sales-command-dday-value">${dDayText}</div>
+            <div class="sales-command-dday-label">출시일</div>
           </div>
         </div>
 
-        ${isExpanded ? renderProductDetail(projectId, items, catEntries) : ""}
-      </div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function renderProductDetail(projectId, items, catEntries) {
-  let html = `<div style="border-top:1px solid var(--border);">`;
-  for (const [cat, data] of catEntries) {
-    const catItems = items.filter(i => i.category === cat);
-    html += `
-      <div style="padding:0.5rem 1rem;background:var(--surface-2);border-bottom:1px solid var(--surface-3);">
-        <div class="flex items-center justify-between">
-          ${getCategoryBadge(cat)}
-          <span class="text-xs text-soft">${data.done}/${data.total}</span>
+        <!-- Progress bar -->
+        <div class="sales-command-progress">
+          <div class="sales-command-progress-bar">
+            <div class="sales-command-progress-fill" style="width:${pct}%;"></div>
+          </div>
+          <span class="sales-command-progress-text">${pct}%</span>
         </div>
-      </div>
-      ${renderItemTable(catItems, { showProject: false, showCategory: false })}`;
-  }
-  html += `</div>`;
-  return html;
-}
 
-// =============================================================================
-// View 2: 카테고리 매트릭스
-// =============================================================================
-
-function renderCategoryMatrix(filtered) {
-  const cats = showAllCategories
-    ? Object.keys(LAUNCH_CATEGORY_LABELS)
-    : [...new Set(filtered.map(i => i.category))];
-
-  const matrix = {};
-  for (const cat of cats) {
-    matrix[cat] = { total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 };
-  }
-  for (const item of filtered) {
-    if (!matrix[item.category]) {
-      matrix[item.category] = { total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 };
-    }
-    matrix[item.category].total++;
-    matrix[item.category][item.status]++;
-    if (item.status !== "completed" && item.dueDate && daysUntil(item.dueDate) !== null && daysUntil(item.dueDate) < 0) {
-      matrix[item.category].overdue++;
-    }
-  }
-
-  const sortedCats = Object.entries(matrix)
-    .filter(([, d]) => d.total > 0)
-    .sort((a, b) => {
-      const pctA = a[1].total > 0 ? a[1].completed / a[1].total : 1;
-      const pctB = b[1].total > 0 ? b[1].completed / b[1].total : 1;
-      return pctA - pctB;
-    });
-
-  if (sortedCats.length === 0) return renderEmpty();
-
-  const totals = { total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 };
-  for (const [, d] of sortedCats) {
-    totals.total += d.total;
-    totals.pending += d.pending;
-    totals.in_progress += d.in_progress;
-    totals.completed += d.completed;
-    totals.overdue += d.overdue;
-  }
-  const totalPct = totals.total > 0 ? Math.round((totals.completed / totals.total) * 100) : 0;
-
-  let html = `
-    <div class="table-wrapper mb-6">
-      <table>
-        <thead>
-          <tr>
-            <th>카테고리</th>
-            <th style="text-align:center;">전체</th>
-            <th style="text-align:center;">대기</th>
-            <th style="text-align:center;">진행중</th>
-            <th style="text-align:center;">완료</th>
-            <th style="text-align:center;">지연</th>
-            <th>진행률</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sortedCats.map(([cat, d]) => {
-            const pct = d.total > 0 ? Math.round((d.completed / d.total) * 100) : 0;
-            const isSalesCore = SALES_CORE_CATEGORIES.includes(cat);
-            const rowBg = d.overdue > 0 ? 'background:rgba(239,68,68,0.04);' : '';
+        <!-- 5-Stage Pipeline -->
+        <div class="sales-pipeline">
+          ${pipeline.map((stage, i) => {
+            let stageClass = "pending";
+            if (stage.status === "completed") stageClass = "completed";
+            else if (stage.status === "in_progress") stageClass = "in_progress";
+            if (stage.overdue > 0) stageClass = "overdue";
             return `
-              <tr class="cursor-pointer" data-matrix-category="${cat}" style="${rowBg}" title="클릭하여 상세 보기">
-                <td>
-                  ${getCategoryBadge(cat)}
-                  ${isSalesCore ? ' <span style="color:var(--warning);font-size:11px;">★</span>' : ""}
-                </td>
-                <td style="text-align:center;" class="font-mono">${d.total}</td>
-                <td style="text-align:center;">${d.pending > 0 ? `<span class="badge badge-neutral">${d.pending}</span>` : '<span class="text-soft">0</span>'}</td>
-                <td style="text-align:center;">${d.in_progress > 0 ? `<span class="badge badge-warning">${d.in_progress}</span>` : '<span class="text-soft">0</span>'}</td>
-                <td style="text-align:center;">${d.completed > 0 ? `<span class="badge badge-success">${d.completed}</span>` : '<span class="text-soft">0</span>'}</td>
-                <td style="text-align:center;">${d.overdue > 0 ? `<span class="badge badge-danger">${d.overdue}</span>` : '<span class="text-soft">0</span>'}</td>
-                <td>
-                  <div class="flex items-center gap-2">
-                    <div class="progress-bar" style="width:100px;">
-                      <div class="progress-fill" style="width:${pct}%;${pct >= 100 ? 'background:var(--success)' : ''}"></div>
-                    </div>
-                    <span class="text-xs font-mono">${pct}%</span>
-                  </div>
-                </td>
-              </tr>`;
-          }).join("")}
-        </tbody>
-        <tfoot>
-          <tr style="font-weight:600;background:var(--surface-2);">
-            <td>합계</td>
-            <td style="text-align:center;" class="font-mono">${totals.total}</td>
-            <td style="text-align:center;">${totals.pending}</td>
-            <td style="text-align:center;">${totals.in_progress}</td>
-            <td style="text-align:center;">${totals.completed}</td>
-            <td style="text-align:center;">${totals.overdue}</td>
-            <td>
-              <div class="flex items-center gap-2">
-                <div class="progress-bar" style="width:100px;">
-                  <div class="progress-fill" style="width:${totalPct}%"></div>
-                </div>
-                <span class="text-xs font-mono">${totalPct}%</span>
+              <div class="sales-pipeline-stage ${stageClass}" title="${stage.label}: ${stage.completed}/${stage.total}">
+                <div class="sales-pipeline-dot">${stage.status === "completed" ? "✓" : stage.icon}</div>
+                <div class="sales-pipeline-label">${stage.label}</div>
+                ${stage.total > 0 ? `<div class="sales-pipeline-count">${stage.completed}/${stage.total}</div>` : ""}
               </div>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>`;
+              ${i < pipeline.length - 1 ? '<div class="sales-pipeline-connector"></div>' : ""}
+            `;
+          }).join("")}
+        </div>
 
-  const projectIds = [...new Set(filtered.map(i => i.projectId))];
-  if (projectIds.length > 1) {
-    html += `
-      <h3 class="text-sm font-medium mb-3" style="color:var(--slate-300);">프로젝트별 카테고리 분포</h3>
-      <div class="table-wrapper">
-        <table style="font-size:0.8rem;">
-          <thead>
-            <tr>
-              <th>프로젝트</th>
-              ${sortedCats.map(([cat]) => {
-                const label = LAUNCH_CATEGORY_LABELS[cat] || cat;
-                const shortLabel = label.length > 6 ? label.slice(0, 6) + "…" : label;
-                return `<th style="text-align:center;font-size:11px;" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</th>`;
-              }).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${projectIds.map(pid => {
-              const pItems = filtered.filter(i => i.projectId === pid);
-              return `
-                <tr>
-                  <td class="text-xs">${escapeHtml(getProjectName(pid))}</td>
-                  ${sortedCats.map(([cat]) => {
-                    const catItems = pItems.filter(i => i.category === cat);
-                    const done = catItems.filter(i => i.status === "completed").length;
-                    const total = catItems.length;
-                    if (total === 0) return `<td style="text-align:center;"><span class="text-soft">—</span></td>`;
-                    const cellPct = Math.round((done / total) * 100);
-                    const color = cellPct >= 100 ? 'color:var(--success)' : cellPct >= 50 ? 'color:var(--primary-400)' : cellPct > 0 ? 'color:var(--warning)' : 'color:var(--slate-300)';
-                    return `<td style="text-align:center;${color};font-weight:500;">${done}/${total}</td>`;
-                  }).join("")}
-                </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+        <!-- Bottleneck / Status -->
+        <div class="sales-command-status">
+          ${overdueCount > 0 ? `<span class="badge badge-danger" style="font-size:10px;">${overdueCount}건 지연</span>` : ""}
+          ${bottleneckText ? `<span class="text-xs text-soft" style="display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">병목: ${escapeHtml(bottleneckText)}</span>` : ""}
+          ${overdueCount === 0 && pct >= 80 ? `<span class="badge badge-success" style="font-size:10px;">준비 완료</span>` : ""}
+        </div>
+
+        <!-- Expand hint -->
+        <div class="sales-command-expand">${isExpanded ? "▲ 접기" : "▼ 상세 보기"}</div>
+
+        <!-- Expanded detail -->
+        ${isExpanded ? renderCommandDetail(projectId, items, pipeline) : ""}
       </div>`;
   }
 
+  html += `</div>`;
+  return html;
+}
+
+function renderCommandDetail(projectId, items, pipeline) {
+  let html = `<div class="sales-command-detail">`;
+  for (const stage of pipeline) {
+    if (stage.total === 0) continue;
+    const stageItems = items.filter(i => stage.categories.includes(i.category));
+    html += `
+      <div class="sales-detail-stage">
+        <div class="sales-detail-stage-header">
+          <span>${stage.icon} ${stage.label}</span>
+          <span class="text-xs text-soft">${stage.completed}/${stage.total}</span>
+        </div>
+        <div class="sales-detail-items">
+          ${stageItems.map(item => `
+            <div class="sales-detail-item ${item.status}">
+              <span class="sales-detail-item-status">${item.status === "completed" ? "✓" : item.status === "in_progress" ? "▶" : "○"}</span>
+              <span class="sales-detail-item-title">${escapeHtml(item.title)}</span>
+              <span class="sales-detail-item-assignee">${escapeHtml(item.assignee || item.department || "")}</span>
+              ${getActionButtons(item)}
+            </div>
+          `).join("")}
+        </div>
+      </div>`;
+  }
+  html += `</div>`;
   return html;
 }
 
 // =============================================================================
-// View 3: D-Day 타임라인
+// View 2: Execute Board — kanban by execution stage
+// =============================================================================
+
+function renderExecuteBoard(filtered) {
+  if (filtered.length === 0) return renderEmpty();
+
+  let html = `<div class="sales-kanban">`;
+
+  for (const stage of EXEC_STAGES) {
+    const stageItems = filtered.filter(i => stage.categories.includes(i.category));
+    const completed = stageItems.filter(i => i.status === "completed").length;
+    const total = stageItems.length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const overdue = stageItems.filter(i => {
+      if (i.status === "completed") return false;
+      const d = daysUntil(i.dueDate);
+      return d !== null && d < 0;
+    }).length;
+    const isOpen = expandedExecStages.has(stage.key);
+
+    // Sort: overdue first, then in_progress, then pending, completed last
+    const sorted = [...stageItems].sort((a, b) => {
+      const order = { overdue: 0, in_progress: 1, pending: 2, completed: 3 };
+      const aKey = (a.status !== "completed" && a.dueDate && daysUntil(a.dueDate) !== null && daysUntil(a.dueDate) < 0) ? "overdue" : a.status;
+      const bKey = (b.status !== "completed" && b.dueDate && daysUntil(b.dueDate) !== null && daysUntil(b.dueDate) < 0) ? "overdue" : b.status;
+      return (order[aKey] ?? 2) - (order[bKey] ?? 2);
+    });
+
+    // Stage column status color
+    let stageColor = "var(--slate-400)";
+    if (total > 0 && completed === total) stageColor = "var(--success)";
+    else if (overdue > 0) stageColor = "var(--danger)";
+    else if (completed > 0 || stageItems.some(i => i.status === "in_progress")) stageColor = "var(--warning)";
+
+    html += `
+      <div class="sales-kanban-column">
+        <div class="sales-kanban-header" data-toggle-exec="${stage.key}" style="border-top:3px solid ${stageColor};">
+          <div class="sales-kanban-header-top">
+            <span class="sales-kanban-icon">${stage.icon}</span>
+            <strong class="sales-kanban-title">${stage.label}</strong>
+            ${overdue > 0 ? `<span class="badge badge-danger" style="font-size:10px;">${overdue}</span>` : ""}
+          </div>
+          <div class="sales-kanban-header-stats">
+            <div class="progress-bar" style="height:4px;flex:1;">
+              <div class="progress-fill" style="width:${pct}%;${pct >= 100 ? "background:var(--success);" : ""}"></div>
+            </div>
+            <span class="text-xs font-mono" style="color:${stageColor};">${completed}/${total}</span>
+          </div>
+        </div>
+
+        <div class="sales-kanban-items${isOpen ? "" : " collapsed"}">
+          ${sorted.map(item => {
+            const isOverdue = item.status !== "completed" && item.dueDate && daysUntil(item.dueDate) !== null && daysUntil(item.dueDate) < 0;
+            const days = daysUntil(item.dueDate);
+            let dLabel = "";
+            if (days !== null && days !== undefined) {
+              if (days < 0) dLabel = `D+${Math.abs(days)}`;
+              else if (days === 0) dLabel = "D-Day";
+              else dLabel = `D-${days}`;
+            }
+            return `
+              <div class="sales-kanban-card ${item.status}${isOverdue ? " overdue" : ""}" data-navigate-project="${item.projectId}">
+                <div class="sales-kanban-card-top">
+                  <span class="sales-kanban-card-title">${escapeHtml(item.title)}</span>
+                  ${dLabel ? `<span class="sales-kanban-card-dday${isOverdue ? " danger" : ""}">${dLabel}</span>` : ""}
+                </div>
+                <div class="sales-kanban-card-bottom">
+                  <span class="sales-kanban-card-project">${escapeHtml(getProjectName(item.projectId))}</span>
+                  <span class="sales-kanban-card-assignee">${escapeHtml(item.assignee || item.department || "")}</span>
+                </div>
+                <div class="sales-kanban-card-actions">
+                  ${getCategoryBadge(item.category)}
+                  ${getActionButtons(item)}
+                </div>
+              </div>`;
+          }).join("")}
+          ${total === 0 ? `<div class="sales-kanban-empty">항목 없음</div>` : ""}
+        </div>
+      </div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// =============================================================================
+// View 3: D-Day Timeline
 // =============================================================================
 
 function renderTimelineView(filtered) {
@@ -1272,9 +766,9 @@ function renderTimelineView(filtered) {
 
   const sections = [
     { key: "overdue", label: "마감 초과", icon: "🚨", items: buckets.overdue, color: "var(--danger)", bg: "rgba(239,68,68,0.06)", alwaysOpen: true },
-    { key: "thisWeek", label: "이번 주 (D-7 ~ D0)", icon: "⚠️", items: buckets.thisWeek, color: "var(--warning)", bg: "rgba(245,158,11,0.06)", alwaysOpen: true },
-    { key: "nextWeek", label: "다음 주 (D1 ~ D7)", icon: "📅", items: buckets.nextWeek, color: "var(--primary-400)", bg: "rgba(6,182,212,0.06)", alwaysOpen: true },
-    { key: "upcoming", label: "이후 (D8 ~ D30)", icon: "📋", items: buckets.upcoming, color: "var(--slate-400)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
+    { key: "thisWeek", label: "이번 주", icon: "⚠️", items: buckets.thisWeek, color: "var(--warning)", bg: "rgba(245,158,11,0.06)", alwaysOpen: true },
+    { key: "nextWeek", label: "다음 주", icon: "📅", items: buckets.nextWeek, color: "var(--primary-400)", bg: "rgba(6,182,212,0.06)", alwaysOpen: true },
+    { key: "upcoming", label: "이후 (D8~D30)", icon: "📋", items: buckets.upcoming, color: "var(--slate-400)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
     { key: "later", label: "장기 (D31+)", icon: "📦", items: buckets.later, color: "var(--slate-300)", bg: "transparent", alwaysOpen: false, toggleKey: "later" },
   ];
 
@@ -1295,21 +789,21 @@ function renderTimelineView(filtered) {
           </div>
           ${isCollapsible ? `<span style="font-size:12px;transition:transform 0.2s;transform:rotate(${isOpen ? '90' : '0'}deg);">&#9654;</span>` : ""}
         </div>
-        ${isOpen ? renderItemTable(sec.items, { showProject: true, showCategory: true, showCustomer: false, showChecked: false }) : ""}
+        ${isOpen ? renderTimelineItems(sec.items) : ""}
       </div>`;
   }
 
   if (buckets.noDueDate.length > 0) {
     html += `
       <div class="card" style="border-left:4px solid var(--slate-400);padding:0;overflow:hidden;">
-        <div style="padding:0.75rem 1rem;background:transparent;border-bottom:1px solid var(--border);">
+        <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
           <div class="flex items-center gap-2">
             <span>❓</span>
             <strong style="color:var(--slate-300)">마감일 미설정</strong>
             <span class="badge badge-neutral" style="font-size:11px;">${buckets.noDueDate.length}건</span>
           </div>
         </div>
-        ${renderItemTable(buckets.noDueDate, { showProject: true, showCategory: true, showCustomer: false, showChecked: false })}
+        ${renderTimelineItems(buckets.noDueDate)}
       </div>`;
   }
 
@@ -1324,8 +818,7 @@ function renderTimelineView(filtered) {
           </div>
           <span style="font-size:12px;transition:transform 0.2s;transform:rotate(${timelineShowCompleted ? '90' : '0'}deg);">&#9654;</span>
         </div>
-        ${timelineShowCompleted ? renderItemTable(completed.slice(0, 50), { showProject: true, showCategory: true, showCustomer: false, showChecked: false }) : ""}
-        ${timelineShowCompleted && completed.length > 50 ? `<div class="text-xs text-soft text-center" style="padding:0.5rem;">외 ${completed.length - 50}건</div>` : ""}
+        ${timelineShowCompleted ? renderTimelineItems(completed.slice(0, 30)) : ""}
       </div>`;
   }
 
@@ -1333,8 +826,34 @@ function renderTimelineView(filtered) {
   return html;
 }
 
+function renderTimelineItems(items) {
+  return `
+    <div class="sales-timeline-list">
+      ${items.map(item => {
+        const isOverdue = item.status !== "completed" && item.dueDate && daysUntil(item.dueDate) !== null && daysUntil(item.dueDate) < 0;
+        const stage = getExecStageForCategory(item.category);
+        return `
+          <div class="sales-timeline-item ${item.status}${isOverdue ? " overdue" : ""}" data-navigate-project="${item.projectId}">
+            <div class="sales-timeline-item-left">
+              <span class="sales-timeline-item-icon">${stage.icon}</span>
+              <div>
+                <div class="sales-timeline-item-title">${escapeHtml(item.title)}</div>
+                <div class="sales-timeline-item-meta">
+                  ${escapeHtml(getProjectName(item.projectId))} · ${escapeHtml(item.assignee || item.department || "")}
+                </div>
+              </div>
+            </div>
+            <div class="sales-timeline-item-right">
+              ${getDueDateDisplay(item)}
+              ${getActionButtons(item)}
+            </div>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
 // =============================================================================
-// View 4: 거래처 확인현황 보드
+// View 4: Customer Board
 // =============================================================================
 
 function renderCustomerBoard(filtered) {
@@ -1344,9 +863,7 @@ function renderCustomerBoard(filtered) {
   const byCustomer = {};
   for (const item of customerItems) {
     const key = item.customerId;
-    if (!byCustomer[key]) {
-      byCustomer[key] = { customerId: item.customerId, customerName: item.customerName || "알 수 없음", items: [] };
-    }
+    if (!byCustomer[key]) byCustomer[key] = { customerId: item.customerId, customerName: item.customerName || "알 수 없음", items: [] };
     byCustomer[key].items.push(item);
   }
 
@@ -1356,47 +873,38 @@ function renderCustomerBoard(filtered) {
     return uncB - uncA;
   });
 
-  const totalChecked = customerItems.filter(i => i.checkedBy).length;
-  const totalUnchecked = customerItems.filter(i => !i.checkedBy).length;
-
   if (customerList.length === 0) {
     return `
       <div class="card" style="padding:3rem;text-align:center;">
         <p class="text-soft">거래처별 항목이 없습니다</p>
-        ${nonCustomerCount > 0 ? `<p class="text-xs text-soft" style="margin-top:8px;">일반 항목 ${nonCustomerCount}건은 테이블 뷰에서 확인하세요</p>` : ""}
+        ${nonCustomerCount > 0 ? `<p class="text-xs text-soft" style="margin-top:8px;">일반 항목 ${nonCustomerCount}건은 실행보드에서 확인하세요</p>` : ""}
       </div>`;
   }
+
+  const totalChecked = customerItems.filter(i => i.checkedBy).length;
+  const totalUnchecked = customerItems.filter(i => !i.checkedBy).length;
 
   let html = `
     <div class="card mb-4" style="padding:1rem 1.25rem;">
       <div class="flex items-center justify-between flex-wrap gap-4">
         <div>
           <strong style="color:var(--slate-100)">거래처별 확인 현황</strong>
-          <span class="text-sm text-soft" style="margin-left:8px;">${customerList.length}개 거래처 · ${customerItems.length}개 항목</span>
+          <span class="text-sm text-soft" style="margin-left:8px;">${customerList.length}개 거래처</span>
         </div>
         <div class="flex items-center gap-3">
-          <span class="badge badge-success">확인 완료 ${totalChecked}</span>
+          <span class="badge badge-success">확인 ${totalChecked}</span>
           <span class="badge badge-warning">미확인 ${totalUnchecked}</span>
         </div>
       </div>
     </div>
-    <div class="grid grid-cols-1 gap-4" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">`;
+    <div class="sales-customer-grid">`;
 
   for (const cust of customerList) {
-    const checkedCount = cust.items.filter(i => i.checkedBy).length;
-    const uncheckedCount = cust.items.filter(i => !i.checkedBy).length;
-    const completedCount = cust.items.filter(i => i.status === "completed").length;
-    const inProgressCount = cust.items.filter(i => i.status === "in_progress").length;
-    const pendingCount = cust.items.filter(i => i.status === "pending").length;
-    const overdueCount = cust.items.filter(i => {
-      if (i.status === "completed") return false;
-      const d = daysUntil(i.dueDate);
-      return d !== null && d < 0;
-    }).length;
-    const confirmedPct = cust.items.length > 0 ? Math.round((checkedCount / cust.items.length) * 100) : 0;
+    const checked = cust.items.filter(i => i.checkedBy).length;
+    const unchecked = cust.items.filter(i => !i.checkedBy).length;
+    const pct = cust.items.length > 0 ? Math.round((checked / cust.items.length) * 100) : 0;
     const isExpanded = expandedCustomers.has(cust.customerId);
 
-    // Last response time
     const lastChecked = cust.items.filter(i => i.checkedAt).sort((a, b) => {
       const ta = a.checkedAt instanceof Date ? a.checkedAt : new Date(a.checkedAt);
       const tb = b.checkedAt instanceof Date ? b.checkedAt : new Date(b.checkedAt);
@@ -1405,318 +913,170 @@ function renderCustomerBoard(filtered) {
     const lastTime = lastChecked ? timeAgo(lastChecked.checkedAt) : null;
 
     html += `
-      <div class="card card-hover cursor-pointer" data-customer-card="${cust.customerId}" style="padding:0;overflow:hidden;${isExpanded ? 'outline:2px solid var(--primary);' : ''}">
+      <div class="card card-hover cursor-pointer${isExpanded ? " expanded" : ""}" data-customer-card="${cust.customerId}" style="padding:0;overflow:hidden;">
         <div style="padding:1rem 1.25rem;">
           <div class="flex items-center justify-between mb-2">
             <strong style="color:var(--slate-100);">${escapeHtml(cust.customerName)}</strong>
-            <span class="text-xs text-soft">${cust.items.length}개 항목</span>
+            <span class="text-xs" style="color:${pct >= 100 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)"};">${checked}/${cust.items.length}</span>
           </div>
-          <div class="progress-bar mb-2" style="height:6px;">
-            <div class="progress-fill" style="width:${confirmedPct}%;background:var(--success);"></div>
+          <div class="progress-bar mb-2" style="height:5px;">
+            <div class="progress-fill" style="width:${pct}%;background:${pct >= 100 ? "var(--success)" : "var(--primary)"};"></div>
           </div>
-          <div class="flex items-center justify-between text-xs mb-2">
-            <span style="color:var(--success)">확인 ${checkedCount}</span>
-            <span style="color:var(--warning)">미확인 ${uncheckedCount}</span>
+          <div class="text-xs text-soft">
+            ${unchecked > 0 ? `미확인 ${unchecked}건` : "전체 확인 완료"}
+            ${lastTime ? ` · ${lastTime}` : ""}
           </div>
-          ${lastTime ? `<div class="text-xs text-soft mb-2">마지막 응답: ${lastTime}</div>` : ""}
-          <div class="flex items-center gap-2 flex-wrap">
-            ${completedCount > 0 ? `<span class="badge badge-success">${completedCount} 완료</span>` : ""}
-            ${inProgressCount > 0 ? `<span class="badge badge-warning">${inProgressCount} 진행</span>` : ""}
-            ${pendingCount > 0 ? `<span class="badge badge-neutral">${pendingCount} 대기</span>` : ""}
-            ${overdueCount > 0 ? `<span class="badge badge-danger">${overdueCount} 지연</span>` : ""}
-          </div>
-          <div class="text-xs text-soft text-center" style="margin-top:8px;">
-            ${isExpanded ? "▲ 접기" : "▼ 상세 보기"}
-          </div>
+          <div class="text-xs text-soft text-center" style="margin-top:6px;">${isExpanded ? "▲ 접기" : "▼ 상세 보기"}</div>
         </div>
         ${isExpanded ? `
           <div style="border-top:1px solid var(--border);">
-            ${renderItemTable(cust.items, { showProject: true, showCategory: true, showCustomer: false, showChecked: true })}
+            ${renderTimelineItems(cust.items)}
           </div>` : ""}
       </div>`;
   }
 
   html += `</div>`;
-
-  if (nonCustomerCount > 0) {
-    html += `
-      <div class="card" style="padding:0.75rem 1rem;margin-top:1rem;">
-        <span class="text-sm text-soft">거래처 미지정 항목: ${nonCustomerCount}건 — 테이블 뷰에서 확인하세요</span>
-      </div>`;
-  }
-
   return html;
 }
 
 // =============================================================================
-// View 5: 테이블 (with bulk checkboxes)
+// View 5: Readiness Scorecard (RAG)
 // =============================================================================
 
-function renderTableView(filtered) {
-  const grouped = {};
-  for (const item of filtered) {
-    if (!grouped[item.projectId]) grouped[item.projectId] = [];
-    grouped[item.projectId].push(item);
-  }
+function renderReadinessView(filtered) {
+  const projectIds = [...new Set(filtered.map(i => i.projectId))];
+  if (projectIds.length === 0) return renderEmpty();
 
-  if (Object.keys(grouped).length === 0) return renderEmpty();
+  let html = `<div class="flex flex-col gap-4">`;
 
-  return Object.entries(grouped).map(([projectId, items]) => {
-    const pName = getProjectName(projectId);
-    const proj = projects.find((p) => p.id === projectId);
-    const isCollapsed = collapsedProjects.has(projectId);
-    const completedCount = items.filter((i) => i.status === "completed").length;
-    const overdueCount = items.filter((i) => {
+  for (const pid of projectIds) {
+    const projItems = filtered.filter(i => i.projectId === pid);
+    const proj = projects.find(p => p.id === pid);
+    const pipeline = getProjectPipelineStats(projItems);
+    const totalCompleted = projItems.filter(i => i.status === "completed").length;
+    const totalCount = projItems.length;
+    const pct = totalCount > 0 ? Math.round((totalCompleted / totalCount) * 100) : 0;
+
+    // Overall RAG
+    const hasOverdue = projItems.some(i => {
       if (i.status === "completed") return false;
       const d = daysUntil(i.dueDate);
       return d !== null && d < 0;
-    }).length;
-    const custItems = items.filter(i => i.customerId);
-    const unchecked = custItems.filter(i => !i.checkedBy).length;
-    const pct = items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+    });
+    let ragClass = "rag-green";
+    if (hasOverdue || pct < 50) ragClass = "rag-red";
+    else if (pct < 80) ragClass = "rag-amber";
 
-    return `
-      <div class="card mb-4" style="padding:0;overflow:hidden;">
-        <div class="project-group-header" data-project-id="${projectId}" style="padding:1rem 1.25rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:${isCollapsed ? "none" : "1px solid var(--border)"};">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span style="transition:transform 0.2s;transform:rotate(${isCollapsed ? "0" : "90"}deg);font-size:12px;">&#9654;</span>
-            <div>
-              <strong style="color:var(--slate-100)">${escapeHtml(pName)}</strong>
-              ${proj ? `<span class="text-sm text-soft" style="margin-left:8px;">${proj.currentStage || ""}</span>` : ""}
+    const dDay = proj?.endDate ? daysUntil(proj.endDate) : null;
+    let goNoGo = "진행 가능";
+    let goClass = "text-success";
+    if (hasOverdue) { goNoGo = "지연 발생"; goClass = "text-danger"; }
+    else if (pct < 80) { goNoGo = "준비 중"; goClass = "text-warning"; }
+    else if (pct >= 100) { goNoGo = "출시 준비 완료"; goClass = "text-success"; }
+
+    html += `
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="sales-rag-dot ${ragClass}" style="width:12px;height:12px;"></span>
+              <strong style="color:var(--slate-100);">${escapeHtml(getProjectName(pid))}</strong>
+              ${dDay !== null ? `<span class="badge badge-neutral">D-${dDay > 0 ? dDay : "Day"}</span>` : ""}
             </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            ${overdueCount > 0 ? `<span class="badge" style="background:var(--danger);color:#fff;">${overdueCount} 지연</span>` : ""}
-            ${unchecked > 0 ? `<span class="badge badge-warning" style="font-size:10px;">${unchecked} 미확인</span>` : ""}
-            <span class="text-sm text-soft">${completedCount}/${items.length}</span>
-            <div style="width:80px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;">
-              <div style="width:${pct}%;height:100%;background:var(--primary);border-radius:3px;"></div>
+            <div class="flex items-center gap-3">
+              <span class="${goClass} font-semibold text-sm">${goNoGo}</span>
+              <span class="text-sm font-mono" style="color:var(--slate-300);">${pct}%</span>
             </div>
-            <span class="text-sm font-medium" style="color:var(--primary);min-width:32px;text-align:right;">${pct}%</span>
           </div>
         </div>
-        ${isCollapsed ? "" : renderItemTable(items, { showProject: false, showCategory: false, showCheckbox: true })}
+        <div style="padding:1rem 1.25rem;">
+          <div class="sales-readiness-stages">
+            ${pipeline.map(stage => {
+              let sRag = "rag-gray";
+              if (stage.total === 0) sRag = "rag-gray";
+              else if (stage.overdue > 0) sRag = "rag-red";
+              else if (stage.pct >= 80) sRag = "rag-green";
+              else if (stage.pct >= 50) sRag = "rag-amber";
+              else sRag = "rag-red";
+
+              return `
+                <div class="sales-readiness-stage">
+                  <span class="sales-rag-dot ${sRag}"></span>
+                  <span class="sales-readiness-stage-label">${stage.icon} ${stage.label}</span>
+                  <span class="sales-readiness-stage-stat">${stage.total > 0 ? `${stage.completed}/${stage.total}` : "—"}</span>
+                </div>`;
+            }).join("")}
+          </div>
+        </div>
       </div>`;
-  }).join("");
+  }
+
+  html += `</div>`;
+  return html;
 }
 
 // =============================================================================
-// Event Binding
+// Event Binding — Common
 // =============================================================================
 
-function bindEvents() {
+function bindCommonEvents() {
   // Search & filters
-  app.querySelector("#search-input")?.addEventListener("input", (e) => {
-    searchQuery = e.target.value;
-    render();
-  });
-  app.querySelector("#filter-project")?.addEventListener("change", (e) => {
-    filterProject = e.target.value;
-    render();
-  });
-  app.querySelector("#filter-category")?.addEventListener("change", (e) => {
-    filterCategory = e.target.value;
-    render();
-  });
-  app.querySelector("#filter-status")?.addEventListener("change", (e) => {
-    filterStatus = e.target.value;
-    render();
-  });
-  app.querySelector("#filter-assignee")?.addEventListener("change", (e) => {
-    filterAssignee = e.target.value;
-    render();
-  });
-  app.querySelector("#toggle-all-categories")?.addEventListener("change", (e) => {
+  app.querySelector("#search-input")?.addEventListener("input", e => { searchQuery = e.target.value; render(); });
+  app.querySelector("#filter-project")?.addEventListener("change", e => { filterProject = e.target.value; render(); });
+  app.querySelector("#filter-status")?.addEventListener("change", e => { filterStatus = e.target.value; render(); });
+  app.querySelector("#filter-assignee")?.addEventListener("change", e => { filterAssignee = e.target.value; render(); });
+  app.querySelector("#toggle-all-categories")?.addEventListener("change", e => {
     showAllCategories = e.target.checked;
     filterCategory = "all";
     render();
   });
 
-  // View mode switcher
-  app.querySelectorAll("[data-view]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      viewMode = btn.dataset.view;
-      render();
-    });
-  });
-
-  // Stat card click actions
-  app.querySelectorAll("[data-stat-action]").forEach((card) => {
+  // Stat card click
+  app.querySelectorAll("[data-stat-action]").forEach(card => {
     card.addEventListener("click", () => {
       const action = card.dataset.statAction;
-      if (action === "all") { filterStatus = "all"; }
-      if (action === "completed") { filterStatus = "completed"; }
-      if (action === "unchecked") { viewMode = "customer"; filterStatus = "all"; }
-      if (action === "overdue") { viewMode = "timeline"; filterStatus = "all"; }
+      if (action === "overdue") { viewMode = "timeline"; renderSalesNav(navRoot); }
       render();
     });
   });
 
-  // Table row click → navigate to project detail
-  app.querySelectorAll("tr[data-navigate-project]").forEach((row) => {
-    row.addEventListener("click", (e) => {
-      if (e.target.closest("button") || e.target.closest("a") || e.target.closest("input")) return;
-      const pid = row.dataset.navigateProject;
-      if (pid) window.location.href = `project.html?id=${pid}`;
-    });
-  });
-
-  // Product card expand/collapse
-  app.querySelectorAll("[data-product-card]").forEach((card) => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest("button") || e.target.closest("a")) return;
-      const pid = card.dataset.productCard;
-      if (expandedProducts.has(pid)) {
-        expandedProducts.delete(pid);
-      } else {
-        expandedProducts.clear();
-        expandedProducts.add(pid);
-      }
-      render();
-    });
-  });
-
-  // Customer card expand/collapse
-  app.querySelectorAll("[data-customer-card]").forEach((card) => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
-      const cid = card.dataset.customerCard;
-      if (expandedCustomers.has(cid)) {
-        expandedCustomers.delete(cid);
-      } else {
-        expandedCustomers.add(cid);
-      }
-      render();
-    });
-  });
-
-  // Matrix row drill-down
-  app.querySelectorAll("[data-matrix-category]").forEach((row) => {
-    row.addEventListener("click", () => {
-      filterCategory = row.dataset.matrixCategory;
-      viewMode = "table";
-      render();
-    });
-  });
-
-  // RAG cell click → filter to project+dept and switch to table
-  app.querySelectorAll("[data-rag-project]").forEach((cell) => {
-    cell.addEventListener("click", () => {
-      filterProject = cell.dataset.ragProject;
-      viewMode = "table";
-      render();
-    });
-  });
-
-  // Timeline toggles
-  app.querySelector("[data-toggle-completed]")?.addEventListener("click", () => {
-    timelineShowCompleted = !timelineShowCompleted;
-    render();
-  });
-  app.querySelectorAll("[data-toggle-later]").forEach((el) => {
-    el.addEventListener("click", () => {
-      timelineShowLater = !timelineShowLater;
-      render();
-    });
-  });
-
-  // Table view: project group toggle
-  app.querySelectorAll(".project-group-header").forEach((header) => {
-    header.addEventListener("click", () => {
-      const pid = header.dataset.projectId;
-      if (collapsedProjects.has(pid)) {
-        collapsedProjects.delete(pid);
-      } else {
-        collapsedProjects.add(pid);
-      }
-      render();
-    });
-  });
-
-  // Start buttons (with error handling)
-  app.querySelectorAll(".start-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+  // Start buttons
+  app.querySelectorAll(".start-btn").forEach(btn => {
+    btn.addEventListener("click", async e => {
       e.stopPropagation();
       btn.disabled = true;
-      const origText = btn.innerHTML;
+      const orig = btn.innerHTML;
       btn.innerHTML = "...";
       try {
         await updateLaunchChecklist(btn.dataset.id, { status: "in_progress" });
       } catch (err) {
         console.error("시작 실패:", err);
-        btn.innerHTML = origText;
+        btn.innerHTML = orig;
         btn.disabled = false;
       }
     });
   });
 
-  // Complete buttons (with error handling)
-  app.querySelectorAll(".complete-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+  // Complete buttons
+  app.querySelectorAll(".complete-btn").forEach(btn => {
+    btn.addEventListener("click", async e => {
       e.stopPropagation();
       btn.disabled = true;
-      const origText = btn.innerHTML;
+      const orig = btn.innerHTML;
       btn.innerHTML = "...";
       try {
         await completeLaunchChecklist(btn.dataset.id);
       } catch (err) {
         console.error("완료 실패:", err);
-        btn.innerHTML = origText;
+        btn.innerHTML = orig;
         btn.disabled = false;
       }
     });
   });
 
-  // Briefing quick action buttons
-  app.querySelectorAll(".briefing-start-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      btn.disabled = true;
-      btn.textContent = "...";
-      try {
-        await updateLaunchChecklist(btn.dataset.id, { status: "in_progress" });
-      } catch (err) {
-        console.error("시작 실패:", err);
-        btn.disabled = false;
-        btn.textContent = "시작";
-      }
-    });
-  });
-  app.querySelectorAll(".briefing-complete-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      btn.disabled = true;
-      btn.textContent = "...";
-      try {
-        await completeLaunchChecklist(btn.dataset.id);
-      } catch (err) {
-        console.error("완료 실패:", err);
-        btn.disabled = false;
-        btn.textContent = "완료";
-      }
-    });
-  });
-
-  // Workload chart → filter by assignee
-  app.querySelectorAll("[data-filter-assignee]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const name = el.dataset.filterAssignee;
-      filterAssignee = filterAssignee === name ? "all" : name;
-      render();
-    });
-  });
-
-  // Customer summary card → filter to customer view
-  app.querySelectorAll("[data-filter-customer]").forEach((el) => {
-    el.addEventListener("click", () => {
-      viewMode = "customer";
-      render();
-    });
-  });
-
-  // Confirm buttons — open modal
-  app.querySelectorAll(".confirm-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+  // Confirm buttons
+  app.querySelectorAll(".confirm-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
       e.stopPropagation();
       pendingConfirmId = btn.dataset.id;
       const modal = document.getElementById("confirm-modal");
@@ -1727,30 +1087,15 @@ function bindEvents() {
     });
   });
 
-  // Modal close
+  // Modal
   const modal = document.getElementById("confirm-modal");
-  document.getElementById("confirm-modal-close")?.addEventListener("click", () => {
-    modal.classList.add("hidden");
-    pendingConfirmId = null;
-  });
-  document.getElementById("confirm-cancel")?.addEventListener("click", () => {
-    modal.classList.add("hidden");
-    pendingConfirmId = null;
-  });
-  modal?.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      modal.classList.add("hidden");
-      pendingConfirmId = null;
-    }
-  });
+  document.getElementById("confirm-modal-close")?.addEventListener("click", () => { modal.classList.add("hidden"); pendingConfirmId = null; });
+  document.getElementById("confirm-cancel")?.addEventListener("click", () => { modal.classList.add("hidden"); pendingConfirmId = null; });
+  modal?.addEventListener("click", e => { if (e.target === modal) { modal.classList.add("hidden"); pendingConfirmId = null; } });
 
-  // Modal submit
   document.getElementById("confirm-submit")?.addEventListener("click", async () => {
     const name = document.getElementById("confirm-name").value.trim();
-    if (!name) {
-      showToast('warning', "확인자 이름을 입력해주세요.");
-      return;
-    }
+    if (!name) { showToast("warning", "확인자 이름을 입력해주세요."); return; }
     const note = document.getElementById("confirm-note").value.trim();
     const submitBtn = document.getElementById("confirm-submit");
     submitBtn.disabled = true;
@@ -1759,96 +1104,90 @@ function bindEvents() {
       await confirmLaunchChecklist(pendingConfirmId, name, note);
       modal.classList.add("hidden");
       pendingConfirmId = null;
-      showToast('success', "거래처 확인 처리가 완료되었습니다.");
+      showToast("success", "거래처 확인 처리가 완료되었습니다.");
     } catch (err) {
       console.error("확인 처리 실패:", err);
-      showToast('error', "확인 처리에 실패했습니다.");
+      showToast("error", "확인 처리에 실패했습니다.");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "확인 처리";
     }
   });
 
-  // Bulk checkboxes
-  app.querySelectorAll(".bulk-check").forEach((cb) => {
-    cb.addEventListener("change", (e) => {
-      e.stopPropagation();
-      const id = cb.dataset.itemId;
-      if (cb.checked) {
-        selectedItems.add(id);
-      } else {
-        selectedItems.delete(id);
-      }
-      render();
+  // Navigate to project on row click
+  app.querySelectorAll("[data-navigate-project]").forEach(el => {
+    el.addEventListener("click", e => {
+      if (e.target.closest("button") || e.target.closest("a") || e.target.closest("input")) return;
+      const pid = el.dataset.navigateProject;
+      if (pid) window.location.href = `project.html?id=${pid}`;
     });
   });
 
-  // Bulk check all
-  app.querySelectorAll(".bulk-check-all").forEach((cb) => {
-    cb.addEventListener("change", (e) => {
-      e.stopPropagation();
-      const table = cb.closest("table");
-      const checks = table.querySelectorAll(".bulk-check:not(:disabled)");
-      checks.forEach((c) => {
-        c.checked = cb.checked;
-        if (cb.checked) selectedItems.add(c.dataset.itemId);
-        else selectedItems.delete(c.dataset.itemId);
-      });
+  // Focus search
+  if (searchQuery) {
+    const input = app.querySelector("#search-input");
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  }
+}
+
+// =============================================================================
+// Event Binding — View-specific
+// =============================================================================
+
+function bindViewEvents() {
+  switch (viewMode) {
+    case "command": bindCommandEvents(); break;
+    case "execute": bindExecuteEvents(); break;
+    case "timeline": bindTimelineEvents(); break;
+    case "customer": bindCustomerEvents(); break;
+  }
+}
+
+function bindCommandEvents() {
+  app.querySelectorAll("[data-product-card]").forEach(card => {
+    card.addEventListener("click", e => {
+      if (e.target.closest("button") || e.target.closest("a")) return;
+      const pid = card.dataset.productCard;
+      if (expandedProducts.has(pid)) expandedProducts.delete(pid);
+      else { expandedProducts.clear(); expandedProducts.add(pid); }
       render();
     });
   });
+}
 
-  // Bulk action buttons
-  document.getElementById("bulk-deselect")?.addEventListener("click", () => {
-    selectedItems.clear();
+function bindExecuteEvents() {
+  app.querySelectorAll("[data-toggle-exec]").forEach(el => {
+    el.addEventListener("click", () => {
+      const key = el.dataset.toggleExec;
+      if (expandedExecStages.has(key)) expandedExecStages.delete(key);
+      else expandedExecStages.add(key);
+      render();
+    });
+  });
+}
+
+function bindTimelineEvents() {
+  app.querySelector("[data-toggle-completed]")?.addEventListener("click", () => {
+    timelineShowCompleted = !timelineShowCompleted;
     render();
   });
-
-  document.getElementById("bulk-start")?.addEventListener("click", async () => {
-    const btn = document.getElementById("bulk-start");
-    btn.disabled = true;
-    btn.textContent = "처리 중...";
-    const ids = [...selectedItems];
-    let count = 0;
-    for (const id of ids) {
-      const item = allItems.find(i => i.id === id);
-      if (item && item.status === "pending") {
-        try {
-          await updateLaunchChecklist(id, { status: "in_progress" });
-          count++;
-        } catch (e) { console.error("bulk start failed:", id, e); }
-      }
-    }
-    selectedItems.clear();
-    showToast('success', `${count}개 항목이 진행 중으로 변경되었습니다.`);
-    btn.disabled = false;
-    btn.textContent = "일괄 시작";
+  app.querySelectorAll("[data-toggle-later]").forEach(el => {
+    el.addEventListener("click", () => {
+      timelineShowLater = !timelineShowLater;
+      render();
+    });
   });
+}
 
-  document.getElementById("bulk-complete")?.addEventListener("click", async () => {
-    const btn = document.getElementById("bulk-complete");
-    btn.disabled = true;
-    btn.textContent = "처리 중...";
-    const ids = [...selectedItems];
-    let count = 0;
-    let failCount = 0;
-    for (const id of ids) {
-      const item = allItems.find(i => i.id === id);
-      if (item && item.status === "in_progress") {
-        try {
-          await completeLaunchChecklist(id);
-          count++;
-        } catch (e) {
-          console.error("bulk complete failed:", id, e);
-          failCount++;
-        }
-      }
-    }
-    selectedItems.clear();
-    if (failCount > 0) showToast('warning', `${count}건 완료, ${failCount}건 실패`);
-    else showToast('success', `${count}개 항목이 완료되었습니다.`);
-    btn.disabled = false;
-    btn.textContent = "일괄 완료";
+function bindCustomerEvents() {
+  app.querySelectorAll("[data-customer-card]").forEach(card => {
+    card.addEventListener("click", e => {
+      if (e.target.closest("button")) return;
+      const cid = card.dataset.customerCard;
+      if (expandedCustomers.has(cid)) expandedCustomers.delete(cid);
+      else expandedCustomers.add(cid);
+      render();
+    });
   });
 }
 
