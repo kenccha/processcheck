@@ -9,7 +9,7 @@ service cloud.firestore {
     }
 
     function isInBodyUser() {
-      return isAuthenticated() && request.auth.token.email.matches('.*@inbody[.]com');
+      return isAuthenticated() && request.auth.token.email.matches('.*@inbody\\.com$');
     }
 
     // ─── Users ────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ service cloud.firestore {
 
     // ─── Reviews ──────────────────────────────────────────────────────────
     match /reviews/{reviewId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
 
@@ -102,7 +102,7 @@ service cloud.firestore {
     // ─── Lessons Learned ──────────────────────────────────────────────────
     match /lessons/{lessonId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Meetings ───────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ service cloud.firestore {
     // ─── Feedbacks ────────────────────────────────────────────────────────
     // Written by docs/deliverables/js/feedback-system.js
     match /feedbacks/{feedbackId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
 
