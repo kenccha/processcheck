@@ -30,13 +30,48 @@ let activeView = "projects"; // "projects" | "notifications"
 let loginError = "";
 const unsubs = [];
 
-// --- Session check ---
+// --- Session check (TTL: 4시간) ---
 const SESSION_KEY = "pc_portal_customer";
+const SESSION_TTL = 4 * 60 * 60 * 1000; // 4 hours
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+const ATTEMPTS_KEY = "pc_portal_attempts";
+
+function getLoginAttempts() {
+  try {
+    const data = JSON.parse(sessionStorage.getItem(ATTEMPTS_KEY) || "{}");
+    if (data.lockedUntil && Date.now() < data.lockedUntil) return data;
+    if (data.lockedUntil && Date.now() >= data.lockedUntil) {
+      sessionStorage.removeItem(ATTEMPTS_KEY);
+      return { count: 0 };
+    }
+    return data.count ? data : { count: 0 };
+  } catch { return { count: 0 }; }
+}
+
+function recordLoginAttempt(success) {
+  if (success) {
+    sessionStorage.removeItem(ATTEMPTS_KEY);
+    return;
+  }
+  const data = getLoginAttempts();
+  data.count = (data.count || 0) + 1;
+  if (data.count >= MAX_LOGIN_ATTEMPTS) {
+    data.lockedUntil = Date.now() + LOCKOUT_DURATION;
+  }
+  sessionStorage.setItem(ATTEMPTS_KEY, JSON.stringify(data));
+}
+
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (saved) {
   try {
-    currentCustomer = JSON.parse(saved);
-    loadPortalData();
+    const parsed = JSON.parse(saved);
+    if (parsed._loginAt && (Date.now() - parsed._loginAt) > SESSION_TTL) {
+      sessionStorage.removeItem(SESSION_KEY);
+    } else {
+      currentCustomer = parsed;
+      loadPortalData();
+    }
   } catch {
     sessionStorage.removeItem(SESSION_KEY);
   }
@@ -288,22 +323,38 @@ function bindEvents() {
   const emailInput = app.querySelector("#portal-email");
   if (loginBtn) {
     const doLogin = () => {
-      const email = emailInput.value.trim();
+      const attempts = getLoginAttempts();
+      if (attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+        const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 60000);
+        loginError = `너무 많은 시도가 있었습니다. ${remaining}분 후 다시 시도해주세요.`;
+        render();
+        return;
+      }
+
+      const email = emailInput.value.trim().toLowerCase();
       if (!email) {
         loginError = "이메일을 입력해주세요";
         render();
         return;
       }
-      const customer = allCustomers.find(
-        (c) => c.portalLoginEmail === email && c.portalEnabled === true
-      );
-      if (!customer) {
-        loginError = "등록되지 않은 이메일이거나 포털 접근이 비활성화되어 있습니다";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        loginError = "올바른 이메일 형식이 아닙니다";
         render();
         return;
       }
-      currentCustomer = customer;
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(customer));
+      const customer = allCustomers.find(
+        (c) => c.portalLoginEmail && c.portalLoginEmail.toLowerCase() === email && c.portalEnabled === true
+      );
+      if (!customer) {
+        recordLoginAttempt(false);
+        const remaining = MAX_LOGIN_ATTEMPTS - (getLoginAttempts().count || 0);
+        loginError = `등록되지 않은 이메일이거나 포털 접근이 비활성화되어 있습니다${remaining <= 2 ? ` (${remaining}회 남음)` : ""}`;
+        render();
+        return;
+      }
+      recordLoginAttempt(true);
+      currentCustomer = { ...customer, _loginAt: Date.now() };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentCustomer));
       loginError = "";
       loadPortalData();
       render();

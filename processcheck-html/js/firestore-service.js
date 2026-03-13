@@ -9,6 +9,34 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
 
+// ─── Input Validation ──────────────────────────────────────────────────────
+
+const MAX_STRING = 500;
+const MAX_COMMENT = 2000;
+const MAX_MENTIONS_PER_COMMENT = 5;
+const VALID_ROLES = ["worker", "manager", "observer", "admin"];
+const VALID_STATUSES = ["pending", "in_progress", "completed", "rejected"];
+const VALID_IMPORTANCE = ["green", "yellow", "red"];
+
+function sanitizeString(val, maxLen = MAX_STRING) {
+  if (typeof val !== "string") return "";
+  return val.trim().slice(0, maxLen);
+}
+
+function validateRequired(obj, fields) {
+  for (const f of fields) {
+    if (!obj[f] || (typeof obj[f] === "string" && obj[f].trim() === "")) {
+      throw new Error(`필수 필드 누락: ${f}`);
+    }
+  }
+}
+
+function validateEnum(val, allowed, fieldName) {
+  if (val && !allowed.includes(val)) {
+    throw new Error(`유효하지 않은 값: ${fieldName}=${val}`);
+  }
+}
+
 // ─── Timestamp helpers ──────────────────────────────────────────────────────
 
 function toDate(val) {
@@ -728,8 +756,17 @@ export async function getUsers() {
 }
 
 export async function createUser(user) {
-  const ref = await addDoc(collection(db, "users"), user);
-  return { ...user, id: ref.id };
+  validateRequired(user, ["name"]);
+  if (user.role) validateEnum(user.role, VALID_ROLES, "role");
+  const clean = {
+    ...user,
+    name: sanitizeString(user.name, 50),
+    email: sanitizeString(user.email, 200),
+    role: user.role || "worker",
+    department: sanitizeString(user.department || "", 50),
+  };
+  const ref = await addDoc(collection(db, "users"), clean);
+  return { ...clean, id: ref.id };
 }
 
 export async function updateUser(id, data) {
@@ -753,11 +790,19 @@ export async function getProject(id) {
 }
 
 export async function createProject(data) {
-  const ref = await addDoc(collection(db, "projects"), {
+  validateRequired(data, ["name", "startDate", "endDate"]);
+  if (!(data.startDate instanceof Date) || isNaN(data.startDate)) throw new Error("시작일이 유효하지 않습니다");
+  if (!(data.endDate instanceof Date) || isNaN(data.endDate)) throw new Error("종료일이 유효하지 않습니다");
+  const clean = {
     ...data,
+    name: sanitizeString(data.name, 200),
+    productType: sanitizeString(data.productType || "", 100),
+    status: data.status || "active",
+    progress: 0,
     startDate: Timestamp.fromDate(data.startDate),
     endDate: Timestamp.fromDate(data.endDate),
-  });
+  };
+  const ref = await addDoc(collection(db, "projects"), clean);
   return ref.id;
 }
 
@@ -834,7 +879,12 @@ export async function getChecklistItem(id) {
 }
 
 export async function updateChecklistItem(id, data) {
+  if (data.status) validateEnum(data.status, VALID_STATUSES, "status");
+  if (data.importance) validateEnum(data.importance, VALID_IMPORTANCE, "importance");
   const payload = { ...data };
+  if (data.title) payload.title = sanitizeString(data.title, 300);
+  if (data.assignee !== undefined) payload.assignee = sanitizeString(data.assignee, 50);
+  if (data.department !== undefined) payload.department = sanitizeString(data.department, 50);
   if (data.dueDate) payload.dueDate = Timestamp.fromDate(data.dueDate);
   if (data.completedDate) payload.completedDate = Timestamp.fromDate(data.completedDate);
   await updateDoc(doc(db, "checklistItems", id), payload);
@@ -853,8 +903,14 @@ export async function updateChecklistItemStatus(itemId, newStatus) {
 }
 
 export async function createChecklistItem(data) {
+  validateRequired(data, ["projectId", "title"]);
+  if (data.status) validateEnum(data.status, VALID_STATUSES, "status");
+  if (data.importance) validateEnum(data.importance, VALID_IMPORTANCE, "importance");
   const payload = {
     ...data,
+    title: sanitizeString(data.title, 300),
+    assignee: sanitizeString(data.assignee || "", 50),
+    department: sanitizeString(data.department || "", 50),
     status: data.status || "pending",
     comments: [],
     completedDate: null,
@@ -1003,12 +1059,14 @@ async function _createPortalNotificationsForProject(projectId, type, title, mess
 }
 
 export async function addComment(taskId, userId, userName, content) {
+  if (!content || typeof content !== "string") throw new Error("코멘트 내용이 필요합니다");
+  content = sanitizeString(content, MAX_COMMENT);
   const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
   if (!taskSnap.exists()) return;
   const existing = taskSnap.data().comments || [];
   const newComment = {
     id: `comment-${Date.now()}`,
-    userId, userName, content,
+    userId, userName: sanitizeString(userName, 50), content,
     createdAt: Timestamp.fromDate(new Date()),
   };
   await updateDoc(doc(db, "checklistItems", taskId), {
@@ -1016,12 +1074,12 @@ export async function addComment(taskId, userId, userName, content) {
   });
   try { await addActivityLog("add_comment", userId, userName, "", "task", taskId, { content: content.substring(0, 100) }); } catch { /* ignore */ }
 
-  // @mention 알림 생성
+  // @mention 알림 생성 (최대 5명)
   try {
     const mentionRegex = /@([\uAC00-\uD7A3a-zA-Z]{2,10})/g;
     let match;
     const mentioned = new Set();
-    while ((match = mentionRegex.exec(content)) !== null) mentioned.add(match[1]);
+    while ((match = mentionRegex.exec(content)) !== null && mentioned.size < MAX_MENTIONS_PER_COMMENT) mentioned.add(match[1]);
     if (mentioned.size > 0) {
       const t = taskSnap.data();
       for (const name of mentioned) {
@@ -1117,9 +1175,14 @@ export async function loadDashboardPendingApprovals(_department = null) {
 }
 
 export async function createNotification(data) {
+  validateRequired(data, ["userId", "title"]);
   await addDoc(collection(db, "notifications"), {
     ...data,
-    createdAt: Timestamp.fromDate(data.createdAt),
+    title: sanitizeString(data.title, 200),
+    message: sanitizeString(data.message || "", MAX_STRING),
+    link: sanitizeString(data.link || "", MAX_STRING),
+    read: false,
+    createdAt: Timestamp.fromDate(data.createdAt || new Date()),
   });
 }
 

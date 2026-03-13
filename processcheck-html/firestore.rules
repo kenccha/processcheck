@@ -50,9 +50,12 @@ service cloud.firestore {
     }
 
     // ─── Notifications ────────────────────────────────────────────────────
+    // userId는 Firestore doc ID (Auth UID와 다름) — UID 매칭 불가, 인증 기반 제한
     match /notifications/{notifId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isInBodyUser();
+      allow update: if isAuthenticated();
+      allow delete: if false;
     }
 
     // ─── Customers ────────────────────────────────────────────────────────
