@@ -1885,6 +1885,27 @@ const PHASE_DESCRIPTIONS = {
 
 export { PHASE_DESCRIPTIONS };
 
+/** 전체 gateRecords 실시간 구독 */
+export function subscribeAllGateRecords(callback) {
+  return onSnapshot(collection(db, "gateRecords"), (snap) => {
+    const records = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        approvedAt: data.approvedAt ? toDate(data.approvedAt) : null,
+        createdAt: data.createdAt ? toDate(data.createdAt) : null,
+        updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
+        decisionHistory: (data.decisionHistory || []).map(h => ({
+          ...h,
+          decidedAt: h.decidedAt ? toDate(h.decidedAt) : null,
+        })),
+      };
+    });
+    callback(records);
+  });
+}
+
 /** 프로젝트의 gateRecords 실시간 구독 */
 export function subscribeGateRecords(projectId, callback) {
   const q = query(collection(db, "gateRecords"), where("projectId", "==", projectId));
@@ -1928,7 +1949,7 @@ export async function getGateRecord(projectId, phaseId) {
 }
 
 /** gateRecord 생성 또는 업데이트 (승인/반려) */
-export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus, approvedBy) {
+export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus, approvedBy, reviewData) {
   const q = query(
     collection(db, "gateRecords"),
     where("projectId", "==", projectId),
@@ -1947,25 +1968,47 @@ export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus
     updatedAt: Timestamp.now(),
   };
 
+  // Gate review data (M1: 판단 기준 체계)
+  if (reviewData) {
+    if (reviewData.mustMeetItems) data.mustMeetItems = reviewData.mustMeetItems;
+    if (reviewData.shouldMeetItems) data.shouldMeetItems = reviewData.shouldMeetItems;
+    if (reviewData.shouldMeetTotal != null) data.shouldMeetTotal = reviewData.shouldMeetTotal;
+    if (reviewData.shouldMeetMax != null) data.shouldMeetMax = reviewData.shouldMeetMax;
+    if (reviewData.decisionReason != null) data.decisionReason = reviewData.decisionReason;
+  }
+
+  // 의사결정 이력 누적
+  const historyEntry = {
+    decision: gateStatus,
+    decidedBy: approvedBy || "",
+    decidedAt: Timestamp.now(),
+    reason: reviewData?.decisionReason || "",
+  };
+
   if (snap.empty) {
-    // 새로 생성
     await addDoc(collection(db, "gateRecords"), {
       ...data,
       meetingNotes: [],
+      decisionHistory: [historyEntry],
       createdAt: Timestamp.now(),
     });
   } else {
-    // 기존 업데이트 (meetingNotes는 건드리지 않음)
-    await updateDoc(snap.docs[0].ref, data);
+    const existing = snap.docs[0].data().decisionHistory || [];
+    await updateDoc(snap.docs[0].ref, {
+      ...data,
+      decisionHistory: [...existing, historyEntry],
+    });
   }
 
   // 활동 로그 기록
-  const actionLabel = gateStatus === "approved" ? "gate_approved" : gateStatus === "rejected" ? "gate_rejected" : "gate_reset";
+  const actionMap = { go: "gate_approved", approved: "gate_approved", kill: "gate_rejected", rejected: "gate_rejected", hold: "gate_hold", recycle: "gate_recycle", pending: "gate_reset" };
+  const actionLabel = actionMap[gateStatus] || "gate_reset";
   try {
     await addActivityLog(actionLabel, "", approvedBy, "", "project", projectId, {
       phaseId,
       phaseName,
       gateStatus,
+      decisionReason: reviewData?.decisionReason || "",
     });
   } catch { /* ignore */ }
 }
@@ -2160,4 +2203,363 @@ export function hasCyclicDependency(taskId, proposedDeps, allTasks) {
     }
   }
   return false;
+}
+
+// ─── Meetings (프로젝트 회의록) ─────────────────────────────────────────────
+
+function docToMeeting(id, data) {
+  return {
+    ...data,
+    id,
+    date: toDate(data.date),
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+    actionItems: (data.actionItems || []).map(ai => ({
+      ...ai,
+      dueDate: ai.dueDate ? toDate(ai.dueDate) : null,
+    })),
+  };
+}
+
+export function subscribeMeetings(projectId, callback) {
+  const q = query(
+    collection(db, "meetings"),
+    where("projectId", "==", projectId),
+    orderBy("date", "desc")
+  );
+  return onSnapshot(q, (snap) => {
+    const meetings = snap.docs.map(d => docToMeeting(d.id, d.data()));
+    callback(meetings);
+  }, (err) => console.error("subscribeMeetings:", err));
+}
+
+export async function createMeeting(data) {
+  const now = Timestamp.now();
+  const docRef = await addDoc(collection(db, "meetings"), {
+    ...data,
+    date: Timestamp.fromDate(new Date(data.date)),
+    createdAt: now,
+    updatedAt: now,
+  });
+  try {
+    await addActivityLog("meeting_created", "", data.createdBy, "", "project", data.projectId, {
+      meetingId: docRef.id,
+      title: data.title,
+      meetingType: data.meetingType,
+    });
+  } catch { /* ignore */ }
+  return docRef.id;
+}
+
+export async function updateMeeting(meetingId, data) {
+  const updateData = { ...data, updatedAt: Timestamp.now() };
+  if (data.date) updateData.date = Timestamp.fromDate(new Date(data.date));
+  await updateDoc(doc(db, "meetings", meetingId), updateData);
+}
+
+export async function deleteMeeting(meetingId) {
+  await deleteDoc(doc(db, "meetings", meetingId));
+}
+
+export async function convertMeetingActionToTask(meetingId, actionItemId, projectId, taskData) {
+  // 1. Create checklistItem
+  const now = Timestamp.now();
+  const taskRef = await addDoc(collection(db, "checklistItems"), {
+    ...taskData,
+    projectId,
+    status: "pending",
+    dueDate: taskData.dueDate instanceof Date ? Timestamp.fromDate(taskData.dueDate)
+      : taskData.dueDate ? Timestamp.fromDate(new Date(taskData.dueDate)) : null,
+    completedDate: null,
+    comments: [],
+    files: [],
+    dependencies: [],
+    createdAt: now,
+  });
+
+  // 2. Update meeting's actionItem with convertedTaskId
+  const meetingSnap = await getDoc(doc(db, "meetings", meetingId));
+  if (meetingSnap.exists()) {
+    const meetingData = meetingSnap.data();
+    const actionItems = (meetingData.actionItems || []).map(ai =>
+      ai.id === actionItemId ? { ...ai, convertedTaskId: taskRef.id, status: "converted" } : ai
+    );
+    await updateDoc(doc(db, "meetings", meetingId), { actionItems, updatedAt: Timestamp.now() });
+  }
+
+  // 3. Activity log
+  try {
+    await addActivityLog("meeting_action_converted", "", taskData.assignee || "", "", "project", projectId, {
+      meetingId,
+      actionItemId,
+      taskId: taskRef.id,
+      taskTitle: taskData.title,
+    });
+  } catch { /* ignore */ }
+
+  return taskRef.id;
+}
+
+// ─── Lessons Learned (교훈) ──────────────────────────────────────────────
+
+function docToLesson(id, data) {
+  return {
+    ...data,
+    id,
+    createdAt: toDate(data.createdAt),
+  };
+}
+
+/**
+ * 특정 프로젝트의 교훈 실시간 구독
+ */
+export function subscribeLessons(projectId, callback) {
+  const q = query(
+    collection(db, "lessons"),
+    where("projectId", "==", projectId),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => docToLesson(d.id, d.data())));
+  });
+}
+
+/**
+ * 전체 교훈 구독 (교차 프로젝트 참고용)
+ */
+export function subscribeAllLessons(callback) {
+  const q = query(collection(db, "lessons"), orderBy("createdAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => docToLesson(d.id, d.data())));
+  });
+}
+
+// ─── Phase Handoff Checklist (Phase 간 핸드오프) ────────────────────────────
+
+const DEFAULT_HANDOFF_ITEMS = [
+  "산출물 검토 및 승인 완료",
+  "미결 이슈 목록 정리 및 인수인계",
+  "다음 단계 담당자에게 브리핑 완료",
+  "관련 문서/파일 공유 및 접근 권한 확인",
+  "리스크/주의사항 전달",
+];
+
+export async function getHandoffChecklist(projectId, phaseId) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return DEFAULT_HANDOFF_ITEMS.map((label, i) => ({ id: `h${i}`, label, checked: false, checkedBy: "", checkedAt: null }));
+  const data = snap.docs[0].data();
+  return data.handoffChecklist || DEFAULT_HANDOFF_ITEMS.map((label, i) => ({ id: `h${i}`, label, checked: false, checkedBy: "", checkedAt: null }));
+}
+
+export async function updateHandoffChecklist(projectId, phaseId, checklist) {
+  const q = query(
+    collection(db, "gateRecords"),
+    where("projectId", "==", projectId),
+    where("phaseId", "==", phaseId)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+  await updateDoc(snap.docs[0].ref, { handoffChecklist: checklist, updatedAt: Timestamp.now() });
+}
+
+// ─── Escalation System (지연 자동 에스컬레이션) ─────────────────────────────
+
+const ESCALATION_THRESHOLDS = {
+  gateDelayDays: 3,       // Gate 승인 미처리 N일 초과 시
+  taskOverdueDays: 2,     // 작업 마감 N일 초과 시
+  reminderIntervalDays: 3, // 반복 알림 간격
+};
+
+/**
+ * 에스컬레이션 체크 — 대시보드 로드 시 호출
+ * Gate 승인 지연 + 작업 마감 초과를 감지하여 자동 알림 생성
+ */
+export async function checkAndCreateEscalations(currentUser) {
+  if (!currentUser) return;
+  // observer/admin/manager만 에스컬레이션 수행 (중복 방지)
+  if (currentUser.role === "worker") return;
+
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+
+  // 하루에 한 번만 실행
+  const lastRun = localStorage.getItem("pc_escalation_last");
+  if (lastRun === todayKey) return;
+
+  try {
+    // 1) Gate 승인 지연 체크
+    const gateSnap = await getDocs(collection(db, "gateRecords"));
+    const pendingGates = gateSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(g => g.gateStatus === "pending" && g.createdAt);
+
+    for (const gate of pendingGates) {
+      const createdAt = toDate(gate.createdAt);
+      const daysSince = Math.floor((now - createdAt) / 86400000);
+      if (daysSince < ESCALATION_THRESHOLDS.gateDelayDays) continue;
+
+      // 중복 체크: 같은 gate에 대해 최근 알림이 있는지
+      const escQ = query(
+        collection(db, "notifications"),
+        where("type", "==", "escalation_gate"),
+        where("metadata.gateRecordId", "==", gate.id),
+      );
+      const escSnap = await getDocs(escQ);
+      const recentEsc = escSnap.docs.find(d => {
+        const t = toDate(d.data().createdAt);
+        return (now - t) / 86400000 < ESCALATION_THRESHOLDS.reminderIntervalDays;
+      });
+      if (recentEsc) continue;
+
+      // observer 전원에게 알림
+      const usersSnap = await getDocs(query(collection(db, "users"), where("role", "in", ["observer", "admin"])));
+      for (const uDoc of usersSnap.docs) {
+        await addDoc(collection(db, "notifications"), {
+          userId: uDoc.id,
+          type: "escalation_gate",
+          title: `⚠️ 위원회 승인 ${daysSince}일 지연`,
+          message: `${gate.phaseName || gate.phaseId} 승인이 ${daysSince}일간 미처리 상태입니다.`,
+          link: `project.html?id=${gate.projectId}&tab=overview`,
+          read: false,
+          createdAt: Timestamp.now(),
+          metadata: { gateRecordId: gate.id, projectId: gate.projectId, phaseId: gate.phaseId, daysSince },
+        });
+      }
+    }
+
+    // 2) 작업 마감 초과 체크 — 매니저에게 알림
+    const taskQ = query(collection(db, "checklistItems"), where("status", "in", ["pending", "in_progress"]));
+    const taskSnap = await getDocs(taskQ);
+    const overdueTasks = taskSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => {
+        if (!t.dueDate) return false;
+        const due = toDate(t.dueDate);
+        const overdueDays = Math.floor((now - due) / 86400000);
+        return overdueDays >= ESCALATION_THRESHOLDS.taskOverdueDays;
+      });
+
+    // 부서별로 그룹핑하여 매니저에게 요약 알림
+    const deptOverdue = {};
+    for (const t of overdueTasks) {
+      const dept = t.department || "미정";
+      if (!deptOverdue[dept]) deptOverdue[dept] = [];
+      deptOverdue[dept].push(t);
+    }
+
+    for (const [dept, tasks] of Object.entries(deptOverdue)) {
+      // 해당 부서 매니저 찾기
+      const mgrQ = query(collection(db, "users"), where("role", "==", "manager"), where("department", "==", dept));
+      const mgrSnap = await getDocs(mgrQ);
+      const targetUsers = mgrSnap.docs;
+
+      // 매니저가 없으면 observer에게
+      if (targetUsers.length === 0) {
+        const obsSnap = await getDocs(query(collection(db, "users"), where("role", "in", ["observer", "admin"])));
+        targetUsers.push(...obsSnap.docs);
+      }
+
+      // 중복 체크
+      for (const uDoc of targetUsers) {
+        const escQ2 = query(
+          collection(db, "notifications"),
+          where("userId", "==", uDoc.id),
+          where("type", "==", "escalation_overdue"),
+          where("metadata.department", "==", dept),
+        );
+        const escSnap2 = await getDocs(escQ2);
+        const recentEsc2 = escSnap2.docs.find(d => {
+          const t = toDate(d.data().createdAt);
+          return (now - t) / 86400000 < ESCALATION_THRESHOLDS.reminderIntervalDays;
+        });
+        if (recentEsc2) continue;
+
+        const maxOverdue = Math.max(...tasks.map(t => Math.floor((now - toDate(t.dueDate)) / 86400000)));
+        await addDoc(collection(db, "notifications"), {
+          userId: uDoc.id,
+          type: "escalation_overdue",
+          title: `⚠️ ${dept} 작업 ${tasks.length}건 마감 초과`,
+          message: `최대 ${maxOverdue}일 초과. 가장 지연: "${tasks[0].title}"`,
+          link: `projects.html`,
+          read: false,
+          createdAt: Timestamp.now(),
+          metadata: { department: dept, taskCount: tasks.length, maxOverdueDays: maxOverdue },
+        });
+      }
+    }
+
+    localStorage.setItem("pc_escalation_last", todayKey);
+  } catch (e) {
+    console.error("에스컬레이션 체크 오류:", e);
+  }
+}
+
+/**
+ * 에스컬레이션 설정 조회/저장
+ */
+export async function getEscalationSettings() {
+  const snap = await getDoc(doc(db, "settings", "escalation"));
+  if (!snap.exists()) return { ...ESCALATION_THRESHOLDS };
+  return { ...ESCALATION_THRESHOLDS, ...snap.data() };
+}
+
+export async function updateEscalationSettings(data) {
+  await setDoc(doc(db, "settings", "escalation"), data, { merge: true });
+}
+
+// ─── Lessons Learned ─────────────────────────────────────────────────────────
+
+/**
+ * 교훈 추가
+ * @param {{ projectId, projectName, phase, category, title, content, department, author, tags }} data
+ */
+export async function addLesson(data) {
+  const docRef = await addDoc(collection(db, "lessons"), {
+    ...data,
+    upvotes: 0,
+    upvotedBy: [],
+    createdAt: serverTimestamp(),
+  });
+  try {
+    await addActivityLog("lesson_added", "", data.author, "", "project", data.projectId, {
+      lessonId: docRef.id,
+      title: data.title,
+      category: data.category,
+    });
+  } catch { /* ignore */ }
+  return docRef.id;
+}
+
+/**
+ * 교훈 수정
+ */
+export async function updateLesson(lessonId, data) {
+  await updateDoc(doc(db, "lessons", lessonId), data);
+}
+
+/**
+ * 교훈 삭제
+ */
+export async function deleteLesson(lessonId) {
+  await deleteDoc(doc(db, "lessons", lessonId));
+}
+
+/**
+ * 교훈 추천 토글 (upvote/downvote)
+ */
+export async function toggleLessonUpvote(lessonId, userName) {
+  const snap = await getDoc(doc(db, "lessons", lessonId));
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const upvotedBy = data.upvotedBy || [];
+  const already = upvotedBy.includes(userName);
+  await updateDoc(doc(db, "lessons", lessonId), {
+    upvotedBy: already ? upvotedBy.filter(n => n !== userName) : [...upvotedBy, userName],
+    upvotes: already ? (data.upvotes || 1) - 1 : (data.upvotes || 0) + 1,
+  });
 }

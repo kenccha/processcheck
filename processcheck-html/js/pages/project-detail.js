@@ -1,5 +1,5 @@
 // =============================================================================
-// Project Detail Page — 3-tab project view (개요+작업 / 스케줄 / 병목)
+// Project Detail Page — 4-tab project view (개요+작업 / 스케줄 / 병목 / 교훈)
 // =============================================================================
 
 import { guardPage } from "../auth.js";
@@ -27,6 +27,18 @@ import {
   batchUpdateMultiPhaseSchedule,
   PHASE_DESCRIPTIONS,
   getBlockingStatus,
+  subscribeMeetings,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
+  convertMeetingActionToTask,
+  subscribeLessons,
+  subscribeAllLessons,
+  addLesson,
+  updateLesson,
+  deleteLesson,
+  toggleLessonUpvote,
+  updateHandoffChecklist,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { storage } from "../firebase-init.js";
@@ -36,6 +48,10 @@ import { initSortable } from "../ui/dnd.js";
 import {
   departments,
   PHASE_GROUPS,
+  MEETING_TYPES,
+  GATE_DECISIONS,
+  GATE_CRITERIA_TEMPLATES,
+  getGateStatusDisplay,
   getStatusLabel,
   formatStageName,
   escapeHtml,
@@ -67,7 +83,7 @@ const app = document.getElementById("app");
 // --- State ---
 let project = null;
 let checklistItems = [];
-let activeTab = "work";      // work | schedule | bottleneck
+let activeTab = "work";      // work | schedule | bottleneck | lessons
 let selectedStage = "";
 let selectedDepartment = "";
 let checklistFilter = "";
@@ -75,6 +91,9 @@ let allUsers = [];
 let activityLogs = [];
 let checklistView = "phase"; // phase | timeline | department | board | list
 let dynamicPhaseGroups = []; // Firestore templateStages 기반 동적 phase
+let meetings = [];           // 프로젝트 회의록
+let lessons = [];            // 이 프로젝트 교훈
+let allLessons = [];         // 전체 프로젝트 교훈 (교차 참고용)
 
 // --- Render nav ---
 if (navRoot) renderNav(navRoot, "project.html", user);
@@ -129,6 +148,23 @@ subscribeLaunchChecklists(projectId, (items) => {
   if (btn) btn.style.display = launchCount > 0 ? "none" : "";
 });
 
+subscribeMeetings(projectId, (m) => {
+  meetings = m;
+  // Update badge count if rendered
+  const badge = document.getElementById("meetings-count-badge");
+  if (badge) badge.textContent = m.length;
+});
+
+subscribeLessons(projectId, (l) => {
+  lessons = l;
+  if (activeTab === "lessons") render();
+});
+
+subscribeAllLessons((l) => {
+  allLessons = l;
+  if (activeTab === "lessons") render();
+});
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -160,8 +196,10 @@ function getPhaseGateStatus(phaseName) {
   if (phaseIdx < 0) return "none";
   const phaseId = `phase${phaseIdx}`;
   const gr = gateRecords.find(r => r.phaseId === phaseId);
-  if (gr?.gateStatus === "approved") return "approved";
-  if (gr?.gateStatus === "rejected") return "rejected";
+  const s = gr?.gateStatus;
+  if (s === "approved" || s === "go") return "approved";
+  if (s === "rejected" || s === "kill") return "rejected";
+  if (s === "hold" || s === "recycle") return s;
   return "not_reached";
 }
 
@@ -258,6 +296,7 @@ function render() {
         <button class="tab-btn${activeTab === "work" ? " active" : ""}" data-tab="work">개요 + 작업</button>
         <button class="tab-btn${activeTab === "schedule" ? " active" : ""}" data-tab="schedule">스케줄</button>
         <button class="tab-btn${activeTab === "bottleneck" ? " active" : ""}" data-tab="bottleneck">병목</button>
+        <button class="tab-btn${activeTab === "lessons" ? " active" : ""}" data-tab="lessons">교훈${lessons.length > 0 ? ` (${lessons.length})` : ""}</button>
       </div>
 
       <!-- Tab Content -->
@@ -265,6 +304,7 @@ function render() {
         ${activeTab === "work" ? renderWorkTab() : ""}
         ${activeTab === "schedule" ? renderScheduleTab() : ""}
         ${activeTab === "bottleneck" ? renderBottleneckTab() : ""}
+        ${activeTab === "lessons" ? renderLessonsTab() : ""}
       </div>
     </div>
   `;
@@ -459,12 +499,16 @@ function renderWorkTab() {
     <!-- Gate Approval Card (위원회 승인 + 일정) -->
     ${renderGateApprovalCard(getActivePhaseGroups())}
 
-    <!-- View Switcher -->
+    <!-- View Switcher + Meeting Button -->
     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
       ${["phase","timeline","board","matrix"].map(v => {
         const labels = { phase: "Phase", timeline: "타임라인", board: "부서", matrix: "매트릭스" };
         return `<button class="btn-ghost btn-sm view-switch-btn${checklistView === v ? " active" : ""}" data-view="${v}" style="font-size:0.7rem;padding:0.3rem 0.6rem;${checklistView === v ? "background:var(--primary-500);color:white;" : ""}">${labels[v]}</button>`;
       }).join("")}
+      <div style="flex:1;"></div>
+      <button class="btn-ghost btn-sm" id="open-meetings-btn" style="font-size:0.75rem;padding:0.3rem 0.7rem;display:flex;align-items:center;gap:0.3rem;">
+        📋 회의록 <span id="meetings-count-badge" class="badge badge-neutral" style="font-size:0.6rem;padding:0.05rem 0.35rem;">${meetings.length}</span>
+      </button>
     </div>
 
     <!-- Filters -->
@@ -858,7 +902,8 @@ function renderGateApprovalCard(phases) {
           const phaseId = `phase${idx}`;
           const gr = gateRecords.find(r => r.phaseId === phaseId) || null;
           const gateStatus = gr?.gateStatus || "pending";
-          const bgColor = gateStatus === "approved" ? "rgba(34,197,94,0.06)" : gateStatus === "rejected" ? "rgba(239,68,68,0.06)" : "transparent";
+          const gsd = getGateStatusDisplay(gateStatus);
+          const bgColor = gateStatus === "approved" || gateStatus === "go" ? "rgba(34,197,94,0.06)" : gateStatus === "rejected" || gateStatus === "kill" ? "rgba(239,68,68,0.06)" : gateStatus === "hold" ? "rgba(245,158,11,0.06)" : gateStatus === "recycle" ? "rgba(6,182,212,0.06)" : "transparent";
 
           // Schedule info
           const sched = schedules[idx];
@@ -889,9 +934,10 @@ function renderGateApprovalCard(phases) {
                 </div>
               ` : ""}
 
-              <div style="font-size:0.7rem;margin-bottom:0.25rem;color:${gateStatus === "approved" ? "var(--success-400)" : gateStatus === "rejected" ? "var(--danger-400)" : "var(--slate-400)"};">
-                ${gateStatus === "approved" ? "✅ 승인" : gateStatus === "rejected" ? "❌ 반려" : "⏳ 대기"}
+              <div style="font-size:0.7rem;margin-bottom:0.25rem;color:${gsd.color};">
+                ${gsd.icon} ${gsd.label}
               </div>
+              ${gr?.shouldMeetTotal != null ? `<div style="font-size:0.55rem;color:var(--slate-400);">스코어 ${gr.shouldMeetTotal}/${gr.shouldMeetMax || 40}</div>` : ""}
               ${gr?.approvedBy ? `<div style="font-size:0.6rem;color:var(--slate-400);margin-bottom:0.25rem;">${escapeHtml(gr.approvedBy)} · ${gr.approvedAt ? formatDate(gr.approvedAt) : ""}</div>` : ""}
               ${noteCount > 0 ? `<div style="font-size:0.6rem;color:var(--primary-400);">💬 회의록 (${noteCount})</div>` : ""}
             </div>
@@ -930,10 +976,22 @@ function renderPhaseView() {
     const isCompleted = completed === total;
     const hasOverdue = progress.overdue > 0;
 
-    // Date range from dueDate
-    const dueDates = allTasks.filter(t => t.dueDate).map(t => new Date(t.dueDate).getTime());
-    const minDate = dueDates.length > 0 ? new Date(Math.min(...dueDates)) : null;
-    const maxDate = dueDates.length > 0 ? new Date(Math.max(...dueDates)) : null;
+    // Date range: prefer phaseSchedules (user-set), fall back to task dueDate min/max
+    const savedSch = (project.phaseSchedules || {})[`phase${idx}`];
+    let minDate = null, maxDate = null;
+    if (savedSch) {
+      const src = savedSch.actualStart || savedSch.plannedStart;
+      const end = savedSch.actualEnd || savedSch.plannedEnd;
+      if (src) minDate = new Date(src);
+      if (end) maxDate = new Date(end);
+    }
+    if (!minDate || !maxDate) {
+      const dueDates = allTasks.filter(t => t.dueDate).map(t => new Date(t.dueDate).getTime());
+      if (dueDates.length > 0) {
+        if (!minDate) minDate = new Date(Math.min(...dueDates));
+        if (!maxDate) maxDate = new Date(Math.max(...dueDates));
+      }
+    }
 
     // Max delay days among overdue incomplete tasks
     const overdueTasks = allTasks.filter(t => {
@@ -1057,6 +1115,9 @@ function renderPhaseView() {
               ${notes.length > 3 ? `<div style="text-align:center;"><button class="btn-ghost btn-sm" data-gate-notes="${phaseId}" style="font-size:0.65rem;color:var(--primary-400);">전체 보기 (${notes.length}건) →</button></div>` : ""}
             </div>
           </div>` : ""}
+
+          <!-- Lessons from other projects for this phase -->
+          ${renderPhaseLessonsInline(phase.name)}
         </div>
       </div>
     `;
@@ -1831,6 +1892,10 @@ function bindEvents() {
     });
   });
 
+  // Meetings button
+  const meetingsBtn = document.getElementById("open-meetings-btn");
+  if (meetingsBtn) meetingsBtn.addEventListener("click", openMeetingsPanel);
+
   // Phase pipeline click → scroll to phase card & expand
   app.querySelectorAll("[data-phase-panel]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -2184,31 +2249,46 @@ function openPhaseScheduleSlideOver(phaseIdx) {
   const phase = phases[phaseIdx];
   if (!phase) return;
 
-  // 항상 실제 task dueDate 기준으로 날짜 표시
+  // phaseSchedules (user-set) 우선, 없으면 task dueDate 기준
   const allTaskDates = phases.map(p => getPhaseTaskDates(p));
   const taskDates = allTaskDates[phaseIdx];
   const savedSchedules = project.phaseSchedules || {};
+  const curSaved = savedSchedules[`phase${phaseIdx}`];
 
-  const startVal = taskDates.start ? taskDates.start.toISOString().slice(0, 10) : "";
-  const endVal = taskDates.end ? taskDates.end.toISOString().slice(0, 10) : "";
+  // Input defaults: actualStart/End → plannedStart/End → task dates
+  const resolvedStart = (curSaved?.actualStart && new Date(curSaved.actualStart))
+    || (curSaved?.plannedStart && new Date(curSaved.plannedStart))
+    || taskDates.start;
+  const resolvedEnd = (curSaved?.actualEnd && new Date(curSaved.actualEnd))
+    || (curSaved?.plannedEnd && new Date(curSaved.plannedEnd))
+    || taskDates.end;
+  const startVal = resolvedStart ? resolvedStart.toISOString().slice(0, 10) : "";
+  const endVal = resolvedEnd ? resolvedEnd.toISOString().slice(0, 10) : "";
 
-  // 전체 Phase 요약 (실제 task 날짜 기준)
+  // 전체 Phase 요약 (phaseSchedules 우선, 없으면 task 날짜)
   const allPhaseSummary = phases.map((p, i) => {
     const td = allTaskDates[i];
     const isCurrent = i === phaseIdx;
     const saved = savedSchedules[`phase${i}`];
     const hasPlanned = saved && saved.plannedStart && saved.plannedEnd;
+    // Resolved dates: actualStart/End → plannedStart/End → task dates
+    const rStart = (saved?.actualStart && new Date(saved.actualStart))
+      || (saved?.plannedStart && new Date(saved.plannedStart))
+      || td.start;
+    const rEnd = (saved?.actualEnd && new Date(saved.actualEnd))
+      || (saved?.plannedEnd && new Date(saved.plannedEnd))
+      || td.end;
     // 지연 표시: 계획 대비 실제가 늦은 경우
     let delayBadge = "";
-    if (hasPlanned && td.end) {
+    if (hasPlanned && rEnd) {
       const plannedEnd = new Date(saved.plannedEnd);
-      const delay = Math.round((td.end - plannedEnd) / 86400000);
+      const delay = Math.round((rEnd - plannedEnd) / 86400000);
       if (delay > 0) delayBadge = `<span style="font-size:0.6rem;color:var(--danger-400);font-weight:600;">+${delay}일</span>`;
     }
     return `
       <div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.5rem;border-radius:var(--radius-md);${isCurrent ? "background:var(--surface-2);border:1px solid var(--primary-400);" : "background:var(--surface-1);"}">
         <span style="font-size:0.75rem;font-weight:${isCurrent ? "700" : "500"};color:${isCurrent ? "var(--primary-400)" : "var(--slate-300)"};min-width:60px;">${p.name}</span>
-        <span style="font-size:0.7rem;color:var(--slate-400);flex:1;">${td.start ? formatDate(td.start) : "-"} ~ ${td.end ? formatDate(td.end) : "-"}</span>
+        <span style="font-size:0.7rem;color:var(--slate-400);flex:1;">${rStart ? formatDate(rStart) : "-"} ~ ${rEnd ? formatDate(rEnd) : "-"}</span>
         ${delayBadge}
         <span style="font-size:0.65rem;color:var(--slate-400);">${td.count}건</span>
       </div>
@@ -2306,7 +2386,8 @@ function openPhaseScheduleSlideOver(phaseIdx) {
           const tasks = checklistItems.filter(t => t.stage === ph.workStage || t.stage === ph.gateStage);
           const days = Math.max(1, Math.ceil((eDate - sDate) / 86400000));
           const taskUpdates = tasks.map((t, i) => {
-            const offset = tasks.length > 1 ? (i / (tasks.length - 1)) * days : 0;
+            // 1 task → endDate, 2+ tasks → distribute evenly from start to end
+            const offset = tasks.length <= 1 ? days : (i / (tasks.length - 1)) * days;
             return { id: t.id, dueDate: new Date(sDate.getTime() + offset * 86400000) };
           });
 
@@ -2358,6 +2439,17 @@ function openPhaseScheduleSlideOver(phaseIdx) {
       }
     });
   }
+
+  // Lessons tab events
+  if (activeTab === "lessons") bindLessonsEvents();
+
+  // Phase inline lessons → navigate to lessons tab
+  app.querySelectorAll("[data-phase-lessons]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeTab = "lessons";
+      render();
+    });
+  });
 }
 
 // ─── UXA-05: Task Peek Slide-Over ───────────────────────────────────────────
@@ -2743,20 +2835,30 @@ function openPhasePanel(phase, phaseIdx) {
   const phaseId = `phase${phaseIdx}`;
   const gr = gateRecords.find(r => r.phaseId === phaseId) || null;
   const gateStatus = gr?.gateStatus || "pending";
+  const gsd = getGateStatusDisplay(gateStatus);
   const notes = gr?.meetingNotes || [];
   const desc = PHASE_DESCRIPTIONS[phase.name] || "";
-
-  const statusLabel = gateStatus === "approved" ? "✅ 승인 완료" : gateStatus === "rejected" ? "❌ 반려" : "⏳ 대기";
-  const statusCls = gateStatus === "approved" ? "gate-approved" : gateStatus === "rejected" ? "gate-rejected" : "gate-pending";
+  const isObserver = user.role === "observer" || user.role === "admin";
 
   // 체크리스트 기반 진행 현황
   const phaseTasks = checklistItems.filter(t => t.stage === phase.workStage || t.stage === phase.gateStage);
   const doneTasks = phaseTasks.filter(t => t.status === "completed").length;
   const totalTasks = phaseTasks.length;
 
+  // Gate criteria (from saved data or templates)
+  const template = GATE_CRITERIA_TEMPLATES[phase.name] || { mustMeet: [], shouldMeet: [] };
+  const savedMustMeet = gr?.mustMeetItems || template.mustMeet.map((label, i) => ({ id: `mm${i}`, label, checked: false }));
+  const savedShouldMeet = gr?.shouldMeetItems || template.shouldMeet.map((s, i) => ({ id: `sm${i}`, label: s.label, description: s.description, score: 0, maxScore: 10 }));
+
+  const mustMeetAllPassed = savedMustMeet.length > 0 && savedMustMeet.every(m => m.checked);
+  const shouldMeetTotal = savedShouldMeet.reduce((sum, s) => sum + (s.score || 0), 0);
+  const shouldMeetMax = savedShouldMeet.length * 10;
+  const scorePercent = shouldMeetMax > 0 ? Math.round(shouldMeetTotal / shouldMeetMax * 100) : 0;
+  const scoreColor = scorePercent >= 70 ? "var(--success-400)" : scorePercent >= 40 ? "var(--warning-500)" : "var(--danger-400)";
+
   const body = `
     <div class="gate-panel">
-      <!-- 설명 -->
+      <!-- Phase 설명 + 진행 현황 -->
       <div class="gate-section">
         <div class="gate-section-title">📋 Phase 설명</div>
         <p class="gate-desc">${escapeHtml(desc) || "설명 없음"}</p>
@@ -2767,23 +2869,158 @@ function openPhasePanel(phase, phaseIdx) {
         ${totalTasks > 0 ? `<div class="gate-progress-bar"><div class="gate-progress-fill" style="width:${Math.round(doneTasks/totalTasks*100)}%"></div></div>` : ""}
       </div>
 
-      <!-- 승인 상태 -->
+      <!-- 현재 승인 상태 -->
       <div class="gate-section">
-        <div class="gate-section-title">🔒 위원회 승인</div>
-        <div class="gate-status ${statusCls}">${statusLabel}</div>
+        <div class="gate-section-title">🔒 위원회 승인 상태</div>
+        <div class="gate-status ${gsd.cls}" style="display:flex;align-items:center;gap:0.5rem;">
+          <span>${gsd.icon} ${gsd.label}</span>
+          ${gr?.shouldMeetTotal != null ? `<span style="font-size:0.7rem;opacity:0.8;">(스코어 ${gr.shouldMeetTotal}/${gr.shouldMeetMax || shouldMeetMax})</span>` : ""}
+        </div>
         ${gr?.approvedBy ? `<div class="gate-meta" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-          <span>승인자: ${escapeHtml(gr.approvedBy)}</span>
+          <span>결정자: ${escapeHtml(gr.approvedBy)}</span>
           <span style="color:var(--slate-400);">·</span>
           <span class="gate-date-display" style="display:inline-flex;align-items:center;gap:0.25rem;">
             <input type="date" class="gate-date-input" value="${gr.approvedAt ? new Date(gr.approvedAt).toISOString().slice(0,10) : ""}" style="font-size:0.75rem;padding:0.15rem 0.3rem;border:1px solid var(--surface-4);border-radius:var(--radius-sm);background:var(--surface-1);color:var(--text-primary);cursor:pointer;width:auto;" title="날짜 클릭하여 수정">
           </span>
         </div>` : ""}
-        <div class="gate-actions">
-          <button class="btn-sm gate-btn-approve" data-gate-action="approved" ${gateStatus === "approved" ? "disabled" : ""}>✅ 승인</button>
-          <button class="btn-sm gate-btn-reject" data-gate-action="rejected" ${gateStatus === "rejected" ? "disabled" : ""}>❌ 반려</button>
-          ${gateStatus !== "pending" ? `<button class="btn-sm gate-btn-reset" data-gate-action="pending">↩ 초기화</button>` : ""}
+        ${gr?.decisionReason ? `<div style="font-size:0.75rem;margin-top:0.3rem;padding:0.4rem 0.6rem;background:var(--surface-2);border-radius:var(--radius-md);border-left:3px solid ${gsd.color};">${escapeHtml(gr.decisionReason)}</div>` : ""}
+      </div>
+
+      <!-- Must-Meet 체크리스트 -->
+      ${isObserver ? `
+      <div class="gate-review-section">
+        <h5>🚦 Must-Meet 기준 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">(하나라도 미충족 시 Go 불가)</span></h5>
+        <div id="gate-must-meet-list">
+          ${savedMustMeet.map((m, i) => `
+            <label class="gate-must-meet-item ${m.checked ? "checked" : ""}" data-mm-idx="${i}">
+              <input type="checkbox" ${m.checked ? "checked" : ""}>
+              <span>${escapeHtml(m.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+        <div id="gate-must-meet-result" class="gate-must-meet-summary ${mustMeetAllPassed ? "pass" : "fail"}">
+          ${mustMeetAllPassed ? "전체 충족 — Go 가능" : `미충족 ${savedMustMeet.filter(m => !m.checked).length}건 — Go 불가`}
         </div>
       </div>
+
+      <!-- Should-Meet 스코어카드 -->
+      <div class="gate-review-section">
+        <h5>📊 Should-Meet 스코어카드 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">(0~10점)</span></h5>
+        <div id="gate-should-meet-list">
+          ${savedShouldMeet.map((s, i) => `
+            <div class="gate-score-item" data-sm-idx="${i}">
+              <div class="gate-score-label">
+                ${escapeHtml(s.label)}
+                <span class="gate-score-desc">${escapeHtml(s.description || "")}</span>
+              </div>
+              <input type="number" class="gate-score-input" min="0" max="10" value="${s.score || 0}">
+              <span class="gate-score-max">/ 10</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="gate-score-total">
+          <span>총점</span>
+          <span id="gate-score-value" style="color:${scoreColor};">${shouldMeetTotal} / ${shouldMeetMax}</span>
+        </div>
+        <div class="gate-score-bar">
+          <div class="gate-score-bar-fill" style="width:${scorePercent}%;background:${scoreColor};"></div>
+        </div>
+      </div>
+
+      <!-- Gate 의사결정 -->
+      <div class="gate-review-section">
+        <h5>🎯 Gate 의사결정</h5>
+        <div class="gate-decision-grid">
+          ${GATE_DECISIONS.map(d => `
+            <button class="gate-decision-btn" data-gate-decision="${d.value}" style="color:${d.color};border-color:${gateStatus === d.value || (d.value === "go" && gateStatus === "approved") || (d.value === "kill" && gateStatus === "rejected") ? d.color : "var(--surface-3)"}; background:${gateStatus === d.value || (d.value === "go" && gateStatus === "approved") || (d.value === "kill" && gateStatus === "rejected") ? d.bg : "var(--surface-1)"};">
+              <span style="font-size:1rem;">${d.icon}</span> ${d.label}
+            </button>
+          `).join("")}
+        </div>
+        <div style="margin-top:0.5rem;">
+          <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.2rem;">결정 사유</label>
+          <textarea id="gate-decision-reason" class="gate-decision-reason" style="width:100%;font-size:0.78rem;padding:0.5rem;border:1px solid var(--surface-4);border-radius:var(--radius-md);background:var(--surface-1);color:var(--text-primary);resize:vertical;min-height:60px;" placeholder="결정의 근거와 후속 조치를 기록하세요...">${escapeHtml(gr?.decisionReason || "")}</textarea>
+        </div>
+        <button class="btn-primary btn-sm" id="gate-submit-decision" style="margin-top:0.5rem;width:100%;font-size:0.8rem;" ${gateStatus !== "pending" && gateStatus !== "hold" && gateStatus !== "recycle" ? "" : ""}>결정 저장</button>
+        ${gateStatus !== "pending" ? `<button class="btn-ghost btn-sm" id="gate-reset-decision" style="margin-top:0.3rem;width:100%;font-size:0.75rem;">↩ 초기화 (대기로 변경)</button>` : ""}
+      </div>
+      ` : `
+      <!-- 비 observer: 읽기 전용 Gate Review 정보 -->
+      ${savedMustMeet.some(m => m.checked) || savedShouldMeet.some(s => s.score > 0) ? `
+      <div class="gate-review-section">
+        <h5>🚦 Must-Meet 기준</h5>
+        ${savedMustMeet.map(m => `
+          <div style="font-size:0.75rem;padding:0.25rem 0;display:flex;gap:0.4rem;align-items:center;">
+            <span>${m.checked ? "✅" : "❌"}</span> <span style="${m.checked ? "" : "color:var(--danger-400);"}">${escapeHtml(m.label)}</span>
+          </div>
+        `).join("")}
+        <div class="gate-must-meet-summary ${mustMeetAllPassed ? "pass" : "fail"}" style="margin-top:0.4rem;">
+          ${mustMeetAllPassed ? "전체 충족" : `미충족 ${savedMustMeet.filter(m => !m.checked).length}건`}
+        </div>
+      </div>
+      <div class="gate-review-section">
+        <h5>📊 Should-Meet 스코어</h5>
+        ${savedShouldMeet.map(s => `
+          <div style="font-size:0.75rem;padding:0.2rem 0;display:flex;justify-content:space-between;">
+            <span>${escapeHtml(s.label)}</span>
+            <span style="font-weight:700;">${s.score || 0}/10</span>
+          </div>
+        `).join("")}
+        <div class="gate-score-total" style="margin-top:0.3rem;">
+          <span>총점</span>
+          <span style="color:${scoreColor};">${shouldMeetTotal} / ${shouldMeetMax}</span>
+        </div>
+      </div>
+      ` : `<div style="font-size:0.75rem;color:var(--slate-400);padding:0.5rem 0;">기획조정실이 Gate Review를 진행하면 판단 기준이 여기에 표시됩니다.</div>`}
+      `}
+
+      <!-- 핸드오프 체크리스트 -->
+      <div class="gate-review-section">
+        <h5>🤝 Phase 인수인계 체크리스트</h5>
+        <div id="gate-handoff-list">
+          ${(gr?.handoffChecklist || [
+            { id: "h0", label: "산출물 검토 및 승인 완료", checked: false },
+            { id: "h1", label: "미결 이슈 목록 정리 및 인수인계", checked: false },
+            { id: "h2", label: "다음 단계 담당자에게 브리핑 완료", checked: false },
+            { id: "h3", label: "관련 문서/파일 공유 및 접근 권한 확인", checked: false },
+            { id: "h4", label: "리스크/주의사항 전달", checked: false },
+          ]).map((h, i) => `
+            <label class="gate-must-meet-item ${h.checked ? "checked" : ""}" data-handoff-idx="${i}" style="cursor:pointer;">
+              <input type="checkbox" ${h.checked ? "checked" : ""} class="handoff-cb">
+              <span>${escapeHtml(h.label)}</span>
+              ${h.checkedBy ? `<span style="font-size:0.625rem;color:var(--slate-400);margin-left:auto;">${escapeHtml(h.checkedBy)}</span>` : ""}
+            </label>
+          `).join("")}
+        </div>
+        <div style="font-size:0.7rem;margin-top:0.3rem;color:var(--slate-400);">
+          ${(() => {
+            const items = gr?.handoffChecklist || [];
+            const done = items.filter(h => h.checked).length;
+            const total = items.length || 5;
+            return done === total ? `<span style="color:var(--success-400);">전체 인수인계 완료</span>` : `${done}/${total} 완료`;
+          })()}
+        </div>
+      </div>
+
+      <!-- 의사결정 이력 -->
+      ${(gr?.decisionHistory && gr.decisionHistory.length > 0) ? `
+      <div class="gate-review-section">
+        <h5>📋 의사결정 이력 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">${gr.decisionHistory.length}건</span></h5>
+        <div style="max-height:200px;overflow-y:auto;">
+          ${[...gr.decisionHistory].reverse().map(h => {
+            const decisionLabels = { go: "Go ✅", kill: "Kill ❌", hold: "Hold ⏸", recycle: "Recycle ♻", approved: "승인 ✅", rejected: "반려 ❌", pending: "초기화 ↩" };
+            const decisionColors = { go: "var(--success-400)", kill: "var(--danger-400)", hold: "var(--warning-400)", recycle: "var(--primary-400)", approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--slate-400)" };
+            const dAt = h.decidedAt ? (typeof h.decidedAt.toDate === "function" ? h.decidedAt.toDate() : new Date(h.decidedAt)) : null;
+            const dateStr = dAt ? formatDate(dAt) : "";
+            return `<div style="display:flex;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--surface-3);font-size:0.75rem;">
+              <span style="flex-shrink:0;font-weight:700;color:${decisionColors[h.decision] || "var(--slate-300)"};">${decisionLabels[h.decision] || h.decision}</span>
+              <span style="flex:1;min-width:0;color:var(--slate-300);">${h.reason ? escapeHtml(h.reason) : "<span style='color:var(--slate-500);'>사유 없음</span>"}</span>
+              <span style="flex-shrink:0;color:var(--slate-400);white-space:nowrap;">${escapeHtml(h.decidedBy)} · ${dateStr}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+      ` : ""}
 
       <!-- 회의록 -->
       <div class="gate-section">
@@ -2832,42 +3069,169 @@ function openPhasePanel(phase, phaseIdx) {
 
   openSlideOver(`${phase.name} — ${phase.gateStage}`, body);
 
-  // 이벤트 바인딩 (슬라이드 패널 내부)
+  // 이벤트 바인딩
   setTimeout(() => {
     const panel = document.querySelector(".slide-over-body");
     if (!panel) return;
 
-    // 승인/반려/초기화 버튼
-    panel.querySelectorAll("[data-gate-action]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const action = btn.dataset.gateAction;
+    // Gate Review 이벤트 (observer only)
+    if (isObserver) {
+      let selectedDecision = gateStatus === "approved" ? "go" : gateStatus === "rejected" ? "kill" : (gateStatus !== "pending" ? gateStatus : "");
+
+      // Must-Meet 체크박스
+      panel.querySelectorAll("#gate-must-meet-list .gate-must-meet-item input").forEach(cb => {
+        cb.addEventListener("change", () => {
+          const item = cb.closest(".gate-must-meet-item");
+          if (cb.checked) item.classList.add("checked"); else item.classList.remove("checked");
+          const allChecked = [...panel.querySelectorAll("#gate-must-meet-list input")].every(c => c.checked);
+          const unchecked = [...panel.querySelectorAll("#gate-must-meet-list input")].filter(c => !c.checked).length;
+          const result = panel.querySelector("#gate-must-meet-result");
+          if (result) {
+            result.className = `gate-must-meet-summary ${allChecked ? "pass" : "fail"}`;
+            result.textContent = allChecked ? "전체 충족 — Go 가능" : `미충족 ${unchecked}건 — Go 불가`;
+          }
+        });
+      });
+
+      // Should-Meet 점수 입력
+      panel.querySelectorAll(".gate-score-input").forEach(input => {
+        input.addEventListener("input", () => {
+          let val = parseInt(input.value) || 0;
+          if (val > 10) { val = 10; input.value = 10; }
+          if (val < 0) { val = 0; input.value = 0; }
+          const total = [...panel.querySelectorAll(".gate-score-input")].reduce((s, inp) => s + (parseInt(inp.value) || 0), 0);
+          const max = panel.querySelectorAll(".gate-score-input").length * 10;
+          const pct = Math.round(total / max * 100);
+          const c = pct >= 70 ? "var(--success-400)" : pct >= 40 ? "var(--warning-500)" : "var(--danger-400)";
+          const sv = panel.querySelector("#gate-score-value");
+          if (sv) { sv.textContent = `${total} / ${max}`; sv.style.color = c; }
+          const bar = panel.querySelector(".gate-score-bar-fill");
+          if (bar) { bar.style.width = `${pct}%`; bar.style.background = c; }
+        });
+      });
+
+      // Decision 버튼
+      panel.querySelectorAll(".gate-decision-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          selectedDecision = btn.dataset.gateDecision;
+          const dec = GATE_DECISIONS.find(d => d.value === selectedDecision);
+          panel.querySelectorAll(".gate-decision-btn").forEach(b => {
+            const bd = GATE_DECISIONS.find(d => d.value === b.dataset.gateDecision);
+            if (b === btn) {
+              b.style.borderColor = dec.color;
+              b.style.background = dec.bg;
+              b.classList.add("selected");
+            } else {
+              b.style.borderColor = "var(--surface-3)";
+              b.style.background = "var(--surface-1)";
+              b.classList.remove("selected");
+            }
+          });
+        });
+      });
+
+      // Submit decision
+      panel.querySelector("#gate-submit-decision")?.addEventListener("click", async () => {
+        if (!selectedDecision) { showToast("warning", "의사결정을 선택해주세요."); return; }
+
+        // Must-Meet check: Go selected but not all met
+        const allMustMet = [...panel.querySelectorAll("#gate-must-meet-list input")].every(c => c.checked);
+        if (selectedDecision === "go" && !allMustMet) {
+          showToast("warning", "Must-Meet 기준이 모두 충족되지 않아 Go를 선택할 수 없습니다.");
+          return;
+        }
+
+        // Collect review data
+        const mustMeetItems = [...panel.querySelectorAll("#gate-must-meet-list .gate-must-meet-item")].map((el, i) => ({
+          id: `mm${i}`,
+          label: el.querySelector("span")?.textContent || "",
+          checked: el.querySelector("input")?.checked || false,
+        }));
+        const shouldMeetItems = [...panel.querySelectorAll(".gate-score-item")].map((el, i) => ({
+          id: `sm${i}`,
+          label: el.querySelector(".gate-score-label")?.childNodes[0]?.textContent?.trim() || "",
+          description: el.querySelector(".gate-score-desc")?.textContent || "",
+          score: parseInt(el.querySelector(".gate-score-input")?.value) || 0,
+          maxScore: 10,
+        }));
+        const smTotal = shouldMeetItems.reduce((s, it) => s + it.score, 0);
+        const smMax = shouldMeetItems.length * 10;
+        const reason = panel.querySelector("#gate-decision-reason")?.value?.trim() || "";
+
+        // Map decision to gateStatus for backward compat
+        const statusMap = { go: "go", kill: "kill", hold: "hold", recycle: "recycle" };
+        const newStatus = statusMap[selectedDecision];
+
+        const submitBtn = panel.querySelector("#gate-submit-decision");
         try {
-          btn.disabled = true;
-          btn.style.opacity = "0.5";
-          await updateGateRecord(projectId, phaseId, phase.name, action, user?.name || "");
-          showToast("success", action === "approved" ? "승인 완료" : action === "rejected" ? "반려 처리" : "초기화 완료");
-          // Optimistic update: immediately patch local gateRecords so panel re-renders with new status
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "저장 중..."; }
+          await updateGateRecord(projectId, phaseId, phase.name, newStatus, user?.name || "", {
+            mustMeetItems,
+            shouldMeetItems,
+            shouldMeetTotal: smTotal,
+            shouldMeetMax: smMax,
+            decisionReason: reason,
+          });
+          const decLabel = GATE_DECISIONS.find(d => d.value === selectedDecision)?.label || selectedDecision;
+          showToast("success", `${phase.name} Gate: ${decLabel}`);
+          // Optimistic update
           const existingIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
           const now = new Date().toISOString();
-          if (existingIdx >= 0) {
-            gateRecords[existingIdx].gateStatus = action;
-            if (action === "approved" || action === "rejected") {
-              gateRecords[existingIdx].approvedBy = user?.name || "";
-              gateRecords[existingIdx].approvedAt = now;
-            }
-            if (action === "pending") {
-              gateRecords[existingIdx].approvedBy = "";
-              gateRecords[existingIdx].approvedAt = null;
-            }
-          } else {
-            gateRecords.push({ phaseId, phaseName: phase.name, gateStatus: action, approvedBy: action !== "pending" ? (user?.name || "") : "", approvedAt: action !== "pending" ? now : null, meetingNotes: [] });
-          }
-          // Re-open panel immediately with updated data
+          const patch = { phaseId, phaseName: phase.name, gateStatus: newStatus, approvedBy: user?.name || "", approvedAt: now, mustMeetItems, shouldMeetItems, shouldMeetTotal: smTotal, shouldMeetMax: smMax, decisionReason: reason, meetingNotes: notes };
+          if (existingIdx >= 0) Object.assign(gateRecords[existingIdx], patch);
+          else gateRecords.push(patch);
           openPhasePanel(phase, phaseIdx);
         } catch (err) {
-          showToast("error", "처리 실패: " + err.message);
-          btn.disabled = false;
-          btn.style.opacity = "1";
+          showToast("error", "저장 실패: " + err.message);
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "결정 저장"; }
+        }
+      });
+
+      // Reset decision
+      panel.querySelector("#gate-reset-decision")?.addEventListener("click", async () => {
+        try {
+          await updateGateRecord(projectId, phaseId, phase.name, "pending", "", {
+            mustMeetItems: savedMustMeet.map(m => ({ ...m, checked: false })),
+            shouldMeetItems: savedShouldMeet.map(s => ({ ...s, score: 0 })),
+            shouldMeetTotal: 0,
+            shouldMeetMax: shouldMeetMax,
+            decisionReason: "",
+          });
+          showToast("success", "초기화 완료");
+          const existingIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
+          if (existingIdx >= 0) {
+            gateRecords[existingIdx].gateStatus = "pending";
+            gateRecords[existingIdx].approvedBy = "";
+            gateRecords[existingIdx].approvedAt = null;
+            gateRecords[existingIdx].decisionReason = "";
+          }
+          openPhasePanel(phase, phaseIdx);
+        } catch (err) {
+          showToast("error", "초기화 실패: " + err.message);
+        }
+      });
+    }
+
+    // 핸드오프 체크리스트
+    panel.querySelectorAll(".handoff-cb").forEach(cb => {
+      cb.addEventListener("change", async () => {
+        const items = [...panel.querySelectorAll("[data-handoff-idx]")].map((el, i) => {
+          const input = el.querySelector("input");
+          return {
+            id: `h${i}`,
+            label: el.querySelector("span").textContent.trim(),
+            checked: input.checked,
+            checkedBy: input.checked ? (user?.name || "") : "",
+            checkedAt: input.checked ? new Date().toISOString() : null,
+          };
+        });
+        try {
+          await updateHandoffChecklist(projectId, phaseId, items);
+          // Update local state
+          const grIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
+          if (grIdx >= 0) gateRecords[grIdx].handoffChecklist = items;
+        } catch (e) {
+          console.error("핸드오프 저장 실패:", e);
         }
       });
     });
@@ -3073,5 +3437,871 @@ function showAddTaskModal() {
       overlay.remove();
     } catch (err) { showToast('error', "작업 생성 실패: " + err.message); }
     finally { isCreating = false; }
+  });
+}
+
+// =============================================================================
+// Meetings slide-over (회의록)
+// =============================================================================
+
+function getMeetingTypeLabel(value) {
+  const t = MEETING_TYPES.find(m => m.value === value);
+  return t ? t.label : value;
+}
+
+function openMeetingsPanel() {
+  const body = `
+    <div style="margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.8rem;color:var(--slate-400);">${meetings.length}건의 회의</span>
+      <button class="btn-primary btn-sm" id="so-create-meeting" style="font-size:0.75rem;">+ 새 회의 등록</button>
+    </div>
+    <div id="so-meeting-list">
+      ${meetings.length === 0 ? '<p style="text-align:center;color:var(--slate-400);font-size:0.8rem;margin-top:2rem;">등록된 회의가 없습니다.</p>' :
+        meetings.map(m => {
+          const actionOpen = (m.actionItems || []).filter(a => !a.convertedTaskId && a.status !== "cancelled").length;
+          const actionTotal = (m.actionItems || []).length;
+          return `
+            <div class="meeting-card" data-meeting-id="${m.id}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.3rem;">
+                <div>
+                  <span class="meeting-type-badge">${getMeetingTypeLabel(m.meetingType)}</span>
+                  <span style="font-size:0.65rem;color:var(--slate-400);margin-left:0.3rem;">${formatDate(m.date)}</span>
+                </div>
+                ${m.phase ? `<span class="badge badge-neutral" style="font-size:0.6rem;">${escapeHtml(m.phase)}</span>` : ""}
+              </div>
+              <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.2rem;">${escapeHtml(m.title)}</div>
+              <div style="font-size:0.72rem;color:var(--slate-400);display:flex;gap:0.75rem;">
+                <span>참석 ${(m.participants || []).length}명</span>
+                ${actionTotal > 0 ? `<span>액션 ${actionOpen}/${actionTotal}</span>` : ""}
+                <span>결정 ${(m.decisions || []).length}건</span>
+              </div>
+            </div>
+          `;
+        }).join("")
+      }
+    </div>
+  `;
+  openSlideOver("📋 프로젝트 회의록", body);
+
+  // Bind events after DOM is ready
+  requestAnimationFrame(() => {
+    document.getElementById("so-create-meeting")?.addEventListener("click", openMeetingCreatePanel);
+    document.querySelectorAll("[data-meeting-id]").forEach(card => {
+      card.addEventListener("click", () => openMeetingDetailPanel(card.dataset.meetingId));
+    });
+  });
+}
+
+function openMeetingCreatePanel() {
+  const today = new Date().toISOString().slice(0, 10);
+  const phases = getActivePhaseGroups();
+  const body = `
+    <form id="so-meeting-form" style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">회의 제목 *</label>
+        <input type="text" class="input-field" id="mf-title" placeholder="예: 3월 2주차 주간회의" required style="font-size:0.8rem;">
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">날짜 *</label>
+          <input type="date" class="input-field" id="mf-date" value="${today}" required style="font-size:0.8rem;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">유형</label>
+          <select class="input-field" id="mf-type" style="font-size:0.8rem;">
+            ${MEETING_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">연결 Phase (선택)</label>
+        <select class="input-field" id="mf-phase" style="font-size:0.8rem;">
+          <option value="">없음</option>
+          ${phases.map(p => `<option value="${p.name}">${p.name}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">참석자 (쉼표로 구분)</label>
+        <input type="text" class="input-field" id="mf-participants" placeholder="김철수, 이영희, 박민수" style="font-size:0.8rem;">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">회의 요약</label>
+        <textarea class="input-field" id="mf-summary" rows="3" placeholder="회의 내용 요약..." style="font-size:0.8rem;resize:vertical;"></textarea>
+      </div>
+
+      <!-- 결정 사항 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">결정 사항</label>
+        <div id="mf-decisions"></div>
+        <button type="button" class="btn-ghost btn-sm" id="mf-add-decision" style="font-size:0.7rem;margin-top:0.2rem;">+ 결정 추가</button>
+      </div>
+
+      <!-- 액션 아이템 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">액션 아이템</label>
+        <div id="mf-actions"></div>
+        <button type="button" class="btn-ghost btn-sm" id="mf-add-action" style="font-size:0.7rem;margin-top:0.2rem;">+ 액션 추가</button>
+      </div>
+
+      <!-- 보류 사항 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">보류 사항 (Parking Lot)</label>
+        <div id="mf-parking"></div>
+        <button type="button" class="btn-ghost btn-sm" id="mf-add-parking" style="font-size:0.7rem;margin-top:0.2rem;">+ 보류 추가</button>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+        <button type="submit" class="btn-primary btn-sm" style="flex:1;font-size:0.8rem;">등록</button>
+        <button type="button" class="btn-ghost btn-sm" id="mf-cancel" style="flex:1;font-size:0.8rem;">취소</button>
+      </div>
+    </form>
+  `;
+  openSlideOver("새 회의 등록", body);
+
+  requestAnimationFrame(() => {
+    let decisionCount = 0, actionCount = 0, parkingCount = 0;
+
+    document.getElementById("mf-add-decision")?.addEventListener("click", () => {
+      const id = `dec-${decisionCount++}`;
+      const container = document.getElementById("mf-decisions");
+      const row = document.createElement("div");
+      row.className = "meeting-repeatable-row";
+      row.innerHTML = `
+        <input type="text" class="input-field" data-decision placeholder="결정 내용" style="flex:1;font-size:0.75rem;">
+        <input type="text" class="input-field" data-decision-owner placeholder="담당자" style="width:70px;font-size:0.75rem;">
+        <button type="button" class="btn-ghost btn-sm meeting-row-remove" style="font-size:0.7rem;padding:0.2rem;">✕</button>
+      `;
+      row.querySelector(".meeting-row-remove").addEventListener("click", () => row.remove());
+      container.appendChild(row);
+    });
+
+    document.getElementById("mf-add-action")?.addEventListener("click", () => {
+      const container = document.getElementById("mf-actions");
+      const row = document.createElement("div");
+      row.className = "meeting-repeatable-row";
+      row.style.flexWrap = "wrap";
+      row.innerHTML = `
+        <input type="text" class="input-field" data-action-title placeholder="액션 내용" style="flex:1;min-width:150px;font-size:0.75rem;">
+        <input type="text" class="input-field" data-action-assignee placeholder="담당자" style="width:70px;font-size:0.75rem;">
+        <select class="input-field" data-action-dept style="width:90px;font-size:0.7rem;">
+          <option value="">부서</option>
+          ${departments.map(d => `<option value="${d}">${d}</option>`).join("")}
+        </select>
+        <input type="date" class="input-field" data-action-due style="width:120px;font-size:0.75rem;">
+        <select class="input-field" data-action-priority style="width:60px;font-size:0.7rem;">
+          <option value="green">보통</option>
+          <option value="yellow">중요</option>
+          <option value="red">긴급</option>
+        </select>
+        <button type="button" class="btn-ghost btn-sm meeting-row-remove" style="font-size:0.7rem;padding:0.2rem;">✕</button>
+      `;
+      row.querySelector(".meeting-row-remove").addEventListener("click", () => row.remove());
+      container.appendChild(row);
+      actionCount++;
+    });
+
+    document.getElementById("mf-add-parking")?.addEventListener("click", () => {
+      const container = document.getElementById("mf-parking");
+      const row = document.createElement("div");
+      row.className = "meeting-repeatable-row";
+      row.innerHTML = `
+        <input type="text" class="input-field" data-parking placeholder="보류 사항" style="flex:1;font-size:0.75rem;">
+        <button type="button" class="btn-ghost btn-sm meeting-row-remove" style="font-size:0.7rem;padding:0.2rem;">✕</button>
+      `;
+      row.querySelector(".meeting-row-remove").addEventListener("click", () => row.remove());
+      container.appendChild(row);
+    });
+
+    document.getElementById("mf-cancel")?.addEventListener("click", openMeetingsPanel);
+
+    document.getElementById("so-meeting-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("mf-title").value.trim();
+      if (!title) { showToast("warning", "제목을 입력해주세요"); return; }
+
+      // Collect decisions
+      const decisions = [];
+      document.querySelectorAll("#mf-decisions .meeting-repeatable-row").forEach(row => {
+        const content = row.querySelector("[data-decision]")?.value?.trim();
+        if (content) {
+          decisions.push({
+            id: crypto.randomUUID(),
+            content,
+            owner: row.querySelector("[data-decision-owner]")?.value?.trim() || "",
+          });
+        }
+      });
+
+      // Collect actions
+      const actionItems = [];
+      document.querySelectorAll("#mf-actions .meeting-repeatable-row").forEach(row => {
+        const actionTitle = row.querySelector("[data-action-title]")?.value?.trim();
+        if (actionTitle) {
+          actionItems.push({
+            id: crypto.randomUUID(),
+            title: actionTitle,
+            assignee: row.querySelector("[data-action-assignee]")?.value?.trim() || "",
+            department: row.querySelector("[data-action-dept]")?.value || "",
+            dueDate: row.querySelector("[data-action-due]")?.value || null,
+            priority: row.querySelector("[data-action-priority]")?.value || "green",
+            convertedTaskId: null,
+            status: "open",
+          });
+        }
+      });
+
+      // Collect parking lot
+      const parkingLot = [];
+      document.querySelectorAll("#mf-parking .meeting-repeatable-row").forEach(row => {
+        const content = row.querySelector("[data-parking]")?.value?.trim();
+        if (content) {
+          parkingLot.push({ id: crypto.randomUUID(), content });
+        }
+      });
+
+      try {
+        await createMeeting({
+          projectId,
+          title,
+          date: document.getElementById("mf-date").value,
+          meetingType: document.getElementById("mf-type").value,
+          phase: document.getElementById("mf-phase").value || null,
+          participants: document.getElementById("mf-participants").value.split(",").map(s => s.trim()).filter(Boolean),
+          summary: document.getElementById("mf-summary").value.trim(),
+          decisions,
+          actionItems,
+          parkingLot,
+          createdBy: user.name,
+        });
+        showToast("success", "회의록이 등록되었습니다");
+        openMeetingsPanel();
+      } catch (err) {
+        showToast("error", "등록 실패: " + err.message);
+      }
+    });
+  });
+}
+
+function openMeetingDetailPanel(meetingId) {
+  const m = meetings.find(mt => mt.id === meetingId);
+  if (!m) return;
+
+  const actionItems = m.actionItems || [];
+  const decisions = m.decisions || [];
+  const parkingLot = m.parkingLot || [];
+
+  const body = `
+    <div style="margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+        <span class="meeting-type-badge">${getMeetingTypeLabel(m.meetingType)}</span>
+        <span style="font-size:0.75rem;color:var(--slate-400);">${formatDate(m.date)}</span>
+        ${m.phase ? `<span class="badge badge-neutral" style="font-size:0.6rem;">${escapeHtml(m.phase)}</span>` : ""}
+      </div>
+      <h4 style="margin:0.3rem 0;font-size:1rem;">${escapeHtml(m.title)}</h4>
+      ${m.participants?.length ? `<div style="font-size:0.72rem;color:var(--slate-400);margin-bottom:0.3rem;">참석: ${m.participants.map(p => escapeHtml(p)).join(", ")}</div>` : ""}
+      ${m.summary ? `<div style="font-size:0.8rem;line-height:1.5;background:var(--surface-2);padding:0.5rem 0.75rem;border-radius:var(--radius-md);margin-top:0.5rem;">${escapeHtml(m.summary).replace(/\n/g, "<br>")}</div>` : ""}
+    </div>
+
+    <!-- 결정 사항 -->
+    ${decisions.length ? `
+      <div style="margin-bottom:1rem;">
+        <h5 style="font-size:0.8rem;margin:0 0 0.4rem 0;color:var(--warning-500);">결정 사항 (${decisions.length})</h5>
+        ${decisions.map(d => `
+          <div class="meeting-decision-item">
+            <div>${escapeHtml(d.content)}</div>
+            ${d.owner ? `<div style="font-size:0.65rem;color:var(--slate-400);margin-top:0.15rem;">담당: ${escapeHtml(d.owner)}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    <!-- 액션 아이템 -->
+    ${actionItems.length ? `
+      <div style="margin-bottom:1rem;">
+        <h5 style="font-size:0.8rem;margin:0 0 0.4rem 0;color:var(--primary-500);">액션 아이템 (${actionItems.length})</h5>
+        ${actionItems.map(ai => {
+          const statusClass = ai.convertedTaskId ? "meeting-action-converted" : ai.status === "cancelled" ? "meeting-action-cancelled" : "meeting-action-open";
+          return `
+            <div class="meeting-action-item ${statusClass}">
+              <div style="flex:1;">
+                <div style="font-weight:500;">${escapeHtml(ai.title)}</div>
+                <div style="font-size:0.65rem;color:var(--slate-400);margin-top:0.1rem;">
+                  ${ai.assignee ? `담당: ${escapeHtml(ai.assignee)}` : ""}
+                  ${ai.department ? ` · ${escapeHtml(ai.department)}` : ""}
+                  ${ai.dueDate ? ` · 기한: ${formatDate(ai.dueDate)}` : ""}
+                </div>
+              </div>
+              <div style="flex-shrink:0;">
+                ${ai.convertedTaskId ?
+                  `<a href="task.html?id=${ai.convertedTaskId}" class="badge badge-success" style="font-size:0.6rem;text-decoration:none;">작업 보기</a>` :
+                  ai.status !== "cancelled" ?
+                    `<button class="btn-primary btn-sm" data-convert-action="${ai.id}" style="font-size:0.65rem;padding:0.15rem 0.4rem;">작업 변환</button>` :
+                    ""
+                }
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    ` : ""}
+
+    <!-- 보류 사항 -->
+    ${parkingLot.length ? `
+      <div style="margin-bottom:1rem;">
+        <h5 style="font-size:0.8rem;margin:0 0 0.4rem 0;color:var(--slate-400);">보류 사항 (${parkingLot.length})</h5>
+        ${parkingLot.map(p => `
+          <div style="font-size:0.78rem;padding:0.3rem 0.5rem;border-left:3px solid var(--surface-4);background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:0.3rem;">
+            ${escapeHtml(p.content)}
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--surface-3);">
+      <button class="btn-ghost btn-sm" id="so-meeting-back" style="font-size:0.75rem;">← 목록으로</button>
+      <div style="flex:1;"></div>
+      <button class="btn-ghost btn-sm" id="so-meeting-edit" style="font-size:0.75rem;">수정</button>
+      <button class="btn-ghost btn-sm" id="so-meeting-delete" style="font-size:0.75rem;color:var(--danger-500);">삭제</button>
+    </div>
+  `;
+
+  openSlideOver(`회의 상세`, body);
+
+  requestAnimationFrame(() => {
+    document.getElementById("so-meeting-back")?.addEventListener("click", openMeetingsPanel);
+
+    document.getElementById("so-meeting-edit")?.addEventListener("click", () => openMeetingEditPanel(meetingId));
+
+    document.getElementById("so-meeting-delete")?.addEventListener("click", async () => {
+      const ok = await confirmModal("이 회의록을 삭제하시겠습니까?", "삭제", "danger");
+      if (!ok) return;
+      try {
+        await deleteMeeting(meetingId);
+        showToast("success", "회의록이 삭제되었습니다");
+        openMeetingsPanel();
+      } catch (err) {
+        showToast("error", "삭제 실패: " + err.message);
+      }
+    });
+
+    // Convert action item → checklist task
+    document.querySelectorAll("[data-convert-action]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const actionId = btn.dataset.convertAction;
+        const ai = actionItems.find(a => a.id === actionId);
+        if (!ai) return;
+
+        const ok = await confirmModal(
+          `"${ai.title}" 을(를) 프로젝트 작업으로 변환합니다.\n담당: ${ai.assignee || "미정"}, 부서: ${ai.department || "미정"}`,
+          "작업 생성",
+          "primary"
+        );
+        if (!ok) return;
+
+        // Determine stage from phase or default
+        let stage = getActivePhaseGroups()[0]?.workStage || "발의검토";
+        if (m.phase) {
+          const ph = getActivePhaseGroups().find(p => p.name === m.phase);
+          if (ph) stage = ph.workStage;
+        }
+
+        try {
+          btn.disabled = true;
+          btn.textContent = "변환 중...";
+          await convertMeetingActionToTask(meetingId, actionId, projectId, {
+            title: ai.title,
+            assignee: ai.assignee || user.name,
+            department: ai.department || user.department || departments[0],
+            stage,
+            importance: ai.priority || "green",
+            dueDate: ai.dueDate || null,
+            source: "meeting",
+          });
+          showToast("success", "작업이 생성되었습니다");
+          openMeetingDetailPanel(meetingId);
+        } catch (err) {
+          showToast("error", "변환 실패: " + err.message);
+          btn.disabled = false;
+          btn.textContent = "작업 변환";
+        }
+      });
+    });
+  });
+}
+
+function openMeetingEditPanel(meetingId) {
+  const m = meetings.find(mt => mt.id === meetingId);
+  if (!m) return;
+
+  const phases = getActivePhaseGroups();
+  const dateVal = m.date instanceof Date ? m.date.toISOString().slice(0, 10) : "";
+
+  const body = `
+    <form id="so-meeting-edit-form" style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">회의 제목 *</label>
+        <input type="text" class="input-field" id="me-title" value="${escapeHtml(m.title)}" required style="font-size:0.8rem;">
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">날짜 *</label>
+          <input type="date" class="input-field" id="me-date" value="${dateVal}" required style="font-size:0.8rem;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">유형</label>
+          <select class="input-field" id="me-type" style="font-size:0.8rem;">
+            ${MEETING_TYPES.map(t => `<option value="${t.value}" ${t.value === m.meetingType ? "selected" : ""}>${t.label}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">연결 Phase (선택)</label>
+        <select class="input-field" id="me-phase" style="font-size:0.8rem;">
+          <option value="">없음</option>
+          ${phases.map(p => `<option value="${p.name}" ${p.name === m.phase ? "selected" : ""}>${p.name}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">참석자 (쉼표로 구분)</label>
+        <input type="text" class="input-field" id="me-participants" value="${escapeHtml((m.participants || []).join(", "))}" style="font-size:0.8rem;">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.2rem;">회의 요약</label>
+        <textarea class="input-field" id="me-summary" rows="3" style="font-size:0.8rem;resize:vertical;">${escapeHtml(m.summary || "")}</textarea>
+      </div>
+
+      <!-- 결정 사항 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">결정 사항</label>
+        <div id="me-decisions"></div>
+        <button type="button" class="btn-ghost btn-sm" id="me-add-decision" style="font-size:0.7rem;margin-top:0.2rem;">+ 결정 추가</button>
+      </div>
+
+      <!-- 액션 아이템 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">액션 아이템</label>
+        <div id="me-actions"></div>
+        <button type="button" class="btn-ghost btn-sm" id="me-add-action" style="font-size:0.7rem;margin-top:0.2rem;">+ 액션 추가</button>
+      </div>
+
+      <!-- 보류 사항 -->
+      <div>
+        <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.3rem;">보류 사항 (Parking Lot)</label>
+        <div id="me-parking"></div>
+        <button type="button" class="btn-ghost btn-sm" id="me-add-parking" style="font-size:0.7rem;margin-top:0.2rem;">+ 보류 추가</button>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+        <button type="submit" class="btn-primary btn-sm" style="flex:1;font-size:0.8rem;">저장</button>
+        <button type="button" class="btn-ghost btn-sm" id="me-cancel" style="flex:1;font-size:0.8rem;">취소</button>
+      </div>
+    </form>
+  `;
+  openSlideOver("회의 수정", body);
+
+  // Helper to create a removable row with prefilled values
+  function addEditRow(container, html) {
+    const row = document.createElement("div");
+    row.className = "meeting-repeatable-row";
+    row.innerHTML = html + `<button type="button" class="btn-ghost btn-sm meeting-row-remove" style="font-size:0.7rem;padding:0.2rem;">✕</button>`;
+    row.querySelector(".meeting-row-remove").addEventListener("click", () => row.remove());
+    container.appendChild(row);
+    return row;
+  }
+
+  requestAnimationFrame(() => {
+    const decisionsEl = document.getElementById("me-decisions");
+    const actionsEl = document.getElementById("me-actions");
+    const parkingEl = document.getElementById("me-parking");
+
+    // Prefill existing decisions
+    (m.decisions || []).forEach(d => {
+      addEditRow(decisionsEl, `
+        <input type="text" class="input-field" data-decision value="${escapeHtml(d.content)}" style="flex:1;font-size:0.75rem;">
+        <input type="text" class="input-field" data-decision-owner value="${escapeHtml(d.owner || "")}" placeholder="담당자" style="width:70px;font-size:0.75rem;">
+      `);
+    });
+
+    // Prefill existing actions (skip converted ones — they're immutable)
+    (m.actionItems || []).filter(ai => !ai.convertedTaskId).forEach(ai => {
+      const dueVal = ai.dueDate instanceof Date ? ai.dueDate.toISOString().slice(0, 10) : ai.dueDate || "";
+      const row = addEditRow(actionsEl, `
+        <input type="text" class="input-field" data-action-title value="${escapeHtml(ai.title)}" style="flex:1;min-width:150px;font-size:0.75rem;">
+        <input type="text" class="input-field" data-action-assignee value="${escapeHtml(ai.assignee || "")}" placeholder="담당자" style="width:70px;font-size:0.75rem;">
+        <select class="input-field" data-action-dept style="width:90px;font-size:0.7rem;">
+          <option value="">부서</option>
+          ${departments.map(d => `<option value="${d}" ${d === ai.department ? "selected" : ""}>${d}</option>`).join("")}
+        </select>
+        <input type="date" class="input-field" data-action-due value="${dueVal}" style="width:120px;font-size:0.75rem;">
+        <select class="input-field" data-action-priority style="width:60px;font-size:0.7rem;">
+          <option value="green" ${ai.priority === "green" ? "selected" : ""}>보통</option>
+          <option value="yellow" ${ai.priority === "yellow" ? "selected" : ""}>중요</option>
+          <option value="red" ${ai.priority === "red" ? "selected" : ""}>긴급</option>
+        </select>
+      `);
+      row.style.flexWrap = "wrap";
+      row.dataset.actionId = ai.id;
+    });
+
+    // Prefill existing parking
+    (m.parkingLot || []).forEach(p => {
+      addEditRow(parkingEl, `
+        <input type="text" class="input-field" data-parking value="${escapeHtml(p.content)}" style="flex:1;font-size:0.75rem;">
+      `);
+    });
+
+    // Add-row buttons
+    document.getElementById("me-add-decision")?.addEventListener("click", () => {
+      addEditRow(decisionsEl, `
+        <input type="text" class="input-field" data-decision placeholder="결정 내용" style="flex:1;font-size:0.75rem;">
+        <input type="text" class="input-field" data-decision-owner placeholder="담당자" style="width:70px;font-size:0.75rem;">
+      `);
+    });
+    document.getElementById("me-add-action")?.addEventListener("click", () => {
+      const row = addEditRow(actionsEl, `
+        <input type="text" class="input-field" data-action-title placeholder="액션 내용" style="flex:1;min-width:150px;font-size:0.75rem;">
+        <input type="text" class="input-field" data-action-assignee placeholder="담당자" style="width:70px;font-size:0.75rem;">
+        <select class="input-field" data-action-dept style="width:90px;font-size:0.7rem;">
+          <option value="">부서</option>
+          ${departments.map(d => `<option value="${d}">${d}</option>`).join("")}
+        </select>
+        <input type="date" class="input-field" data-action-due style="width:120px;font-size:0.75rem;">
+        <select class="input-field" data-action-priority style="width:60px;font-size:0.7rem;">
+          <option value="green">보통</option>
+          <option value="yellow">중요</option>
+          <option value="red">긴급</option>
+        </select>
+      `);
+      row.style.flexWrap = "wrap";
+    });
+    document.getElementById("me-add-parking")?.addEventListener("click", () => {
+      addEditRow(parkingEl, `
+        <input type="text" class="input-field" data-parking placeholder="보류 사항" style="flex:1;font-size:0.75rem;">
+      `);
+    });
+
+    document.getElementById("me-cancel")?.addEventListener("click", () => openMeetingDetailPanel(meetingId));
+
+    // Keep converted action items intact
+    const convertedActions = (m.actionItems || []).filter(ai => ai.convertedTaskId);
+
+    document.getElementById("so-meeting-edit-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("me-title").value.trim();
+      if (!title) { showToast("warning", "제목을 입력해주세요"); return; }
+
+      const decisions = [];
+      document.querySelectorAll("#me-decisions .meeting-repeatable-row").forEach(row => {
+        const content = row.querySelector("[data-decision]")?.value?.trim();
+        if (content) {
+          decisions.push({ id: crypto.randomUUID(), content, owner: row.querySelector("[data-decision-owner]")?.value?.trim() || "" });
+        }
+      });
+
+      const actionItems = [...convertedActions];
+      document.querySelectorAll("#me-actions .meeting-repeatable-row").forEach(row => {
+        const actionTitle = row.querySelector("[data-action-title]")?.value?.trim();
+        if (actionTitle) {
+          actionItems.push({
+            id: row.dataset.actionId || crypto.randomUUID(),
+            title: actionTitle,
+            assignee: row.querySelector("[data-action-assignee]")?.value?.trim() || "",
+            department: row.querySelector("[data-action-dept]")?.value || "",
+            dueDate: row.querySelector("[data-action-due]")?.value || null,
+            priority: row.querySelector("[data-action-priority]")?.value || "green",
+            convertedTaskId: null,
+            status: "open",
+          });
+        }
+      });
+
+      const parkingLot = [];
+      document.querySelectorAll("#me-parking .meeting-repeatable-row").forEach(row => {
+        const content = row.querySelector("[data-parking]")?.value?.trim();
+        if (content) { parkingLot.push({ id: crypto.randomUUID(), content }); }
+      });
+
+      try {
+        await updateMeeting(meetingId, {
+          title,
+          date: document.getElementById("me-date").value,
+          meetingType: document.getElementById("me-type").value,
+          phase: document.getElementById("me-phase").value || null,
+          participants: document.getElementById("me-participants").value.split(",").map(s => s.trim()).filter(Boolean),
+          summary: document.getElementById("me-summary").value.trim(),
+          decisions,
+          actionItems,
+          parkingLot,
+        });
+        showToast("success", "회의록이 수정되었습니다");
+        openMeetingDetailPanel(meetingId);
+      } catch (err) {
+        showToast("error", "수정 실패: " + err.message);
+      }
+    });
+  });
+}
+
+// =============================================================================
+// Lessons Learned Tab (교훈)
+// =============================================================================
+
+const LESSON_CATEGORIES = [
+  { value: "success", label: "잘한 점", color: "var(--success-400)", bg: "rgba(34,197,94,0.12)", icon: "+" },
+  { value: "problem", label: "문제점", color: "var(--danger-400)", bg: "rgba(239,68,68,0.12)", icon: "!" },
+  { value: "improvement", label: "개선 제안", color: "var(--warning-400)", bg: "rgba(234,179,8,0.12)", icon: "?" },
+];
+
+function getCategoryMeta(cat) {
+  return LESSON_CATEGORIES.find(c => c.value === cat) || LESSON_CATEGORIES[2];
+}
+
+/**
+ * Phase 뷰 카드 안에 인라인으로 보여주는 과거 교훈
+ * 다른 프로젝트에서 같은 Phase에 남긴 교훈만 필터
+ */
+function renderPhaseLessonsInline(phaseName) {
+  const relevant = allLessons.filter(l =>
+    l.projectId !== projectId && l.phase === phaseName
+  ).sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+
+  if (relevant.length === 0) return "";
+
+  const top = relevant.slice(0, 3);
+
+  return `
+    <div class="phase-section" style="margin-top:0.25rem;">
+      <div class="phase-tasks-header">
+        <span class="phase-section-icon">💡</span>
+        <span>과거 프로젝트 교훈 (${relevant.length}건)</span>
+      </div>
+      <div style="padding:0.25rem 0.75rem;">
+        ${top.map(l => {
+          const cat = getCategoryMeta(l.category);
+          return `
+            <div style="padding:0.4rem 0.6rem;background:${cat.bg};border-left:3px solid ${cat.color};border-radius:var(--radius-md);margin-bottom:0.3rem;font-size:0.72rem;">
+              <div style="display:flex;align-items:center;gap:0.3rem;margin-bottom:0.15rem;">
+                <span style="font-size:0.55rem;font-weight:700;padding:0.05rem 0.25rem;border-radius:var(--radius-sm);background:${cat.color};color:#fff;">${cat.label}</span>
+                <span style="font-size:0.6rem;color:var(--slate-400);">${escapeHtml(l.projectName || "")}</span>
+                ${(l.upvotes || 0) > 0 ? `<span style="font-size:0.55rem;color:var(--primary-400);">▲${l.upvotes}</span>` : ""}
+              </div>
+              <div style="font-weight:600;color:var(--slate-200);margin-bottom:0.1rem;">${escapeHtml(l.title)}</div>
+              <div style="color:var(--slate-400);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(l.content)}</div>
+            </div>
+          `;
+        }).join("")}
+        ${relevant.length > 3 ? `
+          <button class="btn-ghost btn-sm" data-phase-lessons="${escapeHtml(phaseName)}" style="font-size:0.65rem;color:var(--primary-400);width:100%;text-align:center;">
+            전체 ${relevant.length}건 보기 →
+          </button>
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderLessonsTab() {
+  const phases = getActivePhaseGroups();
+
+  // Group lessons by phase
+  const byPhase = {};
+  for (const l of lessons) {
+    const key = l.phase || "기타";
+    if (!byPhase[key]) byPhase[key] = [];
+    byPhase[key].push(l);
+  }
+
+  // Cross-project lessons (exclude current project)
+  const otherLessons = allLessons.filter(l => l.projectId !== projectId);
+
+  // Stats
+  const successCount = lessons.filter(l => l.category === "success").length;
+  const problemCount = lessons.filter(l => l.category === "problem").length;
+  const improvementCount = lessons.filter(l => l.category === "improvement").length;
+
+  return `
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1rem;">
+      ${LESSON_CATEGORIES.map(cat => {
+        const count = cat.value === "success" ? successCount : cat.value === "problem" ? problemCount : improvementCount;
+        return `
+          <div class="card p-4" style="text-align:center;border-left:3px solid ${cat.color};">
+            <div style="font-size:1.5rem;font-weight:700;color:${cat.color};">${count}</div>
+            <div style="font-size:0.72rem;color:var(--slate-400);">${cat.label}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+
+    <!-- Add Lesson -->
+    <div class="card p-5 mb-4">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin:0;">교훈 기록</h3>
+        <button class="btn-primary btn-sm" id="lesson-add-toggle" style="font-size:0.75rem;">+ 교훈 추가</button>
+      </div>
+
+      <!-- Add Form (hidden by default) -->
+      <div id="lesson-add-form" style="display:none;">
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+          <select class="input-field" id="lesson-category" style="font-size:0.8rem;flex:1;">
+            ${LESSON_CATEGORIES.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
+          </select>
+          <select class="input-field" id="lesson-phase" style="font-size:0.8rem;flex:1;">
+            <option value="">Phase 선택 (선택)</option>
+            ${phases.map(p => `<option value="${p.name}">${p.name}</option>`).join("")}
+          </select>
+          <select class="input-field" id="lesson-dept" style="font-size:0.8rem;flex:1;">
+            <option value="">부서 (선택)</option>
+            ${departments.map(d => `<option value="${d}">${d}</option>`).join("")}
+          </select>
+        </div>
+        <input type="text" class="input-field" id="lesson-title" placeholder="제목 (핵심 교훈을 한 줄로)" style="font-size:0.8rem;margin-bottom:0.5rem;">
+        <textarea class="input-field" id="lesson-content" rows="3" placeholder="상세 내용: 무엇이 일어났고, 왜 일어났으며, 다음에는 어떻게 해야 하는지..." style="font-size:0.8rem;resize:vertical;margin-bottom:0.5rem;"></textarea>
+        <input type="text" class="input-field" id="lesson-tags" placeholder="태그 (쉼표로 구분, 예: 일정지연, 커뮤니케이션)" style="font-size:0.8rem;margin-bottom:0.5rem;">
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn-primary btn-sm" id="lesson-submit" style="font-size:0.75rem;">등록</button>
+          <button class="btn-ghost btn-sm" id="lesson-cancel" style="font-size:0.75rem;">취소</button>
+        </div>
+      </div>
+
+      <!-- Lesson List -->
+      ${lessons.length === 0 ? `
+        <div style="text-align:center;padding:2rem;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">📝</div>
+          <div style="font-size:0.8rem;color:var(--slate-400);">아직 기록된 교훈이 없습니다</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.25rem;">프로젝트 진행 중 배운 점, 문제점, 개선 아이디어를 기록해보세요</div>
+        </div>
+      ` : `
+        ${Object.entries(byPhase).map(([phase, items]) => `
+          <div style="margin-bottom:1rem;">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--slate-300);margin-bottom:0.5rem;padding-bottom:0.25rem;border-bottom:1px solid var(--surface-3);">${escapeHtml(phase)}</div>
+            ${items.map(l => renderLessonCard(l, true)).join("")}
+          </div>
+        `).join("")}
+      `}
+    </div>
+
+    <!-- Cross-Project Lessons -->
+    <div class="card p-5">
+      <h3 style="font-size:0.9rem;font-weight:600;color:var(--slate-200);margin-bottom:0.25rem;">다른 프로젝트의 교훈</h3>
+      <p style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.75rem;">과거 프로젝트에서 축적된 교훈을 참고하세요. 추천이 많은 순으로 표시됩니다.</p>
+      ${otherLessons.length === 0 ? `
+        <div style="text-align:center;padding:1.5rem;color:var(--slate-400);font-size:0.8rem;">
+          다른 프로젝트에 기록된 교훈이 없습니다
+        </div>
+      ` : `
+        ${otherLessons
+          .sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0))
+          .slice(0, 10)
+          .map(l => renderLessonCard(l, false)).join("")}
+        ${otherLessons.length > 10 ? `
+          <div style="text-align:center;margin-top:0.5rem;">
+            <span style="font-size:0.7rem;color:var(--slate-400);">외 ${otherLessons.length - 10}건 더</span>
+          </div>
+        ` : ""}
+      `}
+    </div>
+  `;
+}
+
+function renderLessonCard(l, isOwn) {
+  const cat = getCategoryMeta(l.category);
+  const upvoted = (l.upvotedBy || []).includes(user.name);
+  const tags = (l.tags || []).filter(Boolean);
+
+  return `
+    <div class="card-hover" style="padding:0.6rem 0.75rem;margin-bottom:0.5rem;border-left:3px solid ${cat.color};background:${cat.bg};border-radius:var(--radius-md);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
+            <span style="font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:var(--radius-sm);background:${cat.color};color:#fff;">${cat.label}</span>
+            ${!isOwn && l.projectName ? `<span style="font-size:0.6rem;color:var(--slate-400);">${escapeHtml(l.projectName)}</span>` : ""}
+            ${l.phase ? `<span style="font-size:0.6rem;color:var(--slate-500);">${escapeHtml(l.phase)}</span>` : ""}
+          </div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--slate-200);margin-bottom:0.15rem;">${escapeHtml(l.title)}</div>
+          <div style="font-size:0.72rem;color:var(--slate-400);line-height:1.4;white-space:pre-line;">${escapeHtml(l.content)}</div>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;flex-wrap:wrap;">
+            ${tags.map(t => `<span style="font-size:0.6rem;padding:0.05rem 0.3rem;background:var(--surface-3);border-radius:var(--radius-sm);color:var(--slate-400);">#${escapeHtml(t)}</span>`).join("")}
+            <span style="font-size:0.6rem;color:var(--slate-500);">${escapeHtml(l.author)} · ${l.department ? escapeHtml(l.department) + " · " : ""}${timeAgo(l.createdAt)}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.15rem;flex-shrink:0;">
+          <button class="btn-ghost" data-lesson-upvote="${l.id}" style="font-size:0.85rem;padding:0.15rem;line-height:1;color:${upvoted ? "var(--primary-400)" : "var(--slate-500)"};" title="추천">▲</button>
+          <span style="font-size:0.7rem;font-weight:600;color:${(l.upvotes || 0) > 0 ? "var(--primary-400)" : "var(--slate-500)"};">${l.upvotes || 0}</span>
+          ${isOwn ? `<button class="btn-ghost" data-lesson-delete="${l.id}" style="font-size:0.65rem;padding:0.1rem;color:var(--slate-500);" title="삭제">✕</button>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function bindLessonsEvents() {
+  // Toggle add form
+  const toggleBtn = document.getElementById("lesson-add-toggle");
+  const form = document.getElementById("lesson-add-form");
+  if (toggleBtn && form) {
+    toggleBtn.addEventListener("click", () => {
+      form.style.display = form.style.display === "none" ? "block" : "none";
+      toggleBtn.textContent = form.style.display === "none" ? "+ 교훈 추가" : "닫기";
+    });
+  }
+
+  // Cancel
+  document.getElementById("lesson-cancel")?.addEventListener("click", () => {
+    if (form) form.style.display = "none";
+    if (toggleBtn) toggleBtn.textContent = "+ 교훈 추가";
+  });
+
+  // Submit
+  document.getElementById("lesson-submit")?.addEventListener("click", async () => {
+    const title = document.getElementById("lesson-title").value.trim();
+    const content = document.getElementById("lesson-content").value.trim();
+    if (!title) { showToast("warning", "제목을 입력해주세요"); return; }
+    if (!content) { showToast("warning", "상세 내용을 입력해주세요"); return; }
+
+    const tagsRaw = document.getElementById("lesson-tags").value.trim();
+    const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
+
+    try {
+      await addLesson({
+        projectId,
+        projectName: project?.name || "",
+        phase: document.getElementById("lesson-phase").value || "",
+        category: document.getElementById("lesson-category").value,
+        title,
+        content,
+        department: document.getElementById("lesson-dept").value || "",
+        author: user.name,
+        tags,
+      });
+      showToast("success", "교훈이 등록되었습니다");
+    } catch (err) {
+      showToast("error", "등록 실패: " + err.message);
+    }
+  });
+
+  // Upvote
+  app.querySelectorAll("[data-lesson-upvote]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      try {
+        await toggleLessonUpvote(btn.dataset.lessonUpvote, user.name);
+      } catch (err) {
+        showToast("error", "추천 실패: " + err.message);
+      }
+    });
+  });
+
+  // Delete
+  app.querySelectorAll("[data-lesson-delete]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ok = await confirmModal("이 교훈을 삭제하시겠습니까?", "삭제", "danger");
+      if (!ok) return;
+      try {
+        await deleteLesson(btn.dataset.lessonDelete);
+        showToast("success", "교훈이 삭제되었습니다");
+      } catch (err) {
+        showToast("error", "삭제 실패: " + err.message);
+      }
+    });
   });
 }

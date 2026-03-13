@@ -17,6 +17,7 @@ import {
   loadDashboardActiveTasks,
   loadDashboardPendingApprovals,
   getTemplateStages,
+  checkAndCreateEscalations,
 } from "../firestore-service.js";
 import {
   escapeHtml,
@@ -163,6 +164,9 @@ if (cached) {
     computeDerived();
     render();
     saveToCache(tasks, projects, notifs.slice(0, 20));
+
+    // 에스컬레이션 체크 (백그라운드, 하루 1회)
+    checkAndCreateEscalations(user).catch(() => {});
   } catch (e) {
     console.error("초기 로딩 오류:", e);
   }
@@ -177,7 +181,7 @@ if (cached) {
     })
   );
 
-  if (user.role === "observer" || user.role === "manager") {
+  if (user.role === "observer" || user.role === "manager" || user.role === "admin") {
     unsubscribers.push(
       subscribeAllChecklistItems((tasks) => {
         if (user.role === "manager") {
@@ -313,7 +317,7 @@ function computeDerived() {
 
   // --- Unassigned tasks (for managers) ---
   unassignedTasks = [];
-  if (user.role === "manager" || user.role === "observer") {
+  if (user.role === "manager" || user.role === "observer" || user.role === "admin") {
     unassignedTasks = allTasks.filter(
       (t) => (t.status === "pending" || t.status === "in_progress") && !t.assignee
     );
@@ -519,7 +523,7 @@ function renderTasksTab() {
   let html = "";
 
   // Group 0: Unassigned (for managers/observers)
-  if (unassignedTasks.length > 0 && (user.role === "manager" || user.role === "observer")) {
+  if (unassignedTasks.length > 0 && (user.role === "manager" || user.role === "observer" || user.role === "admin")) {
     html += renderTaskGroup("미배정", unassignedTasks, "var(--warning-300)", true);
   }
 
@@ -605,7 +609,7 @@ function _renderApprovalsTab() {
     grouped[t.projectId].push(t);
   });
 
-  const canApprove = user.role === "observer"; // 매니저 승인 제거, observer만 승인
+  const canApprove = user.role === "observer" || user.role === "admin";
   const visible = pendingApprovals.slice(0, approvalLimit);
   const remaining = pendingApprovals.length - approvalLimit;
 
@@ -676,7 +680,7 @@ function renderNotificationsTab() {
     ${notifications
       .map(
         (notif) => `
-      <div class="dash-notif-item cursor-pointer" data-notif-id="${notif.id}" data-notif-link="${escapeHtml(notif.link || "")}" style="${!notif.read ? "border-left: 3px solid var(--primary-500);" : ""}">
+      <div class="dash-notif-item cursor-pointer" data-notif-id="${notif.id}" data-notif-link="${escapeHtml(notif.link || "")}" style="${notif.type?.startsWith("escalation_") ? "border-left: 3px solid var(--danger-400); background: rgba(239,68,68,0.05);" : !notif.read ? "border-left: 3px solid var(--primary-500);" : ""}">
         <div class="flex items-start gap-2">
           ${!notif.read
             ? `<span style="width: 6px; height: 6px; border-radius: 50%; background: var(--primary-400); margin-top: 6px; flex-shrink: 0;"></span>`
