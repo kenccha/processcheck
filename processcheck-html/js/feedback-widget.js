@@ -39,7 +39,7 @@ export function initFeedbackWidget() {
 
   // ── Get user ──
   let user = null;
-  try { user = JSON.parse(localStorage.getItem("pc_user")); } catch {}
+  try { user = JSON.parse(localStorage.getItem("pc_user")); } catch { /* ignore parse error */ }
 
   // ── State ──
   let captureCanvas, captureCtx, baseImage;

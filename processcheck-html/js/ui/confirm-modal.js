@@ -46,7 +46,7 @@ style.textContent = `
 document.head.appendChild(style);
 document.body.appendChild(overlay);
 
-const box = overlay.querySelector("#confirm-modal-box");
+const _box = overlay.querySelector("#confirm-modal-box");
 const titleEl = overlay.querySelector("#confirm-modal-title");
 const okBtn = overlay.querySelector("#confirm-modal-ok");
 const cancelBtn = overlay.querySelector("#confirm-modal-cancel");

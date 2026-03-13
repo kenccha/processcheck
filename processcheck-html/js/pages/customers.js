@@ -4,17 +4,16 @@
 
 import { initTheme } from "../components.js";
 import { showToast } from "../ui/toast.js";
-import { renderNav, navigate } from "../components.js";
-import { guardPage, getUser } from "../auth.js";
+import { renderNav } from "../components.js";
+import { guardPage } from "../auth.js";
 import { trapFocus, releaseFocus } from "../ui/focus-trap.js";
 import {
   subscribeCustomers,
   createCustomer,
   updateCustomer,
-  deleteCustomer,
   CUSTOMER_TYPE_LABELS,
 } from "../firestore-service.js";
-import { escapeHtml, formatDate } from "../utils.js";
+import { escapeHtml } from "../utils.js";
 
 initTheme();
 
@@ -43,10 +42,10 @@ function getFiltered() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
-        c.name.toLowerCase().includes(q) ||
-        c.contactName.toLowerCase().includes(q) ||
-        c.region.toLowerCase().includes(q) ||
-        c.salesRep.toLowerCase().includes(q)
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.contactName || "").toLowerCase().includes(q) ||
+        (c.region || "").toLowerCase().includes(q) ||
+        (c.salesRep || "").toLowerCase().includes(q)
       );
     }
     return true;

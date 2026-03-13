@@ -11,7 +11,7 @@ import {
   updatePermissions,
   subscribeUsers,
 } from "../firestore-service.js";
-import { escapeHtml, getRoleName } from "../utils.js";
+import { getRoleName } from "../utils.js";
 
 // --- Auth guard ---
 const user = guardPage();

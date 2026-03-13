@@ -1,5 +1,5 @@
 // Approvals Page — dedicated approval queue for observers
-import { guardPage, getUser } from '../auth.js';
+import { guardPage } from '../auth.js';
 import { renderNav, initTheme } from '../components.js';
 initTheme();
 import { subscribeAllChecklistItems, subscribeProjects, approveTask, rejectTask } from '../firestore-service.js';

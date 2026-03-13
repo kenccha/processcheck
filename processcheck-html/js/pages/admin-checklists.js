@@ -2,11 +2,11 @@
 // Admin Checklists — Template Management Page (Tree / Matrix / List views)
 // =============================================================================
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
 import { trapFocus, releaseFocus } from "../ui/focus-trap.js";
 import { showToast } from "../ui/toast.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderNav, initTheme } from "../components.js";
 initTheme();
 import {
   getTemplateStages, getTemplateDepartments, subscribeTemplateItems,
@@ -1661,7 +1661,7 @@ function renderListContent() {
   if (!container) return;
 
   // Update counter
-  const counterEl = app.querySelector("#list-filter-stage")?.parentElement;
+  const _counterEl = app.querySelector("#list-filter-stage")?.parentElement;
   // Just re-render the whole list area since the filter bar stays
   if (filteredItems.length === 0) {
     container.innerHTML = `

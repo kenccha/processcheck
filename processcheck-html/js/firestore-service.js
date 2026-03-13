@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import {
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, deleteField,
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, Timestamp, writeBatch, onSnapshot, serverTimestamp, setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase-init.js";
@@ -76,7 +76,7 @@ function docToUser(id, data) {
 
 function getMockData() {
   const today = new Date();
-  const d = (offset) => new Date(today.getTime() + offset * 86400000);
+  const _d = (offset) => new Date(today.getTime() + offset * 86400000);
 
   const mockUsers = [
     { id: "user1", name: "김철수", email: "chulsoo@company.com", role: "worker", department: "개발팀" },
@@ -89,11 +89,11 @@ function getMockData() {
   ];
 
   const mockProjects = [
-    { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", projectType: "신규개발", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), pm: "박민수", riskLevel: "yellow", currentStage: "WM제작" },
-    { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", projectType: "신규개발", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), pm: "박민수", riskLevel: "green", currentStage: "Tx단계" },
-    { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", projectType: "신규개발", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), pm: "박민수", riskLevel: "green", currentStage: "기획검토" },
-    { id: "proj4", name: "신장계 신규 모델", productType: "신장계", projectType: "신규개발", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), pm: "박민수", riskLevel: "red", currentStage: "MSG승인회" },
-    { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", projectType: "신규개발", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), pm: "박민수", riskLevel: "green", currentStage: "영업이관" },
+    { id: "proj1", name: "신규 체성분 분석기 개발", productType: "체성분 분석기", projectType: "신규개발", status: "active", progress: 35, startDate: new Date("2026-01-01"), endDate: new Date("2026-08-31"), riskLevel: "yellow", currentStage: "WM제작" },
+    { id: "proj2", name: "가정용 혈압계 업그레이드", productType: "혈압계", projectType: "신규개발", status: "active", progress: 65, startDate: new Date("2025-10-01"), endDate: new Date("2026-05-31"), riskLevel: "green", currentStage: "Tx단계" },
+    { id: "proj3", name: "FRA 장비 신모델", productType: "FRA", projectType: "신규개발", status: "active", progress: 15, startDate: new Date("2026-02-01"), endDate: new Date("2026-12-31"), riskLevel: "green", currentStage: "기획검토" },
+    { id: "proj4", name: "신장계 신규 모델", productType: "신장계", projectType: "신규개발", status: "active", progress: 85, startDate: new Date("2025-11-01"), endDate: new Date("2026-03-31"), riskLevel: "red", currentStage: "MSG승인회" },
+    { id: "proj5", name: "이전 프로젝트 (완료)", productType: "혈압계", projectType: "신규개발", status: "completed", progress: 100, startDate: new Date("2025-06-01"), endDate: new Date("2025-12-31"), riskLevel: "green", currentStage: "영업이관" },
   ];
 
   // checklistItems are now generated from templates via applyTemplateToProject()
@@ -468,7 +468,7 @@ export async function seedDatabaseIfEmpty() {
     console.log("✅ 기본 데이터 시드 완료, 템플릿 기반 체크리스트 생성 시작...");
 
     // ── 최적화: 로컬 데이터로 체크리스트 일괄 생성 (Firestore 재읽기 없음) ──
-    const MINOR_PHASES = ["phase0", "phase3", "phase5"];
+    const _MINOR_PHASES = ["phase0", "phase3", "phase5"];
     const stageMap = {};
     for (const s of stages) stageMap[s.id] = s;
     const deptMap = {};
@@ -525,7 +525,7 @@ export async function seedDatabaseIfEmpty() {
     for (const proj of mockProjects) {
       if (proj.projectType === "신규개발" && proj.status === "active") {
         const lCount = await applyLaunchChecklistToProject(
-          proj.id, proj.projectType, null, proj.endDate, customerObjs.slice(0, 3)
+          proj.id, proj.projectType, proj.endDate, customerObjs.slice(0, 3)
         );
         console.log(`  → ${proj.name}: ${lCount}개 출시 준비 체크리스트`);
       }
@@ -593,7 +593,6 @@ async function _seedUpdateChecklistStatuses(projects) {
         updates.push({ ref: d.ref, data: {
           status: "completed",
           completedDate: Timestamp.fromDate(new Date(proj.endDate.getTime() - Math.random() * 30 * 86400000)),
-          approvalStatus: "approved",
         }});
       }
       continue;
@@ -608,7 +607,6 @@ async function _seedUpdateChecklistStatuses(projects) {
         updates.push({ ref: d.ref, data: {
           status: "completed",
           completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 60 * 86400000)),
-          approvalStatus: "approved",
         }});
       } else if (data.stage === currentStage) {
         const rand = Math.random();
@@ -616,7 +614,6 @@ async function _seedUpdateChecklistStatuses(projects) {
           updates.push({ ref: d.ref, data: {
             status: "completed",
             completedDate: Timestamp.fromDate(new Date(Date.now() - Math.random() * 7 * 86400000)),
-            approvalStatus: "pending",
           }});
         } else if (rand < 0.5) {
           updates.push({ ref: d.ref, data: { status: "in_progress" } });
@@ -877,26 +874,54 @@ export async function completeTask(taskId) {
   } catch (e) {
     throw new Error("작업 완료 처리에 실패했습니다: " + e.message);
   }
-  // 프로젝트 통계 재계산 + 활동 로그
+  // 프로젝트 통계 재계산 + 활동 로그 + 의존 작업 알림
   try {
     const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
     if (taskSnap.exists()) {
       const t = taskSnap.data();
       // Project-level activity log (project detail page에서 표시됨)
       if (t.projectId) {
-        try { await addActivityLog("complete_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch(e) {}
+        try { await addActivityLog("complete_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch { /* ignore */ }
         await recalculateProjectStats(t.projectId);
+
+        // 의존 작업 알림: 이 작업을 선행으로 가진 다른 작업 찾기
+        try {
+          const allSnap = await getDocs(query(collection(db, "checklistItems"), where("projectId", "==", t.projectId)));
+          const allTasks = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          for (const dependent of allTasks) {
+            if (!dependent.dependencies || !dependent.dependencies.includes(taskId)) continue;
+            // 모든 선행 작업이 완료인지 확인
+            const allDepsComplete = dependent.dependencies.every(depId => {
+              const dep = allTasks.find(dt => dt.id === depId);
+              return dep && dep.status === "completed";
+            });
+            if (allDepsComplete && dependent.assignee) {
+              // Find userId by assignee name
+              const usersSnap = await getDocs(query(collection(db, "users"), where("name", "==", dependent.assignee)));
+              const targetUserId = usersSnap.empty ? dependent.assignee : usersSnap.docs[0].id;
+              await createNotification({
+                userId: targetUserId,
+                type: "dependency_resolved",
+                title: "선행 작업 모두 완료",
+                message: `"${dependent.title}"의 선행 작업이 모두 완료되었습니다. 작업을 시작할 수 있습니다.`,
+                link: `task.html?projectId=${t.projectId}&taskId=${dependent.id}`,
+                read: false,
+                createdAt: new Date(),
+              });
+            }
+          }
+        } catch(e) { console.error("의존 작업 알림 실패:", e); }
       }
     }
   } catch (e) { console.error("통계 재계산 실패:", e); }
 }
 
 // 승인 절차 제거됨 — 하위 호환용 stub
-export async function approveTask(taskId, reviewerName) {
+export async function approveTask(_taskId, _reviewerName) {
   console.warn("approveTask is deprecated — approval workflow removed");
 }
 
-export async function rejectTask(taskId, reviewerName, reason) {
+export async function rejectTask(_taskId, _reviewerName, _reason) {
   console.warn("rejectTask is deprecated — approval workflow removed");
 }
 
@@ -908,7 +933,7 @@ export async function restartTask(taskId) {
   if (taskSnap.exists()) {
     const t = taskSnap.data();
     if (t.projectId) {
-      try { await addActivityLog("restart_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch(e) {}
+      try { await addActivityLog("restart_task", "", t.assignee || "", "", "project", t.projectId, { taskTitle: t.title, department: t.department, taskId }); } catch { /* ignore */ }
       await recalculateProjectStats(t.projectId);
     }
   }
@@ -989,7 +1014,7 @@ export async function addComment(taskId, userId, userName, content) {
   await updateDoc(doc(db, "checklistItems", taskId), {
     comments: [...existing, newComment],
   });
-  try { await addActivityLog("add_comment", userId, userName, "", "task", taskId, { content: content.substring(0, 100) }); } catch(e) {}
+  try { await addActivityLog("add_comment", userId, userName, "", "task", taskId, { content: content.substring(0, 100) }); } catch { /* ignore */ }
 
   // @mention 알림 생성
   try {
@@ -1021,14 +1046,14 @@ export async function addComment(taskId, userId, userName, content) {
 
 // ─── Notifications ──────────────────────────────────────────────────────────
 
-export function subscribeNotifications(userId, callback) {
+export function subscribeNotifications(userId, callback, onError) {
   const q = query(collection(db, "notifications"), where("userId", "==", userId));
   return onSnapshot(q, (snap) => {
     const notifs = snap.docs
       .map(d => docToNotification(d.id, d.data()))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     callback(notifs);
-  });
+  }, onError || ((err) => console.error("Notification subscription error:", err)));
 }
 
 export async function markNotificationRead(id) {
@@ -1086,15 +1111,9 @@ export async function loadDashboardActiveTasks(department = null) {
   return tasks;
 }
 
-export async function loadDashboardPendingApprovals(department = null) {
-  const q = query(
-    collection(db, "checklistItems"),
-    where("approvalStatus", "==", "pending")
-  );
-  const snap = await getDocs(q);
-  let tasks = snap.docs.map(d => docToChecklistItem(d.id, d.data()));
-  if (department) tasks = tasks.filter(t => t.department === department);
-  return tasks;
+// 개별 작업 승인 제거됨 — 항상 빈 배열 반환
+export async function loadDashboardPendingApprovals(_department = null) {
+  return [];
 }
 
 export async function createNotification(data) {
@@ -1316,7 +1335,7 @@ export async function deleteTemplateDepartment(deptId) {
  * @param {string} projectType - "신규개발"
  * @returns {Promise<number>} 생성된 체크리스트 항목 수
  */
-export async function applyTemplateToProject(projectId, projectType) {
+export async function applyTemplateToProject(projectId, _projectType) {
   // 0) 중복 방지: 이미 적용된 templateItemId 수집
   const existingSnap = await getDocs(
     query(collection(db, "checklistItems"), where("projectId", "==", projectId))
@@ -1353,7 +1372,7 @@ export async function applyTemplateToProject(projectId, projectType) {
 
   // 4) 체크리스트 항목 변환
   const today = new Date();
-  const checklistItems = filteredItems.map((ti, idx) => {
+  const checklistItems = filteredItems.map((ti, _idx) => {
     const stage = stageMap[ti.stageId];
     const dept = deptMap[ti.departmentId];
     if (!stage || !dept) return null;
@@ -1948,7 +1967,7 @@ export async function updateGateRecord(projectId, phaseId, phaseName, gateStatus
       phaseName,
       gateStatus,
     });
-  } catch (e) {}
+  } catch { /* ignore */ }
 }
 
 /** gateRecord 승인 날짜 수정 */
@@ -2008,43 +2027,10 @@ export async function addGateMeetingNote(projectId, phaseId, phaseName, author, 
 
 // ─── Bulk Operations ─────────────────────────────────────────────────────────
 
-export async function bulkApproveTasks(taskIds, reviewerName) {
-  let successCount = 0;
-  let failCount = 0;
-  const BATCH_LIMIT = 450;
-
-  for (let i = 0; i < taskIds.length; i += BATCH_LIMIT) {
-    const chunk = taskIds.slice(i, i + BATCH_LIMIT);
-    try {
-      const batch = writeBatch(db);
-      for (const taskId of chunk) {
-        batch.update(doc(db, "checklistItems", taskId), {
-          approvedBy: reviewerName,
-          approvedAt: Timestamp.now(),
-          approvalStatus: "approved",
-        });
-      }
-      await batch.commit();
-      successCount += chunk.length;
-    } catch (e) {
-      console.error("Bulk approve batch failed:", e);
-      failCount += chunk.length;
-    }
-  }
-
-  // Recalculate stats for affected projects
-  const projectIds = new Set();
-  for (const taskId of taskIds) {
-    try {
-      const snap = await getDoc(doc(db, "checklistItems", taskId));
-      if (snap.exists() && snap.data().projectId) projectIds.add(snap.data().projectId);
-    } catch (e) { /* skip */ }
-  }
-  for (const pid of projectIds) {
-    try { await recalculateProjectStats(pid); } catch (e) { /* skip */ }
-  }
-
-  return { successCount, failCount };
+// 개별 작업 승인 제거됨 — stub
+export async function bulkApproveTasks(_taskIds, _reviewerName) {
+  console.warn("bulkApproveTasks: 개별 작업 승인이 제거되었습니다.");
+  return { successCount: 0, failCount: 0 };
 }
 
 export async function bulkUpdateAssignee(taskIds, newAssignee) {
@@ -2139,4 +2125,39 @@ export async function removeFileMetadata(taskId, fileId) {
   if (!taskSnap.exists()) return;
   const files = (taskSnap.data().files || []).filter(f => f.id !== fileId);
   await updateDoc(doc(db, "checklistItems", taskId), { files });
+}
+
+// ─── Task Dependencies ──────────────────────────────────────────────────────
+
+export async function updateTaskDependencies(taskId, depIds) {
+  await updateDoc(doc(db, "checklistItems", taskId), { dependencies: depIds });
+}
+
+/** Pure function: returns { blocked: boolean, blockers: Task[] } */
+export function getBlockingStatus(task, allTasks) {
+  const deps = task.dependencies || [];
+  if (deps.length === 0) return { blocked: false, blockers: [] };
+  const blockers = [];
+  for (const depId of deps) {
+    const dep = allTasks.find(t => t.id === depId);
+    if (dep && dep.status !== "completed") blockers.push(dep);
+  }
+  return { blocked: blockers.length > 0, blockers };
+}
+
+/** BFS cycle detection — returns true if adding proposedDeps would create a cycle */
+export function hasCyclicDependency(taskId, proposedDeps, allTasks) {
+  const visited = new Set();
+  const queue = [...proposedDeps];
+  while (queue.length > 0) {
+    const curId = queue.shift();
+    if (curId === taskId) return true;
+    if (visited.has(curId)) continue;
+    visited.add(curId);
+    const cur = allTasks.find(t => t.id === curId);
+    if (cur && cur.dependencies) {
+      for (const depId of cur.dependencies) queue.push(depId);
+    }
+  }
+  return false;
 }

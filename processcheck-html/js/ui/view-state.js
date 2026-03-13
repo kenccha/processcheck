@@ -3,7 +3,7 @@ const VIEW_STATE_VERSION = 1;
 export function saveViewState(page, state) {
   try {
     localStorage.setItem(`pc-view-${page}`, JSON.stringify({ version: VIEW_STATE_VERSION, ...state }));
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 export function loadViewState(page) {
@@ -12,7 +12,7 @@ export function loadViewState(page) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed.version !== VIEW_STATE_VERSION) return null;
-    const { version, ...state } = parsed;
+    const { version: _version, ...state } = parsed;
     return state;
   } catch { return null; }
 }

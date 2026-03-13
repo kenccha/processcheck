@@ -49,7 +49,11 @@ export async function loginWithMicrosoft() {
   const result = await signInWithPopup(auth, provider);
 
   const firebaseUser = result.user;
-  const email = firebaseUser.email;
+  const email = firebaseUser.email || "";
+  if (!email) {
+    await signOut(auth);
+    throw new Error("이메일 정보를 가져올 수 없습니다.");
+  }
   const displayName = firebaseUser.displayName || email.split("@")[0];
 
   // Restrict to @inbody.com only

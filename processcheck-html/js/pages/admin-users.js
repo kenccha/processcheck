@@ -5,7 +5,7 @@
 import { guardPage } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderNav, initTheme } from "../components.js";
 initTheme();
 import {
   subscribeUsers,
@@ -14,7 +14,7 @@ import {
   deactivateUser,
   activateUser,
 } from "../firestore-service.js";
-import { departments, escapeHtml, getRoleName } from "../utils.js";
+import { departments, escapeHtml } from "../utils.js";
 
 // --- Auth guard ---
 const user = guardPage();

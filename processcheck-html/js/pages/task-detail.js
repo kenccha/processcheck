@@ -2,31 +2,29 @@
 // Task Detail Page — view & manage a single checklist item
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderNav, initTheme } from "../components.js";
 import { renderSkeletonCards } from "../ui/skeleton.js";
 initTheme();
 import {
   subscribeProjects,
   subscribeChecklistItems,
-  completeTask,
-  restartTask,
-  addComment,
-  updateComment,
-  deleteComment,
   addFileMetadata,
   removeFileMetadata,
-  subscribeActivityLogs,
   getUsers,
   updateChecklistItem,
   updateChecklistItemStatus,
   subscribeGateRecords,
   addGateMeetingNote,
+  updateTaskDependencies,
+  getBlockingStatus,
+  hasCyclicDependency,
 } from "../firestore-service.js";
-import { getStatusLabel, escapeHtml, timeAgo, formatDate, formatStageName, getStatusBadgeClass, GATE_STAGES, parseMentions, renderSimpleMarkdown, getFileIcon, formatFileSize, validateFile, extractMentions, departments, PHASE_GROUPS, projectStages } from "../utils.js";
+import { escapeHtml, formatDate, formatStageName, getFileIcon, formatFileSize, validateFile, departments, PHASE_GROUPS } from "../utils.js";
+import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { storage } from "../firebase-init.js";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 // ── Guard ────────────────────────────────────────────────────────────────────
 const user = guardPage();
@@ -52,14 +50,11 @@ let task = null;
 let project = null;
 let gateRecords = [];
 let meetingNoteText = "";
-let comment = "";
-let rejectionReason = "";
 let actionLoading = false;
 let feedback = null; // { type: "success" | "error", text: string }
 let feedbackTimer = null;
 let allUsers = [];
-let showMentionDropdown = false;
-let mentionQuery = "";
+let allProjectTasks = [];
 
 // ── Initial skeleton ─────────────────────────────────────────────────────────
 if (app) app.innerHTML = `<div class="container">${renderSkeletonCards(2)}</div>`;
@@ -74,6 +69,7 @@ const unsubProjects = subscribeProjects((projects) => {
 unsubscribers.push(unsubProjects);
 
 const unsubItems = subscribeChecklistItems(projectId, (items) => {
+  allProjectTasks = items;
   task = items.find((t) => t.id === taskId) || null;
   render();
 });
@@ -171,6 +167,15 @@ function getMeetingNotes() {
   })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 }
 
+function getDDayClass(diff, status) {
+  if (status === "completed") return "dday-done";
+  if (diff === null) return "dday-none";
+  if (diff < 0) return "dday-overdue";
+  if (diff === 0) return "dday-today";
+  if (diff <= 7) return "dday-soon";
+  return "dday-safe";
+}
+
 // ── SVG Icons ────────────────────────────────────────────────────────────────
 
 const ICONS = {
@@ -210,16 +215,17 @@ function render() {
 
   // D-Day calculation
   let ddText = "";
-  let ddColor = "var(--slate-400)";
+  let ddDiff = null;
   if (task.dueDate) {
     const due = task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate);
     const now = new Date();
-    const diff = Math.ceil((due - now) / 86400000);
-    if (task.status === "completed") { ddText = "완료"; ddColor = "var(--success-400)"; }
-    else if (diff < 0) { ddText = `D+${Math.abs(diff)}`; ddColor = "var(--danger-400)"; }
-    else if (diff === 0) { ddText = "D-Day"; ddColor = "var(--warning-400)"; }
-    else { ddText = `D-${diff}`; ddColor = diff <= 3 ? "var(--warning-400)" : "var(--slate-300)"; }
+    ddDiff = Math.ceil((due - now) / 86400000);
+    if (task.status === "completed") { ddText = "완료"; }
+    else if (ddDiff < 0) { ddText = `D+${Math.abs(ddDiff)}`; }
+    else if (ddDiff === 0) { ddText = "D-Day"; }
+    else { ddText = `D-${ddDiff}`; }
   }
+  const ddClass = getDDayClass(ddDiff, task.status);
 
   app.innerHTML = `
     <div class="container animate-fade-in">
@@ -248,7 +254,7 @@ function render() {
             ${Object.entries(statusLabels).map(([k, v]) => `<option value="${k}" ${task.status === k ? "selected" : ""}>${v}</option>`).join("")}
           </select>
           <span class="badge badge-neutral">${escapeHtml(formatStageName(task.stage))}</span>
-          <span style="font-size:1.1rem;font-weight:700;color:${ddColor};margin-left:auto;">${ddText}</span>
+          <span class="dday-badge dday-badge-md ${ddClass}" style="margin-left:auto;">${ddText}</span>
         </div>
         <h1 style="font-size:1.5rem;font-weight:700;color:var(--slate-100);letter-spacing:-0.025em;margin-bottom:0.5rem">${escapeHtml(task.title)}</h1>
         ${task.description ? `<p class="text-sm text-soft" style="line-height:1.6;max-width:48rem">${escapeHtml(task.description)}</p>` : ""}
@@ -293,6 +299,9 @@ function render() {
         </div>
       </div>
 
+      <!-- Dependencies Section -->
+      ${renderDependenciesSection()}
+
       <!-- Two-Column Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Column -->
@@ -316,19 +325,29 @@ function render() {
                   ...(task.files || []).map(f => ({ ...f, source: "upload" })),
                   ...(task.attachments || []).map(f => ({ ...f, source: "attachment" })),
                 ];
-                if (allFiles.length === 0) return '<div class="text-xs" style="color:var(--slate-400);padding:8px">업로드된 파일이 없습니다</div>';
-                return allFiles.map(f => `
-                  <div class="flex items-center gap-3" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3)">
-                    <span>${getFileIcon(f.name || '')}</span>
+                if (allFiles.length === 0) return `
+                  <div class="empty-state" style="padding:1.5rem">
+                    <div class="empty-state-icon">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    </div>
+                    <span class="empty-state-text">업로드된 파일이 없습니다</span>
+                    <span class="empty-state-subtext">위 영역에 파일을 드래그하거나 클릭하여 업로드하세요</span>
+                  </div>`;
+                return allFiles.map(f => {
+                  const ext = (f.name || '').split('.').pop()?.toLowerCase() || '';
+                  return `
+                  <div class="file-item">
+                    <span class="file-icon-bg">${getFileIcon(f.name || '')}</span>
                     ${f.url
                       ? `<a href="${escapeHtml(f.url)}" target="_blank" class="text-sm" style="color:var(--primary-400);flex:1;text-decoration:none">${escapeHtml(f.name || '파일')}</a>`
                       : `<span class="text-sm" style="color:var(--slate-200);flex:1">${escapeHtml(f.name || '파일')}</span>`
                     }
+                    ${ext ? `<span class="file-type-badge">${ext}</span>` : ''}
                     <span class="text-xs" style="color:var(--slate-400)">${f.size ? formatFileSize(f.size) : ''}</span>
                     <span class="text-xs" style="color:var(--slate-400)">${escapeHtml(f.uploadedBy || '')}</span>
-                    ${f.source === "upload" && f.uploadedBy === user.name ? `<button class="btn-ghost btn-xs" data-delete-file="${escapeHtml(f.id || '')}" data-file-path="${escapeHtml(f.storagePath || '')}">삭제</button>` : ''}
-                  </div>
-                `).join("");
+                    ${f.source === "upload" && f.uploadedBy === user.name ? `<button class="btn-ghost btn-xs file-delete-btn" data-delete-file="${escapeHtml(f.id || '')}" data-file-path="${escapeHtml(f.storagePath || '')}">삭제</button>` : ''}
+                  </div>`;
+                }).join("");
               })()}
             </div>
           </div>
@@ -383,7 +402,13 @@ function render() {
 
 function renderMeetingNotes(notes) {
   if (!notes || notes.length === 0) {
-    return `<div class="empty-state" style="padding:1rem"><span class="empty-state-text">아직 회의록이 없습니다</span></div>`;
+    return `<div class="empty-state" style="padding:1.5rem">
+      <div class="empty-state-icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      </div>
+      <span class="empty-state-text">아직 회의록이 없습니다</span>
+      <span class="empty-state-subtext">위 입력란에서 회의 내용을 작성하세요</span>
+    </div>`;
   }
   return notes.map((n) => `
     <div style="padding:0.75rem;background:var(--surface-1);border-radius:var(--radius-lg);margin-bottom:0.5rem;border-left:3px solid var(--primary-400);">
@@ -426,7 +451,7 @@ function renderTimeline() {
     },
   ];
 
-  return events.map((ev) => {
+  return events.map((ev, idx) => {
     let dotClass = "timeline-dot";
     if (ev.isDanger && ev.active) dotClass += " active";
     else if (ev.completed) dotClass += " completed";
@@ -439,7 +464,7 @@ function renderTimeline() {
     const dateStr = ev.date ? formatDate(ev.date) : "";
 
     return `
-      <div class="timeline-item">
+      <div class="timeline-item animate-slide-in-up" style="animation-delay:${idx * 0.08}s">
         <div class="${dotClass}" ${ev.isDanger && ev.active ? 'style="border-color:var(--danger-500);background:var(--danger-500)"' : ""}></div>
         <div>
           <div class="text-sm" style="color:${textColor}">${escapeHtml(ev.label)}</div>
@@ -448,6 +473,162 @@ function renderTimeline() {
       </div>
     `;
   }).join("");
+}
+
+// ── Dependencies Section ─────────────────────────────────────────────────────
+
+function renderDependenciesSection() {
+  if (!task) return "";
+  const deps = task.dependencies || [];
+  const blocking = getBlockingStatus(task, allProjectTasks);
+
+  const chips = deps.map(depId => {
+    const dep = allProjectTasks.find(t => t.id === depId);
+    if (!dep) return "";
+    const isDone = dep.status === "completed";
+    const chipClass = isDone ? "dep-chip dep-chip-done" : "dep-chip dep-chip-blocked";
+    const dotColor = isDone ? "var(--success-400)" : dep.status === "in_progress" ? "var(--primary-400)" : "var(--warning-400)";
+    return `
+      <span class="${chipClass}">
+        <span class="dep-dot" style="background:${dotColor}"></span>
+        <a href="task.html?projectId=${escapeHtml(projectId)}&taskId=${escapeHtml(dep.id)}" style="color:inherit;text-decoration:none;" title="${escapeHtml(dep.title)}">${escapeHtml(dep.title.length > 30 ? dep.title.slice(0, 30) + "…" : dep.title)}</a>
+        <button class="dep-remove" data-remove-dep="${escapeHtml(dep.id)}" title="선행 작업 제거">&times;</button>
+      </span>`;
+  }).join("");
+
+  return `
+    <div class="card p-6 mb-6">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <h2 class="section-title" style="margin:0">선행 작업</h2>
+        <button class="btn-ghost btn-sm" id="add-dep-btn" style="font-size:0.75rem;">+ 추가</button>
+      </div>
+      ${blocking.blocked ? `
+        <div style="padding:0.5rem 0.75rem;border-radius:var(--radius-lg);background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);margin-bottom:0.75rem;">
+          <span style="font-size:0.75rem;color:var(--warning-400);font-weight:500;">🔒 선행 작업 ${blocking.blockers.length}건이 미완료입니다</span>
+        </div>
+      ` : deps.length > 0 ? `
+        <div style="padding:0.5rem 0.75rem;border-radius:var(--radius-lg);background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);margin-bottom:0.75rem;">
+          <span style="font-size:0.75rem;color:var(--success-400);font-weight:500;">✓ 모든 선행 작업 완료</span>
+        </div>
+      ` : ""}
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+        ${chips || '<span class="text-sm text-dim">선행 작업 없음</span>'}
+      </div>
+    </div>
+  `;
+}
+
+function openDependencyPicker() {
+  if (!task) return;
+  const currentDeps = new Set(task.dependencies || []);
+  // Group tasks by phase
+  const phaseMap = {};
+  for (const t of allProjectTasks) {
+    if (t.id === task.id) continue;
+    const phase = PHASE_GROUPS.find(p => p.workStage === t.stage || p.gateStage === t.stage);
+    const phaseName = phase ? phase.name : "기타";
+    if (!phaseMap[phaseName]) phaseMap[phaseName] = [];
+    phaseMap[phaseName].push(t);
+  }
+
+  let body = `
+    <div style="margin-bottom:0.75rem;">
+      <input type="text" class="input-field" id="dep-search" placeholder="작업 검색..." style="font-size:0.8rem;padding:0.5rem 0.75rem;">
+    </div>
+    <div id="dep-picker-list">
+      ${renderPickerList(phaseMap, currentDeps)}
+    </div>
+  `;
+
+  const footer = `
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+      <button class="btn-ghost" id="dep-cancel-btn">취소</button>
+      <button class="btn-primary" id="dep-save-btn">저장</button>
+    </div>
+  `;
+
+  openSlideOver("선행 작업 선택", body, footer);
+
+  // Bind search
+  setTimeout(() => {
+    const searchInput = document.getElementById("dep-search");
+    const listEl = document.getElementById("dep-picker-list");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.trim().toLowerCase();
+        const filtered = {};
+        for (const [pName, tasks] of Object.entries(phaseMap)) {
+          const ft = tasks.filter(t => t.title.toLowerCase().includes(q) || (t.department || "").toLowerCase().includes(q));
+          if (ft.length > 0) filtered[pName] = ft;
+        }
+        if (listEl) listEl.innerHTML = renderPickerList(q ? filtered : phaseMap, currentDeps);
+        bindPickerChecks(currentDeps);
+      });
+    }
+
+    bindPickerChecks(currentDeps);
+
+    const cancelBtn = document.getElementById("dep-cancel-btn");
+    if (cancelBtn) cancelBtn.addEventListener("click", () => closeSlideOver());
+
+    const saveBtn = document.getElementById("dep-save-btn");
+    if (saveBtn) saveBtn.addEventListener("click", async () => {
+      const depIds = [...currentDeps];
+      try {
+        await updateTaskDependencies(task.id, depIds);
+        closeSlideOver();
+        showFeedback("success", "선행 작업이 저장되었습니다.");
+      } catch (e) {
+        console.error(e);
+        showFeedback("error", "선행 작업 저장 실패");
+      }
+    });
+  }, 50);
+}
+
+function renderPickerList(phaseMap, currentDeps) {
+  return Object.entries(phaseMap).map(([pName, tasks]) => `
+    <div class="dep-picker-phase">
+      <div class="dep-picker-phase-header">${escapeHtml(pName)}</div>
+      ${tasks.map(t => {
+        const checked = currentDeps.has(t.id);
+        const wouldCycle = !checked && hasCyclicDependency(task.id, [t.id], allProjectTasks);
+        const isSelf = t.id === task.id;
+        const disabled = isSelf || wouldCycle;
+        const dotColor = t.status === "completed" ? "var(--success-400)" : t.status === "in_progress" ? "var(--primary-400)" : "var(--slate-400)";
+        return `
+          <div class="dep-picker-item${disabled ? " disabled" : ""}">
+            <label>
+              <input type="checkbox" data-dep-id="${t.id}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}>
+              <span class="dep-dot" style="background:${dotColor};width:7px;height:7px;border-radius:50%;display:inline-block;"></span>
+              ${escapeHtml(t.title)}
+            </label>
+            <span style="font-size:0.6rem;color:var(--slate-400);white-space:nowrap;">${escapeHtml(t.department || "")}</span>
+            ${wouldCycle ? '<span style="font-size:0.55rem;color:var(--danger-400);">순환</span>' : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `).join("");
+}
+
+function bindPickerChecks(currentDeps) {
+  document.querySelectorAll("[data-dep-id]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const depId = cb.dataset.depId;
+      if (cb.checked) {
+        // Check for cycles before adding
+        if (hasCyclicDependency(task.id, [depId, ...currentDeps], allProjectTasks)) {
+          cb.checked = false;
+          showFeedback("error", "순환 의존이 발생합니다. 추가할 수 없습니다.");
+          return;
+        }
+        currentDeps.add(depId);
+      } else {
+        currentDeps.delete(depId);
+      }
+    });
+  });
 }
 
 // ── Event Binding ────────────────────────────────────────────────────────────
@@ -488,6 +669,26 @@ function bindEvents() {
       }
     });
   }
+
+  // Dependency: add button
+  const addDepBtn = app.querySelector("#add-dep-btn");
+  if (addDepBtn) addDepBtn.addEventListener("click", openDependencyPicker);
+
+  // Dependency: remove buttons
+  app.querySelectorAll("[data-remove-dep]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const depId = btn.dataset.removeDep;
+      const newDeps = (task.dependencies || []).filter(id => id !== depId);
+      try {
+        await updateTaskDependencies(task.id, newDeps);
+        showFeedback("success", "선행 작업이 제거되었습니다.");
+      } catch {
+        showFeedback("error", "선행 작업 제거 실패");
+      }
+    });
+  });
 
   // Meeting note input sync
   const meetingNoteInput = app.querySelector("#meeting-note-input");
@@ -541,7 +742,7 @@ function bindEvents() {
         }
         await removeFileMetadata(task.id, fileId);
         showFeedback("success", "파일 삭제 완료");
-      } catch(err) { showFeedback("error", "파일 삭제 실패"); }
+      } catch { showFeedback("error", "파일 삭제 실패"); }
     });
   });
 
@@ -550,6 +751,10 @@ function bindEvents() {
 }
 
 function handleResponsiveLayout() {
+  // Remove previous handler to avoid accumulation
+  if (window._taskDetailResizeHandler) {
+    window.removeEventListener("resize", window._taskDetailResizeHandler);
+  }
   const leftCol = app.querySelector(".lg-col-span-2");
   if (leftCol) {
     const applyLayout = () => {

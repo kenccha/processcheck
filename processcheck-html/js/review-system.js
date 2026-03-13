@@ -129,12 +129,16 @@ export async function updateReviewStatus(reviewId, newStatus) {
   const user = getUser();
   if (!user) return;
   const now = Timestamp.now();
+  // Read current history then append
+  const snap = await getDoc(doc(db, "reviews", reviewId));
+  const currentHistory = snap.exists() ? (snap.data().history || []) : [];
+  const updatedHistory = [...currentHistory, {
+    action: `status_${newStatus}`, by: user.name, at: now, detail: ""
+  }];
   await updateDoc(doc(db, "reviews", reviewId), {
     status: newStatus,
     updatedAt: now,
-    history: await getUpdatedHistory(reviewId, {
-      action: `status_${newStatus}`, by: user.name, at: now, detail: ""
-    })
+    history: updatedHistory,
   });
 
   // ── 알림 + 이메일: 해결/보류 시 작성자에게 알림 ──
@@ -188,12 +192,7 @@ async function _notifyReviewResolved(reviewId, newStatus, resolver) {
   }
 }
 
-async function getUpdatedHistory(reviewId, newEntry) {
-  // We'll use arrayUnion-like approach — but since history is an array of objects,
-  // we read+append via the update. For simplicity, we use the local review data.
-  // The caller should pass the current history from the local state.
-  return; // handled inline in the panel
-}
+// getUpdatedHistory removed — history is now read+appended inline in updateReviewStatus()
 
 export async function addReply(reviewId, content, currentReplies) {
   const user = getUser();
@@ -430,7 +429,7 @@ export class ReviewPanel {
     `;
   }
 
-  bindEvents(user) {
+  bindEvents(_user) {
     const panel = this.container.querySelector(".review-panel");
     if (!panel) return;
 
@@ -555,7 +554,8 @@ export class ReviewPanel {
       });
     });
 
-    // Click outside to close
+    // Click outside to close — remove previous handler first
+    if (this._outsideClickHandler) document.removeEventListener("click", this._outsideClickHandler);
     document.addEventListener("click", this._outsideClickHandler = (e) => {
       if (this.isOpen && !this.container.contains(e.target)) {
         const bellBtn = document.getElementById("nav-review-btn");

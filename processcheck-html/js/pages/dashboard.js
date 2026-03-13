@@ -2,9 +2,8 @@
 // Dashboard Page Controller — Project-Centric View (D-Day + Delay Focus)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { guardPage, getUser } from "../auth.js";
-import { showToast } from "../ui/toast.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { guardPage } from "../auth.js";
+import { renderNav, initTheme } from "../components.js";
 initTheme();
 import {
   subscribeChecklistItemsByAssignee,
@@ -20,17 +19,11 @@ import {
   getTemplateStages,
 } from "../firestore-service.js";
 import {
-  getStatusLabel,
-  getStatusBadgeClass,
-  getRiskClass,
-  getRiskLabel,
   escapeHtml,
   getRoleName,
   formatDate,
-  formatStageName,
   timeAgo,
   daysUntil,
-  getProgressClass,
   PHASE_GROUPS,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
@@ -74,7 +67,7 @@ const _savedDash = loadViewState('dashboard');
 let activeTab = (_savedDash && _savedDash.activeTab) || "projects";
 let showLaterTasks = false;
 let approvalLimit = 10;
-let hasFullData = false;
+let _hasFullData = false;
 
 const app = document.getElementById("app");
 const unsubscribers = [];
@@ -117,7 +110,7 @@ function saveToCache(tasks, projects, notifs) {
       CACHE_KEY,
       JSON.stringify({ tasks, projects, notifs, ts: Date.now() })
     );
-  } catch {}
+  } catch { /* ignore storage errors */ }
 }
 
 // ─── Phase 0: Instant render from cache ─────────────────────────────────────
@@ -192,7 +185,7 @@ if (cached) {
         } else {
           allTasks = tasks;
         }
-        hasFullData = true;
+        _hasFullData = true;
         computeDerived();
         render();
       })
@@ -201,7 +194,7 @@ if (cached) {
     unsubscribers.push(
       subscribeChecklistItemsByAssignee(user.name, (tasks) => {
         allTasks = tasks;
-        hasFullData = true;
+        _hasFullData = true;
         computeDerived();
         render();
       })
@@ -219,8 +212,6 @@ if (cached) {
 // ─── Derived State Computation ──────────────────────────────────────────────
 
 function computeDerived() {
-  const now = new Date();
-
   // --- Project cards (enriched with D-Day, delay, etc.) ---
   const activeProjects = allProjects.filter((p) => p.status === "active");
 
@@ -595,7 +586,7 @@ function renderTaskGroup(label, tasks, color, showProjectName) {
 // Approvals Tab
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function renderApprovalsTab() {
+function _renderApprovalsTab() {
   if (pendingApprovals.length === 0) {
     return `
       <div class="empty-state" style="padding: 3rem 1rem">
@@ -769,7 +760,7 @@ function bindClickHandlers() {
 
   // Task rows → navigate
   app.querySelectorAll(".dash-row[data-task-id]").forEach((row) => {
-    row.addEventListener("click", (e) => {
+    row.addEventListener("click", (_e) => {
       const projectId = row.dataset.taskProject;
       const taskId = row.dataset.taskId;
       window.location.href = `task.html?projectId=${projectId}&taskId=${taskId}`;

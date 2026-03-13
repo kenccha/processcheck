@@ -4,8 +4,8 @@
 
 // 부서 목록
 export const departments = [
-  "디자인연구소", "글로벌임상파트", "품질파트", "R&D파트", "제조그룹",
-  "전략인증팀", "경영관리그룹", "영업그룹", "글로벌CS팀", "구매파트",
+  "개발팀", "품질팀", "영업팀", "제조팀", "구매팀",
+  "CS팀", "경영관리팀", "글로벌임상팀", "디자인연구소", "인증팀",
 ];
 
 // 프로젝트 단계 목록 (12개 개별 stage — 내부 데이터 키로만 사용)
@@ -170,7 +170,7 @@ export function timeAgo(date) {
 // D-Day 계산
 export function daysUntil(date) {
   if (!date) return null;
-  const d = date instanceof Date ? date : new Date(date);
+  const d = date instanceof Date ? new Date(date.getTime()) : new Date(date);
   if (isNaN(d.getTime())) return null;
   const now = new Date();
   now.setHours(0, 0, 0, 0);

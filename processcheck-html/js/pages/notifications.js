@@ -2,7 +2,7 @@
 // Notification Center Page Controller
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
 import { renderNav, initTheme } from "../components.js";
 import {
@@ -151,7 +151,7 @@ function resolveNotifLink(link) {
   // /projects/proj1/tasks/task4 → task.html?id=task4
   // /projects/proj1 → project.html?id=proj1
   const taskMatch = link.match(/\/projects\/([^/]+)\/tasks\/([^/]+)/);
-  if (taskMatch) return `task.html?id=${taskMatch[2]}`;
+  if (taskMatch) return `task.html?projectId=${taskMatch[1]}&taskId=${taskMatch[2]}`;
   const projMatch = link.match(/\/projects\/([^/]+)/);
   if (projMatch) return `project.html?id=${projMatch[1]}`;
   // Already an HTML link

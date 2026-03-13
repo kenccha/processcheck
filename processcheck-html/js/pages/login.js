@@ -37,7 +37,7 @@ msLoginBtn.addEventListener("click", async () => {
   removeError();
 
   try {
-    const result = await loginWithMicrosoft();
+    const _result = await loginWithMicrosoft();
     // Both existing and new users go straight to dashboard
     // (new users auto-registered as worker, admin assigns role later)
     window.location.href = "home.html";

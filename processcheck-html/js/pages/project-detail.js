@@ -5,7 +5,7 @@
 import { guardPage } from "../auth.js";
 import { showToast } from "../ui/toast.js";
 import { confirmModal } from "../ui/confirm-modal.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderNav, initTheme } from "../components.js";
 initTheme();
 import {
   subscribeProjects,
@@ -17,7 +17,6 @@ import {
   updateChecklistItemStatus,
   updateChecklistItem,
   getTemplateStages,
-  getTemplateDepartments,
   applyTemplateToProject,
   applyLaunchChecklistToProject,
   subscribeLaunchChecklists,
@@ -27,29 +26,24 @@ import {
   addGateMeetingNote,
   batchUpdateMultiPhaseSchedule,
   PHASE_DESCRIPTIONS,
+  getBlockingStatus,
 } from "../firestore-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { storage } from "../firebase-init.js";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { renderSkeletonCards, renderSkeletonStats } from "../ui/skeleton.js";
-import { initSortable, guardRender } from "../ui/dnd.js";
+import { initSortable } from "../ui/dnd.js";
 import {
   departments,
-  projectStages,
   PHASE_GROUPS,
-  GATE_STAGES,
   getStatusLabel,
-  getStatusBadgeClass,
   formatStageName,
   escapeHtml,
   formatDate,
   formatDateShort,
-  formatDateTime,
   getQueryParam,
   daysUntil,
-  getRiskClass,
   getRiskLabel,
-  getProgressClass,
   timeAgo,
   exportToCSV,
   exportToPDF,
@@ -101,19 +95,19 @@ getTemplateStages().then((stages) => {
 }).catch(() => {});
 
 // --- Subscribe ---
-let unsubProject = null;
-let unsubChecklist = null;
+let _unsubProject = null;
+let _unsubChecklist = null;
 let gateRecords = [];
 let launchCount = 0;
 
 let projectsLoaded = false;
-unsubProject = subscribeProjects((projects) => {
+_unsubProject = subscribeProjects((projects) => {
   project = projects.find((p) => p.id === projectId) || null;
   projectsLoaded = true;
   render();
 });
 
-unsubChecklist = subscribeChecklistItems(projectId, (items) => {
+_unsubChecklist = subscribeChecklistItems(projectId, (items) => {
   checklistItems = items;
   render();
 });
@@ -145,11 +139,11 @@ function getActivePhaseGroups() {
 }
 
 // 해당 phase의 gate stage 목록 (동적)
-function getActiveGateStages() {
+function _getActiveGateStages() {
   return getActivePhaseGroups().map(p => p.gateStage);
 }
 
-function getMatrixCellData(stageName, dept) {
+function _getMatrixCellData(stageName, dept) {
   const tasks = checklistItems.filter(
     (t) => t.stage === stageName && t.department === dept
   );
@@ -186,6 +180,15 @@ function getPhaseWorkProgress(phaseName) {
       return d !== null && d < 0;
     }).length,
   };
+}
+
+function getDDayClass(diff, status) {
+  if (status === "completed") return "dday-done";
+  if (diff === null) return "dday-none";
+  if (diff < 0) return "dday-overdue";
+  if (diff === 0) return "dday-today";
+  if (diff <= 7) return "dday-soon";
+  return "dday-safe";
 }
 
 // =============================================================================
@@ -300,7 +303,7 @@ function render() {
 // Project Header — D-Day + Phase + Delay Reason (merged, compact)
 // =============================================================================
 
-function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks, approvalPending) {
+function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks, _approvalPending) {
   const p = project;
   const activePhases = getActivePhaseGroups();
   const currentPhaseName = phaseIndex >= 0 && phaseIndex < activePhases.length ? activePhases[phaseIndex].name : formatStageName(p.currentStage);
@@ -309,7 +312,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
   const endDate = p.endDate ? new Date(p.endDate) : null;
   const dDays = endDate ? daysUntil(endDate) : null;
   const dDayText = dDays !== null ? (dDays < 0 ? `D+${Math.abs(dDays)}` : dDays === 0 ? "D-Day" : `D-${dDays}`) : "-";
-  const dDayColor = dDays !== null ? (dDays < 0 ? "var(--danger-400)" : dDays <= 7 ? "var(--warning-400)" : "var(--success-400)") : "var(--slate-400)";
+  const headerDDayClass = getDDayClass(dDays, p.status);
 
   // 스케줄 지연 계산 (현재 단계 기준 누적 지연)
   const schedules = calculatePhaseSchedules();
@@ -317,8 +320,8 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
   const totalDelay = lastSchedule ? lastSchedule.totalDelay : 0;
   // 현재 활성 또는 지연 중인 Phase 찾기
   const currentSchedule = schedules.find(s => s.status === "delayed" || s.status === "active") || schedules.find(s => s.status === "pending");
-  const currentPhasDelay = currentSchedule ? currentSchedule.phaseDelay : 0;
-  const currentCumDelay = currentSchedule ? currentSchedule.totalDelay : totalDelay;
+  const _currentPhasDelay = currentSchedule ? currentSchedule.phaseDelay : 0;
+  const _currentCumDelay = currentSchedule ? currentSchedule.totalDelay : totalDelay;
   // 예상 종료일 = 원래 종료일 + 누적 지연
   const projectedEndDate = endDate && totalDelay > 0 ? new Date(endDate.getTime() + totalDelay * 86400000) : null;
 
@@ -354,7 +357,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
 
           <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:0.5rem;">
             <!-- D-Day big -->
-            <span style="font-family:'JetBrains Mono',monospace;font-size:1.75rem;font-weight:800;color:${dDayColor};">${dDayText}</span>
+            <span class="dday-badge dday-badge-lg ${headerDDayClass}">${dDayText}</span>
             <div style="font-size:0.8rem;color:var(--slate-400);">
               ${formatDate(p.startDate)} ~ ${formatDate(p.endDate)}
             </div>
@@ -398,7 +401,7 @@ function renderProjectHeader(phaseIndex, phaseStatuses, totalTasks, overdueTasks
 // Tab 1: 개요+작업 (2-column layout)
 // =============================================================================
 
-function renderPhaseCards() {
+function _renderPhaseCards() {
   const activePhases = getActivePhaseGroups();
   return `
     <div class="phase-cards-row">
@@ -555,25 +558,38 @@ function getFilteredTasks() {
 function renderTaskRow(task) {
   const dd = daysUntil(task.dueDate);
   const isOverdue = task.status !== "completed" && task.status !== "rejected" && dd !== null && dd < 0;
-  const overdueStyle = isOverdue ? "color:var(--danger-400);" : "";
   const dotColor = isOverdue ? "var(--danger-400)" :
     task.status === "completed" ? "var(--success-400)" :
     task.status === "in_progress" ? "var(--primary-400)" :
     task.status === "rejected" ? "var(--danger-400)" : "var(--slate-400)";
   const ddText = task.status !== "completed" && dd !== null ? (dd < 0 ? `D+${Math.abs(dd)}` : dd === 0 ? "D-Day" : `D-${dd}`) : "";
+  const rowClass = isOverdue ? "task-row-overdue" : task.status === "completed" ? "task-row-completed" : task.status === "in_progress" ? "task-row-inprogress" : "";
+  const taskDDClass = getDDayClass(dd, task.status);
+
+  // Dependency blocking status
+  const deps = task.dependencies || [];
+  const blocking = deps.length > 0 ? getBlockingStatus(task, checklistItems) : { blocked: false, blockers: [] };
+  const blockedClass = blocking.blocked ? " task-row-blocked" : "";
+  const depBadge = blocking.blocked
+    ? `<span class="dep-inline-badge blocked">🔒 선행 ${blocking.blockers.length}건 미완료</span>`
+    : deps.length > 0 && task.status !== "completed"
+    ? `<span class="dep-inline-badge resolved">✓ 선행 완료</span>`
+    : "";
+
   return `
-    <div class="card-hover pd-task-row" data-task-id="${task.id}" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:0.625rem 0.75rem;cursor:pointer;${isOverdue ? "border-left:3px solid var(--danger-400);background:rgba(239,68,68,0.04);" : ""}">
+    <div class="card-hover pd-task-row ${rowClass}${blockedClass}" data-task-id="${task.id}" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:0.625rem 0.75rem;cursor:pointer;">
       <div style="display:flex;align-items:start;gap:0.5rem;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:0.375rem;margin-bottom:0.25rem;flex-wrap:wrap;">
             <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${dotColor};"></span>
             <span style="font-size:0.8rem;font-weight:500;${isOverdue ? "color:var(--danger-400);" : "color:var(--slate-200);"}">${escapeHtml(task.title)}</span>
+            ${depBadge}
           </div>
           <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.65rem;${isOverdue ? "color:var(--danger-400);font-weight:600;" : "color:var(--slate-400);"};flex-wrap:wrap;">
             <span>${escapeHtml(task.department)}</span>
             ${task.assignee ? `<span>${escapeHtml(task.assignee)}</span>` : ""}
             <span>${formatDate(task.dueDate)}</span>
-            ${ddText ? `<span style="font-weight:600;${isOverdue ? "color:var(--danger-400);" : ""}">${ddText}</span>` : ""}
+            ${ddText ? `<span class="dday-badge dday-badge-sm ${taskDDClass}">${ddText}</span>` : ""}
             ${task.source === "manual" ? '<span class="peek-badge-manual">추가</span>' : ""}
             ${(task.attachments && task.attachments.length > 0) ? `<span style="display:inline-flex;align-items:center;gap:0.15rem;color:var(--primary-400);font-weight:500;" title="${task.attachments.length}개 첨부파일"><svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>${task.attachments.length}</span>` : ""}
           </div>
@@ -682,14 +698,14 @@ function calculatePhaseSchedules() {
   return results;
 }
 
-function renderScheduleTimelineCard() {
+function _renderScheduleTimelineCard() {
   const schedules = calculatePhaseSchedules();
   if (schedules.length === 0) return "";
 
   const totalDelay = schedules.length > 0 ? schedules[schedules.length - 1].totalDelay : 0;
   const p = project;
   const projStart = new Date(p.startDate);
-  const projEnd = p.endDate ? new Date(p.endDate) : null;
+  const _projEnd = p.endDate ? new Date(p.endDate) : null;
 
   // Timeline range: from project start to max of (planned end, projected end)
   const lastSchedule = schedules[schedules.length - 1];
@@ -938,7 +954,7 @@ function renderPhaseView() {
     // Gate record (for approval + meeting notes)
     const phaseId = `phase${idx}`;
     const gr = gateRecords.find(r => r.phaseId === phaseId) || null;
-    const gateStatus = gr?.gateStatus || "pending";
+    const _gateStatus = gr?.gateStatus || "pending";
     const notes = gr?.meetingNotes || [];
 
     // Status badge text
@@ -1096,7 +1112,7 @@ function renderTimelineView() {
   }).join("");
 }
 
-function renderDepartmentView() {
+function _renderDepartmentView() {
   const filtered = getFilteredTasks();
   if (filtered.length === 0) return renderEmptyState();
 
@@ -1150,19 +1166,19 @@ function renderBoardView() {
 
   function renderKanbanCard(t) {
     const isUrgent = t.importance === "red";
-    const urgentBorder = isUrgent ? "border-left:3px solid var(--danger-400);" : "";
     const phaseName = stageToPhase[t.stage] || "";
     const isGate = getActivePhaseGroups().some(p => p.gateStage === t.stage);
     const dd = daysUntil(t.dueDate);
     const ddText = dd === null ? "" : dd < 0 ? `D+${Math.abs(dd)}` : dd === 0 ? "D-Day" : `D-${dd}`;
-    const ddColor = dd === null ? "" : dd < 0 ? "var(--danger-400)" : dd <= 3 ? "var(--warning-400)" : "var(--slate-400)";
+    const kanbanDDClass = getDDayClass(dd, t.status);
+    const kanbanRowClass = isUrgent ? "task-row-overdue" : t.status === "completed" ? "task-row-completed" : t.status === "in_progress" ? "task-row-inprogress" : "";
     return `
-      <div class="card-hover pd-task-row kanban-card" data-task-id="${t.id}" data-status="${t.status}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;${urgentBorder}">
+      <div class="card-hover pd-task-row kanban-card ${kanbanRowClass}" data-task-id="${t.id}" data-status="${t.status}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;">
         <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.25rem;flex-wrap:wrap;">
           ${phaseName ? `<span style="font-size:0.55rem;font-weight:600;padding:0.1rem 0.3rem;border-radius:var(--radius-sm);background:var(--primary-500);color:white;opacity:0.85;">${phaseName}</span>` : ""}
           ${isGate ? `<span style="font-size:0.55rem;font-weight:600;padding:0.1rem 0.3rem;border-radius:var(--radius-sm);background:var(--warning-500);color:white;">승인</span>` : ""}
           ${isUrgent ? '<span style="font-size:0.55rem;color:var(--danger-400);font-weight:700;">긴급</span>' : ''}
-          ${ddText && t.status !== "completed" ? `<span style="font-size:0.55rem;font-weight:600;color:${ddColor};margin-left:auto;">${ddText}</span>` : ""}
+          ${ddText && t.status !== "completed" ? `<span class="dday-badge dday-badge-sm ${kanbanDDClass}" style="margin-left:auto;">${ddText}</span>` : ""}
         </div>
         <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);margin-bottom:0.25rem;">${escapeHtml(t.title)}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1291,7 +1307,7 @@ function renderMatrixView() {
                 const cell = matrix[dept][phase.name];
                 const work = cell.work;
                 const gate = cell.gate;
-                const gateInfo = getGateInfo(gate);
+                const _gateInfo = getGateInfo(gate);
                 const workColor = getWorkColor(work);
                 const hasWork = work.total > 0;
                 const hasBg = work.delayed > 0 ? "background:rgba(239,68,68,0.06)" : work.inProgress > 0 ? "background:rgba(6,182,212,0.06)" : (work.completed === work.total && work.total > 0) ? "background:rgba(34,197,94,0.06)" : "";
@@ -1316,7 +1332,7 @@ function renderMatrixView() {
   `;
 }
 
-function renderListView() {
+function _renderListView() {
   const filtered = getFilteredTasks();
   if (filtered.length === 0) return renderEmptyState();
 
@@ -1340,6 +1356,7 @@ function renderEmptyState() {
       <div class="empty-state" style="padding:3rem;">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         <span class="empty-state-text">${hasAnyTasks ? "해당하는 작업이 없습니다" : "체크리스트 항목이 없습니다"}</span>
+        <span class="empty-state-subtext">${hasAnyTasks ? "필터 조건을 변경해 보세요" : "템플릿을 적용하여 체크리스트를 생성하세요"}</span>
         ${applyBtn}
       </div>
     </div>
@@ -1358,12 +1375,12 @@ function renderRecentActivity() {
   if (activityLogs.length > 0) {
     return `
       <div class="timeline">
-        ${activityLogs.slice(0, 15).map(log => {
+        ${activityLogs.slice(0, 15).map((log, idx) => {
           const label = ACTION_LABELS[log.action] || log.action;
           const actor = log.actorName || log.userName || "";
           const ts = log.timestamp ? timeAgo(log.timestamp) : "";
           return `
-            <div class="timeline-item" style="padding-bottom:0.625rem;">
+            <div class="timeline-item animate-slide-in-up" style="padding-bottom:0.625rem;animation-delay:${idx * 0.08}s">
               <div class="timeline-dot ${log.action?.includes("complete") || log.action?.includes("approved") || log.action?.includes("approve") ? "completed" : log.action?.includes("reject") ? "overdue" : "active"}"></div>
               <div>
                 <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(actor)} 님이 ${escapeHtml(label)}${log.details?.taskTitle ? ` — ${escapeHtml(log.details.taskTitle)}` : ""}${log.details?.phaseName ? ` — ${escapeHtml(log.details.phaseName)}` : ""}</div>
@@ -1387,15 +1404,21 @@ function renderRecentActivity() {
     .slice(0, 10);
 
   if (recentItems.length === 0) {
-    return `<div style="padding:1.5rem;text-align:center;font-size:0.75rem;color:var(--slate-400);">최근 활동이 없습니다</div>`;
+    return `<div class="empty-state" style="padding:1.5rem">
+      <div class="empty-state-icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <span class="empty-state-text">최근 활동이 없습니다</span>
+      <span class="empty-state-subtext">작업이 완료되면 여기에 활동 내역이 표시됩니다</span>
+    </div>`;
   }
 
   return `
     <div class="timeline">
-      ${recentItems.map(item => {
+      ${recentItems.map((item, idx) => {
         const isCompleted = item.status === "completed";
         return `
-          <div class="timeline-item" style="padding-bottom:0.625rem;">
+          <div class="timeline-item animate-slide-in-up" style="padding-bottom:0.625rem;animation-delay:${idx * 0.08}s">
             <div class="timeline-dot ${isCompleted ? "completed" : "active"}"></div>
             <div>
               <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(item.title)}</div>
@@ -1605,6 +1628,50 @@ function renderScheduleTab() {
 }
 
 // =============================================================================
+function renderCriticalPathHints() {
+  // Find incomplete tasks that block the most other tasks
+  const blockingMap = new Map(); // taskId → Set of dependent taskIds
+  for (const t of checklistItems) {
+    const deps = t.dependencies || [];
+    for (const depId of deps) {
+      if (!blockingMap.has(depId)) blockingMap.set(depId, new Set());
+      blockingMap.get(depId).add(t.id);
+    }
+  }
+
+  // Only incomplete tasks that actually block something
+  const criticalTasks = [];
+  for (const [taskId, dependents] of blockingMap.entries()) {
+    const task = checklistItems.find(t => t.id === taskId);
+    if (!task || task.status === "completed") continue;
+    criticalTasks.push({ task, waitingCount: dependents.size });
+  }
+
+  criticalTasks.sort((a, b) => b.waitingCount - a.waitingCount);
+  const top10 = criticalTasks.slice(0, 10);
+
+  if (top10.length === 0) return "";
+
+  return `
+    <div class="card p-5 mb-4">
+      <h3 style="font-size:0.9rem;font-weight:600;color:var(--warning-400);margin-bottom:0.5rem;">핵심 경로 힌트</h3>
+      <p style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.75rem;">다른 작업을 가장 많이 막고 있는 미완료 작업</p>
+      <div>
+        ${top10.map((item, idx) => `
+          <div class="critical-path-item card-hover pd-task-row" data-task-id="${item.task.id}" style="cursor:pointer;">
+            <span class="critical-path-rank">${idx + 1}</span>
+            <div class="critical-path-info">
+              <div class="critical-path-title">${escapeHtml(item.task.title)}</div>
+              <div class="critical-path-meta">${escapeHtml(item.task.department || "미배정")} · ${escapeHtml(item.task.assignee || "미배분")}</div>
+            </div>
+            <span class="critical-path-count">${item.waitingCount}건 대기 중</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 // Tab 3: 병목 (Bottleneck analysis)
 // =============================================================================
 
@@ -1706,6 +1773,9 @@ function renderBottleneckTab() {
       </div>
     </div>
 
+    <!-- Critical Path Hints -->
+    ${renderCriticalPathHints()}
+
     <!-- Delay Reason Detail -->
     <div class="card p-5">
       <h3 style="font-size:0.9rem;font-weight:600;color:${overdueTasks.length > 0 ? "var(--danger-400)" : "var(--slate-200)"};margin-bottom:0.75rem;">
@@ -1727,7 +1797,7 @@ function renderBottleneckTab() {
             ${tasks.map(t => {
               const dd = Math.abs(daysUntil(t.dueDate));
               return `
-                <div class="card-hover pd-task-row" data-task-id="${t.id}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);border-left:3px solid var(--danger-400);cursor:pointer;">
+                <div class="card-hover pd-task-row task-row-overdue" data-task-id="${t.id}" style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--surface-3);cursor:pointer;">
                   <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
                       <div style="font-size:0.75rem;font-weight:500;color:var(--slate-200);">${escapeHtml(t.title)}</div>
@@ -1735,7 +1805,7 @@ function renderBottleneckTab() {
                         ${escapeHtml(t.assignee || "미배정")} · ${formatStageName(t.stage)} · 마감 ${formatDate(t.dueDate)}
                       </div>
                     </div>
-                    <div style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--danger-400);flex-shrink:0;">D+${dd}</div>
+                    <span class="dday-badge dday-badge-sm dday-overdue" style="flex-shrink:0;">D+${dd}</span>
                   </div>
                 </div>
               `;
@@ -1937,6 +2007,17 @@ function bindEvents() {
       if (actualStatus === prevStatus && newStatus !== "delayed") return; // no change
       try {
         sel.disabled = true;
+        // Soft-warning for dependency blocking
+        if (actualStatus === "completed") {
+          const task = checklistItems.find(t => t.id === itemId);
+          if (task) {
+            const depStatus = getBlockingStatus(task, checklistItems);
+            if (depStatus.blocked) {
+              const proceed = await confirmModal(`선행 작업 ${depStatus.blockers.length}건이 미완료입니다. 그래도 완료 처리하시겠습니까?`);
+              if (!proceed) { sel.value = prevStatus; sel.disabled = false; return; }
+            }
+          }
+        }
         if (actualStatus === "completed") {
           // Use completeTask for proper stats recalculation
           const { completeTask } = await import("../firestore-service.js");
@@ -1966,7 +2047,7 @@ function bindEvents() {
       try {
         await updateChecklistItemStatus(itemId, newStatus);
         showToast("success", `상태가 변경되었습니다.`);
-      } catch (err) {
+      } catch {
         showToast("error", "상태 변경에 실패했습니다.");
       }
     });
@@ -1985,7 +2066,7 @@ function bindEvents() {
             try {
               await updateChecklistItemStatus(taskId, newStatus);
               showToast("success", "상태가 변경되었습니다.");
-            } catch (err) {
+            } catch {
               showToast("error", "상태 변경에 실패했습니다.");
               render();
             }
@@ -2300,7 +2381,7 @@ function openTaskPeek(task) {
   function _getFileIcon(fileName) {
     const ext = (fileName || "").split(".").pop().toLowerCase();
     const icons = { doc: "primary", docx: "primary", hwp: "primary", txt: "primary", xls: "#22c55e", xlsx: "#22c55e", csv: "#22c55e", ppt: "#f97316", pptx: "#f97316", pdf: "#ef4444", png: "#8b5cf6", jpg: "#8b5cf6", jpeg: "#8b5cf6" };
-    const color = icons[ext] || "var(--slate-300)";
+    const _color = icons[ext] || "var(--slate-300)";
     if (["doc","docx","hwp","hwpx","txt","rtf"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-400)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
     if (["xls","xlsx","csv"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>`;
     if (["ppt","pptx"].includes(ext)) return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
@@ -2567,7 +2648,7 @@ function openTaskPeek(task) {
 
 // ─── Quick Add Task (NLP Parsing + Smart Assignee) ──────────────────────────
 
-function parseQuickInput(text) {
+function _parseQuickInput(text) {
   const phases = getActivePhaseGroups();
   const result = { title: "", assignee: "", department: "", importance: "green", dueDate: null, stage: phases.length > 0 ? phases[0].workStage : "" };
   let remaining = text;
@@ -2708,7 +2789,12 @@ function openPhasePanel(phase, phaseIdx) {
       <div class="gate-section">
         <div class="gate-section-title">💬 회의록 · 피드백 <span class="gate-note-count">${notes.length}건</span></div>
         <div class="gate-notes-list">
-          ${notes.length === 0 ? '<p class="gate-empty">등록된 회의록이 없습니다</p>' :
+          ${notes.length === 0 ? `<div class="empty-state" style="padding:1rem">
+              <div class="empty-state-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+              </div>
+              <span class="empty-state-text">등록된 회의록이 없습니다</span>
+            </div>` :
             notes.map(n => `
               <div class="gate-note">
                 <div class="gate-note-header">

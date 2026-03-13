@@ -1,6 +1,6 @@
 // Filter pill system — renders removable filter tags
 
-export function renderFilterPills(filters, onRemove) {
+export function renderFilterPills(filters, _onRemove) {
   if (!filters || filters.length === 0) return '';
   return `
     <div class="filter-pills">

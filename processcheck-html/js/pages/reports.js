@@ -2,7 +2,7 @@
 // Reports Page Controller — Analytics & Charts
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { renderNav, initTheme } from "../components.js";
 import {
   subscribeProjects,
@@ -13,7 +13,6 @@ import {
   departments,
   PHASE_GROUPS,
   formatDate,
-  getStatusLabel,
   getRiskLabel,
 } from "../utils.js";
 
@@ -106,14 +105,14 @@ function toCSVRow(fields) {
 
 // ─── Data Computation Helpers ───────────────────────────────────────────────
 
-function getPhaseForStage(stage) {
+function _getPhaseForStage(stage) {
   for (const pg of PHASE_GROUPS) {
     if (pg.workStage === stage || pg.gateStage === stage) return pg.name;
   }
   return stage;
 }
 
-function getPhaseStages(phaseName) {
+function _getPhaseStages(phaseName) {
   const pg = PHASE_GROUPS.find((p) => p.name === phaseName);
   return pg ? [pg.workStage, pg.gateStage] : [];
 }
@@ -289,7 +288,7 @@ function exportAssigneeCSV() {
 // ─── Render ─────────────────────────────────────────────────────────────────
 
 function render() {
-  const projectData = computeProjectProgress();
+  const _projectData = computeProjectProgress();
   const deptData = computeDepartmentWorkload();
   const phaseData = computePhaseBottleneck();
   const assigneeData = computeAssigneeWorkload();

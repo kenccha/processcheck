@@ -1,5 +1,29 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=\"$CLAUDE_FILE_PATH\"; if echo \"$file\" | grep -q 'processcheck-html/js/.*\\.js$'; then cd /Users/injooncha/processcheck/processcheck-html && ./node_modules/.bin/eslint \"$file\" 2>&1 || true; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=\"$CLAUDE_FILE_PATH\"; if echo \"$file\" | grep -qE '\\.env'; then echo 'BLOCKED: .env 파일 수정 금지' && exit 1; fi"
+          }
+        ]
+      }
+    ]
   }
 }

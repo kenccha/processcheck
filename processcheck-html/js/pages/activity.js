@@ -2,7 +2,7 @@
 // Activity Log Page Controller — 전체 시스템 감사 로그
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { renderNav, initTheme } from "../components.js";
 import { subscribeAllActivityLogs, subscribeProjects } from "../firestore-service.js";
 import { escapeHtml, formatDateTime, timeAgo, exportToCSV } from "../utils.js";
@@ -249,8 +249,8 @@ function renderFilterTab(key, label, count) {
 function renderLogItem(log) {
   const meta = getActionMeta(log.action);
   const projName = getProjectName(log.details?.projectId || "");
-  const taskLink = log.targetType === "task" && log.targetId
-    ? `task.html?id=${encodeURIComponent(log.targetId)}`
+  const taskLink = log.targetType === "task" && log.targetId && log.details?.projectId
+    ? `task.html?projectId=${encodeURIComponent(log.details.projectId)}&taskId=${encodeURIComponent(log.targetId)}`
     : null;
 
   let detail = "";

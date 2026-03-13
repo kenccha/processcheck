@@ -4,7 +4,7 @@
 
 import { getUser, logout, startSessionWatcher } from "./auth.js";
 import { subscribeNotifications, markNotificationRead } from "./firestore-service.js";
-import { getRoleName, timeAgo, escapeHtml } from "./utils.js";
+import { timeAgo, escapeHtml } from "./utils.js";
 
 // ─── Theme Management ────────────────────────────────────────────────────────
 
@@ -106,13 +106,13 @@ const BASE_NAV_LINKS = [
   },
 ];
 
-const ADMIN_USER_LINK = {
+const _ADMIN_USER_LINK = {
   href: "admin-users.html",
   label: "사용자 관리",
   icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
 };
 
-function getNavLinks(userRole) {
+function getNavLinks(_userRole) {
   const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
   // 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가 (피드백 모아보기 앞에)
   const reviewMenu = links.find((l) => l.label === "리뷰");
@@ -271,7 +271,7 @@ export function renderNav(container) {
     const unreadCount = notifs.filter(n => !n.read).length;
     bellDot.classList.toggle("hidden", unreadCount === 0);
     if (notifPanelOpen) renderNotifPanel();
-  });
+  }, (err) => { console.error("알림 구독 실패:", err); });
 
   function renderNotifPanel() {
     if (!notifPanelOpen) {

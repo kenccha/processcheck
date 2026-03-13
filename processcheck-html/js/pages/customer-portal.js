@@ -2,8 +2,6 @@
 // Customer Portal — email-based auth, project progress, notifications
 // =============================================================================
 
-import { db } from "../firebase-init.js";
-import { showToast } from "../ui/toast.js";
 import {
   subscribeCustomers,
   subscribeProjects,
@@ -14,8 +12,6 @@ import {
   escapeHtml,
   formatDate,
   PHASE_GROUPS,
-  getStatusLabel,
-  getStatusBadgeClass,
   timeAgo,
 } from "../utils.js";
 import { initTheme } from "../components.js";
@@ -28,7 +24,7 @@ const app = document.getElementById("app");
 let currentCustomer = null;
 let allCustomers = [];
 let portalProjects = [];
-let allProjects = [];
+let _allProjects = [];
 let notifications = [];
 let activeView = "projects"; // "projects" | "notifications"
 let loginError = "";
@@ -66,7 +62,7 @@ window.addEventListener("beforeunload", () => {
 function loadPortalData() {
   unsubs.push(
     subscribeProjects((projects) => {
-      allProjects = projects;
+      _allProjects = projects;
       portalProjects = projects.filter(
         (p) => currentCustomer.products && currentCustomer.products.includes(p.id)
       );
@@ -197,7 +193,7 @@ function renderProjectsView() {
     <div class="flex flex-col gap-4">
       ${portalProjects
         .map((p) => {
-          const currentPhaseIdx = PHASE_GROUPS.findIndex(
+          const _currentPhaseIdx = PHASE_GROUPS.findIndex(
             (ph) => ph.workStage === p.currentStage || ph.gateStage === p.currentStage
           );
           return `

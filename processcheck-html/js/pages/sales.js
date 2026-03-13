@@ -4,7 +4,7 @@
 // 5단계 파이프라인: 제품정보 → 자료제작 → 거래처배포 → 교육행사 → 출시확인
 // =============================================================================
 
-import { initTheme, renderSpinner, getThemeIcon, toggleTheme } from "../components.js";
+import { initTheme, getThemeIcon, toggleTheme } from "../components.js";
 import { guardPage, getUser, logout } from "../auth.js";
 import { showToast } from "../ui/toast.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
@@ -88,7 +88,7 @@ let timelineShowLater = false;
 let pendingConfirmId = null;
 
 // Bulk selection
-let selectedItems = new Set();
+let _selectedItems = new Set();
 
 // 영업 핵심 카테고리
 const SALES_CORE_CATEGORIES = ["pricing", "sales_training", "dealer_notify"];
@@ -232,7 +232,7 @@ function getProjectName(projectId) {
   return p ? p.name : projectId;
 }
 
-function getStatusBadge(status) {
+function _getStatusBadge(status) {
   const map = {
     pending: { label: "대기", cls: "badge-neutral" },
     in_progress: { label: "진행중", cls: "badge-warning" },
@@ -267,7 +267,7 @@ function getActionButtons(item) {
   return "";
 }
 
-function getCheckedDisplay(item) {
+function _getCheckedDisplay(item) {
   if (item.checkedBy) {
     const dateStr = item.checkedAt ? timeAgo(item.checkedAt) : "";
     return `<span class="badge badge-success" style="font-size:10px;" title="${item.checkedNote || ""}">✓ ${escapeHtml(item.checkedBy)}</span>${dateStr ? `<br><span class="text-xs text-soft">${dateStr}</span>` : ""}`;
@@ -337,7 +337,7 @@ function render() {
   // Assignees + projectIds for filters
   const projectIds = [...new Set(allItems.map(i => i.projectId))];
   const assignees = [...new Set(allItems.map(i => i.assignee).filter(Boolean))].sort();
-  const categories = showAllCategories
+  const _categories = showAllCategories
     ? Object.keys(LAUNCH_CATEGORY_LABELS)
     : [...SALES_CORE_CATEGORIES];
 
@@ -545,13 +545,12 @@ function renderCommandCenter(filtered) {
     // D-Day
     const projectDDay = proj?.endDate ? daysUntil(proj.endDate) : null;
     let dDayText = "—";
-    let dDayColor = "var(--slate-400)";
     let dDayClass = "";
     if (projectDDay !== null) {
-      if (projectDDay < 0) { dDayText = `D+${Math.abs(projectDDay)}`; dDayColor = "var(--danger)"; dDayClass = "danger"; }
-      else if (projectDDay === 0) { dDayText = "D-Day"; dDayColor = "var(--danger)"; dDayClass = "danger"; }
-      else if (projectDDay <= 14) { dDayText = `D-${projectDDay}`; dDayColor = "var(--warning)"; dDayClass = "warning"; }
-      else { dDayText = `D-${projectDDay}`; dDayColor = "var(--success)"; dDayClass = "success"; }
+      if (projectDDay < 0) { dDayText = `D+${Math.abs(projectDDay)}`; dDayClass = "danger"; }
+      else if (projectDDay === 0) { dDayText = "D-Day"; dDayClass = "danger"; }
+      else if (projectDDay <= 14) { dDayText = `D-${projectDDay}`; dDayClass = "warning"; }
+      else { dDayText = `D-${projectDDay}`; dDayClass = "success"; }
     }
 
     // Bottleneck: find most delayed stage

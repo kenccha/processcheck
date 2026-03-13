@@ -2,24 +2,19 @@
 // Projects Page -- 2 view modes (table, card)
 // =============================================================================
 
-import { guardPage, getUser } from "../auth.js";
+import { guardPage } from "../auth.js";
 import { confirmModal } from "../ui/confirm-modal.js";
 import { showToast } from "../ui/toast.js";
-import { renderNav, renderSpinner, initTheme } from "../components.js";
+import { renderNav, initTheme } from "../components.js";
 initTheme();
 import { subscribeProjects, subscribeAllChecklistItems, updateProject, createProject, getTemplateStages, getTemplateDepartments } from "../firestore-service.js";
 import {
   departments as defaultDepartments,
-  projectStages,
   PHASE_GROUPS,
-  GATE_STAGES,
-  getStatusLabel,
-  getStatusBadgeClass,
   formatStageName,
   formatDate,
   escapeHtml,
   getRiskClass,
-  getRiskLabel,
   daysUntil,
   exportToCSV,
 } from "../utils.js";
@@ -44,6 +39,8 @@ const forcedType = urlParams.get("type"); // "신규개발" | null
 // -- State --
 let projects = [];
 let allTasks = [];
+let calendarYear = new Date().getFullYear();
+let calendarMonth = new Date().getMonth();
 const _savedProj = loadViewState('projects');
 const _validViews = ["table", "cards"];
 let viewMode = (_savedProj && _validViews.includes(_savedProj.viewMode) && _savedProj.viewMode) || "table";
@@ -179,7 +176,7 @@ function getCalendarDays(year, month) {
   const days = [];
 
   // Previous month fill
-  const prevLast = new Date(year, month, 0);
+  const _prevLast = new Date(year, month, 0);
   for (let i = startDow - 1; i >= 0; i--) {
     const d = new Date(year, month, -i);
     days.push({ date: d, isCurrentMonth: false, isToday: false });
@@ -389,7 +386,7 @@ function renderCards(filtered) {
     <div class="proj-card-grid">
       ${filtered
         .map((p) => {
-          const stats = getTaskStats(p.id);
+          const _stats = getTaskStats(p.id);
           const progress = p.progress || 0;
           const dots = getPhaseDotsForProject(p.id);
           const progressColor = getProgressColor(progress);
@@ -505,7 +502,7 @@ function renderTable(filtered) {
 // 3) Gantt view
 // =============================================================================
 
-function renderGantt(filtered) {
+function _renderGantt(filtered) {
   if (filtered.length === 0) return renderEmpty();
 
   const { minDate, maxDate, totalDays } = getGanttRange(filtered);
@@ -570,7 +567,7 @@ function renderGantt(filtered) {
 // 4) Kanban view
 // =============================================================================
 
-function renderKanban(filtered) {
+function _renderKanban(filtered) {
   const columns = [
     { key: "active", label: "활성", color: "var(--primary-400)" },
     { key: "completed", label: "완료", color: "var(--success-400)" },
@@ -629,7 +626,7 @@ function renderKanban(filtered) {
 // 5) Timeline view
 // =============================================================================
 
-function renderTimeline(filtered) {
+function _renderTimeline(filtered) {
   if (filtered.length === 0) return renderEmpty();
 
   // Sort by start date
@@ -678,7 +675,7 @@ function renderTimeline(filtered) {
 // 6) Calendar view
 // =============================================================================
 
-function renderCalendar(filtered) {
+function _renderCalendar(filtered) {
   const days = getCalendarDays(calendarYear, calendarMonth);
   const monthLabel = `${calendarYear}년 ${calendarMonth + 1}월`;
   const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
@@ -789,7 +786,7 @@ function renderCalendar(filtered) {
 // 7) Matrix view (Department x Stage)
 // =============================================================================
 
-function renderMatrix(filtered) {
+function _renderMatrix(filtered) {
   const projectIds = new Set(filtered.map((p) => p.id));
   const relevantTasks = allTasks.filter((t) => projectIds.has(t.projectId));
 
@@ -865,7 +862,7 @@ function renderMatrix(filtered) {
                 const cell = matrix[dept][phase.name];
                 const work = cell.work;
                 const gate = cell.gate;
-                const gateInfo = getGateInfo(gate);
+                const _gateInfo = getGateInfo(gate);
                 const workColor = getWorkColor(work);
                 const hasWork = work.total > 0;
                 const hasBg = work.delayed > 0 ? "background:rgba(239,68,68,0.06)" : work.inProgress > 0 ? "background:rgba(6,182,212,0.06)" : (work.completed === work.total && work.total > 0) ? "background:rgba(34,197,94,0.06)" : "";
@@ -1046,7 +1043,7 @@ function bindControls() {
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
       const filtered = getFilteredProjects();
-      const headers = ["이름", "유형", "PM", "상태", "진행률", "시작일", "종료일", "현재 단계"];
+      const headers = ["이름", "유형", "상태", "진행률", "시작일", "종료일", "현재 단계"];
       const data = filtered.map((p) => [
         p.name, p.projectType || "", getProjectStatusLabel(p.status),
         (p.progress || 0) + "%", formatDate(p.startDate), formatDate(p.endDate),
