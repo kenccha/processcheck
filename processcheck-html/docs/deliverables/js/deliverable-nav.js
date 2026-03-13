@@ -47,8 +47,7 @@
         { href: "docs/deliverables/user-flows.html", label: "업무 흐름" },
         { href: "docs/deliverables/diagram-viewer.html", label: "시스템 구조" },
         { href: "manual.html", label: "매뉴얼" },
-        { href: "admin-users.html", label: "사용자 관리" },
-        { href: "admin-permissions.html", label: "권한 설정" },
+        // 사용자 관리 + 권한 설정: observer만 표시 (아래 동적 삽입)
         { href: "docs/deliverables/feedback.html", label: "피드백 모아보기" },
       ],
     },
@@ -63,6 +62,19 @@
       ],
     },
   ];
+
+  // observer만 관리자 링크 동적 삽입 (components.js와 동일 로직)
+  if (user && user.role === "observer") {
+    const reviewMenu = NAV_LINKS.find(l => l.label === "리뷰");
+    if (reviewMenu && reviewMenu.children) {
+      const fbIdx = reviewMenu.children.findIndex(c => c.label === "피드백 모아보기");
+      const insertIdx = fbIdx >= 0 ? fbIdx : reviewMenu.children.length;
+      reviewMenu.children.splice(insertIdx, 0,
+        { href: "admin-users.html", label: "사용자 관리" },
+        { href: "admin-permissions.html", label: "권한 설정" }
+      );
+    }
+  }
 
   const currentFile = location.pathname.split("/").pop();
   const isFeedbackPage = currentFile === "feedback.html";

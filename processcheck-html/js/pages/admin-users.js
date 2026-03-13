@@ -17,7 +17,7 @@ import {
 import { departments, escapeHtml } from "../utils.js";
 
 // --- Auth guard ---
-const user = guardPage();
+const user = guardPage("observer");
 if (!user) throw new Error("Not authenticated");
 
 // --- DOM refs ---
@@ -74,6 +74,7 @@ function render() {
   const workers = users.filter((u) => u.role === "worker").length;
   const managers = users.filter((u) => u.role === "manager").length;
   const observers = users.filter((u) => u.role === "observer").length;
+  const admins = users.filter((u) => u.role === "admin").length;
 
   app.innerHTML = `
     <div class="container animate-fade-in">
@@ -103,6 +104,10 @@ function render() {
           <div class="stat-card-label">기획조정실</div>
           <div class="stat-card-row"><span class="stat-value">${observers}</span></div>
         </div>
+        <div class="stat-card">
+          <div class="stat-card-label">관리자</div>
+          <div class="stat-card-row"><span class="stat-value">${admins}</span></div>
+        </div>
       </div>
 
       <!-- Filters -->
@@ -114,6 +119,7 @@ function render() {
             <option value="worker" ${roleFilter === "worker" ? "selected" : ""}>실무자</option>
             <option value="manager" ${roleFilter === "manager" ? "selected" : ""}>매니저</option>
             <option value="observer" ${roleFilter === "observer" ? "selected" : ""}>기획조정실</option>
+            <option value="admin" ${roleFilter === "admin" ? "selected" : ""}>관리자</option>
           </select>
           <select class="input-field" id="dept-filter" style="width:auto;min-width:130px">
             <option value="">전체 부서</option>
@@ -162,6 +168,7 @@ function render() {
                       <option value="worker" ${u.role === "worker" ? "selected" : ""}>실무자</option>
                       <option value="manager" ${u.role === "manager" ? "selected" : ""}>매니저</option>
                       <option value="observer" ${u.role === "observer" ? "selected" : ""}>기획조정실</option>
+                      <option value="admin" ${u.role === "admin" ? "selected" : ""}>관리자</option>
                     </select>
                   </td>
                   <td>

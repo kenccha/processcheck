@@ -144,8 +144,8 @@ function renderSalesNav(container) {
   `;
 
   // Nav event listeners
-  container.querySelector("#sales-home-btn").addEventListener("click", () => window.location.href = "home.html");
-  container.querySelector("#sales-hub-btn").addEventListener("click", () => window.location.href = "home.html");
+  container.querySelector("#sales-home-btn").addEventListener("click", () => window.location.href = "processcheck.html");
+  container.querySelector("#sales-hub-btn").addEventListener("click", () => window.location.href = "processcheck.html");
   container.querySelector("#sales-logout-btn").addEventListener("click", logout);
   container.querySelector("#sales-theme-btn").addEventListener("click", toggleTheme);
 
@@ -395,6 +395,17 @@ function render() {
 
       <!-- Confirm modal -->
       ${renderConfirmModal()}
+      ${renderEditModal()}
+
+      <!-- Bulk action bar -->
+      ${_selectedItems.size > 0 ? `
+        <div class="sales-bulk-bar" id="bulk-bar">
+          <span>${_selectedItems.size}개 선택</span>
+          <button class="btn btn-sm btn-primary" id="bulk-start">일괄 시작</button>
+          <button class="btn btn-sm btn-success" id="bulk-complete">일괄 완료</button>
+          <button class="btn btn-sm btn-ghost" id="bulk-clear">선택 해제</button>
+        </div>
+      ` : ""}
     </div>
   `;
 
@@ -636,14 +647,25 @@ function renderCommandDetail(projectId, items, pipeline) {
           <span class="text-xs text-soft">${stage.completed}/${stage.total}</span>
         </div>
         <div class="sales-detail-items">
-          ${stageItems.map(item => `
-            <div class="sales-detail-item ${item.status}">
+          ${stageItems.map(item => {
+            const dd = daysUntil(item.dueDate);
+            const isOverdue = item.status !== "completed" && dd !== null && dd < 0;
+            let ddLabel = "";
+            if (dd !== null) {
+              if (dd < 0) ddLabel = `D+${Math.abs(dd)}`;
+              else if (dd === 0) ddLabel = "D-Day";
+              else ddLabel = `D-${dd}`;
+            }
+            return `
+            <div class="sales-detail-item ${item.status}${isOverdue ? " overdue" : ""}" data-item-id="${item.id}">
               <span class="sales-detail-item-status">${item.status === "completed" ? "✓" : item.status === "in_progress" ? "▶" : "○"}</span>
               <span class="sales-detail-item-title">${escapeHtml(item.title)}</span>
               <span class="sales-detail-item-assignee">${escapeHtml(item.assignee || item.department || "")}</span>
+              ${item.dueDate ? `<span class="text-xs${isOverdue ? " text-danger" : " text-soft"}" style="min-width:50px;text-align:right;">${ddLabel}</span>` : ""}
               ${getActionButtons(item)}
-            </div>
-          `).join("")}
+              <button class="btn btn-sm btn-ghost sales-edit-btn" data-edit-item="${item.id}" title="편집" onclick="event.stopPropagation();" style="font-size:11px;padding:2px 4px;opacity:0.5;">✏️</button>
+            </div>`;
+          }).join("")}
         </div>
       </div>`;
   }
@@ -715,6 +737,7 @@ function renderExecuteBoard(filtered) {
             return `
               <div class="sales-kanban-card ${item.status}${isOverdue ? " overdue" : ""}" data-navigate-project="${item.projectId}">
                 <div class="sales-kanban-card-top">
+                  <input type="checkbox" class="sales-bulk-cb" data-bulk-check="${item.id}" ${_selectedItems.has(item.id) ? "checked" : ""} onclick="event.stopPropagation();" title="선택">
                   <span class="sales-kanban-card-title">${escapeHtml(item.title)}</span>
                   ${dLabel ? `<span class="sales-kanban-card-dday${isOverdue ? " danger" : ""}">${dLabel}</span>` : ""}
                 </div>
@@ -725,6 +748,7 @@ function renderExecuteBoard(filtered) {
                 <div class="sales-kanban-card-actions">
                   ${getCategoryBadge(item.category)}
                   ${getActionButtons(item)}
+                  <button class="btn btn-sm btn-ghost sales-edit-btn" data-edit-item="${item.id}" title="편집" onclick="event.stopPropagation();" style="font-size:11px;padding:2px 4px;opacity:0.5;">✏️</button>
                 </div>
               </div>`;
           }).join("")}
@@ -1127,6 +1151,10 @@ function bindCommonEvents() {
     const input = app.querySelector("#search-input");
     if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
   }
+
+  // Edit & Bulk
+  bindEditEvents();
+  bindBulkEvents();
 }
 
 // =============================================================================
@@ -1186,6 +1214,204 @@ function bindCustomerEvents() {
       if (expandedCustomers.has(cid)) expandedCustomers.delete(cid);
       else expandedCustomers.add(cid);
       render();
+    });
+  });
+}
+
+// =============================================================================
+// Edit Modal — 항목 인라인 편집 (담당자/마감일/상태)
+// =============================================================================
+
+function renderEditModal() {
+  return `
+    <div class="modal-overlay hidden" id="edit-modal">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-header">
+          <h3 class="modal-title">항목 편집</h3>
+          <button class="modal-close" id="edit-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3" id="edit-title-display" style="font-weight:600;color:var(--slate-200);font-size:0.9rem;"></div>
+          <div class="mb-3">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">담당자</label>
+            <input type="text" class="input-field" id="edit-assignee" placeholder="담당자 이름" style="margin-top:4px;">
+          </div>
+          <div class="mb-3">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">부서</label>
+            <input type="text" class="input-field" id="edit-department" placeholder="부서" style="margin-top:4px;">
+          </div>
+          <div class="mb-3">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">마감일</label>
+            <input type="date" class="input-field" id="edit-duedate" style="margin-top:4px;">
+          </div>
+          <div class="mb-3">
+            <label class="text-sm font-medium" style="color:var(--slate-300)">상태</label>
+            <select class="input-field" id="edit-status" style="margin-top:4px;">
+              <option value="pending">대기</option>
+              <option value="in_progress">진행중</option>
+              <option value="completed">완료</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="edit-cancel">취소</button>
+          <button class="btn btn-primary" id="edit-submit">저장</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openEditModal(itemId) {
+  const item = allItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  const modal = document.getElementById("edit-modal");
+  modal.classList.remove("hidden");
+
+  document.getElementById("edit-title-display").textContent = item.title;
+  document.getElementById("edit-assignee").value = item.assignee || "";
+  document.getElementById("edit-department").value = item.department || "";
+  document.getElementById("edit-status").value = item.status || "pending";
+
+  const dueDateVal = item.dueDate
+    ? (item.dueDate instanceof Date ? item.dueDate : new Date(item.dueDate)).toISOString().split("T")[0]
+    : "";
+  document.getElementById("edit-duedate").value = dueDateVal;
+
+  // Store editing item id
+  modal.dataset.editingId = itemId;
+}
+
+function bindEditEvents() {
+  const modal = document.getElementById("edit-modal");
+  if (!modal) return;
+
+  document.getElementById("edit-modal-close")?.addEventListener("click", () => modal.classList.add("hidden"));
+  document.getElementById("edit-cancel")?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", e => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  document.getElementById("edit-submit")?.addEventListener("click", async () => {
+    const itemId = modal.dataset.editingId;
+    if (!itemId) return;
+
+    const updates = {};
+    const newAssignee = document.getElementById("edit-assignee").value.trim();
+    const newDept = document.getElementById("edit-department").value.trim();
+    const newDueDate = document.getElementById("edit-duedate").value;
+    const newStatus = document.getElementById("edit-status").value;
+
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (newAssignee !== (item.assignee || "")) updates.assignee = newAssignee;
+    if (newDept !== (item.department || "")) updates.department = newDept;
+    if (newStatus !== item.status) updates.status = newStatus;
+    if (newDueDate) {
+      const oldDate = item.dueDate
+        ? (item.dueDate instanceof Date ? item.dueDate : new Date(item.dueDate)).toISOString().split("T")[0]
+        : "";
+      if (newDueDate !== oldDate) updates.dueDate = new Date(newDueDate);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      modal.classList.add("hidden");
+      return;
+    }
+
+    const submitBtn = document.getElementById("edit-submit");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "저장 중...";
+    try {
+      if (updates.status === "completed") {
+        await completeLaunchChecklist(itemId);
+        delete updates.status;
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateLaunchChecklist(itemId, updates);
+      }
+      modal.classList.add("hidden");
+      showToast("success", "항목이 수정되었습니다.");
+    } catch (err) {
+      showToast("error", "수정 실패: " + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "저장";
+    }
+  });
+
+  // Edit button clicks (from command detail + other views)
+  app.querySelectorAll("[data-edit-item]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      openEditModal(btn.dataset.editItem);
+    });
+  });
+}
+
+// =============================================================================
+// Bulk Actions — 일괄 시작/완료
+// =============================================================================
+
+function bindBulkEvents() {
+  // Bulk action buttons
+  document.getElementById("bulk-start")?.addEventListener("click", async () => {
+    const ids = [..._selectedItems];
+    const btn = document.getElementById("bulk-start");
+    btn.disabled = true;
+    btn.textContent = `처리 중... (0/${ids.length})`;
+    let done = 0;
+    for (const id of ids) {
+      const item = allItems.find(i => i.id === id);
+      if (item && item.status === "pending") {
+        try {
+          await updateLaunchChecklist(id, { status: "in_progress" });
+          done++;
+          btn.textContent = `처리 중... (${done}/${ids.length})`;
+        } catch { /* skip */ }
+      }
+    }
+    _selectedItems.clear();
+    showToast("success", `${done}건 시작 처리 완료`);
+    render();
+  });
+
+  document.getElementById("bulk-complete")?.addEventListener("click", async () => {
+    const ids = [..._selectedItems];
+    const btn = document.getElementById("bulk-complete");
+    btn.disabled = true;
+    btn.textContent = `처리 중... (0/${ids.length})`;
+    let done = 0;
+    for (const id of ids) {
+      const item = allItems.find(i => i.id === id);
+      if (item && item.status !== "completed") {
+        try {
+          await completeLaunchChecklist(id);
+          done++;
+          btn.textContent = `처리 중... (${done}/${ids.length})`;
+        } catch { /* skip */ }
+      }
+    }
+    _selectedItems.clear();
+    showToast("success", `${done}건 완료 처리`);
+    render();
+  });
+
+  document.getElementById("bulk-clear")?.addEventListener("click", () => {
+    _selectedItems.clear();
+    render();
+  });
+
+  // Checkboxes
+  app.querySelectorAll("[data-bulk-check]").forEach(cb => {
+    cb.addEventListener("change", e => {
+      const id = cb.dataset.bulkCheck;
+      if (cb.checked) _selectedItems.add(id);
+      else _selectedItems.delete(id);
+      // Update bulk bar without full re-render
+      const bar = document.getElementById("bulk-bar");
+      if (_selectedItems.size > 0 && !bar) render();
+      else if (_selectedItems.size === 0 && bar) render();
+      else if (bar) bar.querySelector("span").textContent = `${_selectedItems.size}개 선택`;
     });
   });
 }

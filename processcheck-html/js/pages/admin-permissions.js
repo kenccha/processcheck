@@ -14,7 +14,7 @@ import {
 import { getRoleName } from "../utils.js";
 
 // --- Auth guard ---
-const user = guardPage();
+const user = guardPage("observer");
 if (!user) throw new Error("Not authenticated");
 
 // --- DOM refs ---

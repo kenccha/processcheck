@@ -2,6 +2,11 @@
 // Utils — helper functions ported from mockData.ts
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// 역할 권한 헬퍼 — admin은 observer 상위 호환
+export function isAdmin(role) { return role === "admin"; }
+export function isObserverOrAdmin(role) { return role === "observer" || role === "admin"; }
+export function isManagerOrAbove(role) { return role === "manager" || role === "observer" || role === "admin"; }
+
 // 부서 목록
 export const departments = [
   "개발팀", "품질팀", "영업팀", "제조팀", "구매팀",
@@ -27,6 +32,125 @@ export const PHASE_GROUPS = [
 
 // 게이트 스테이지 목록 (기획조정실 승인 대상)
 export const GATE_STAGES = ["발의승인", "기획승인", "WM승인회", "Tx승인회", "MSG승인회", "영업이관"];
+
+// Gate 의사결정 옵션
+export const GATE_DECISIONS = [
+  { value: "go", label: "Go (승인)", icon: "✅", color: "var(--success-400)", bg: "rgba(34,197,94,0.1)" },
+  { value: "kill", label: "Kill (중단)", icon: "🛑", color: "var(--danger-400)", bg: "rgba(239,68,68,0.1)" },
+  { value: "hold", label: "Hold (보류)", icon: "⏸", color: "var(--warning-500)", bg: "rgba(245,158,11,0.1)" },
+  { value: "recycle", label: "Recycle (재작업)", icon: "🔄", color: "var(--primary-400)", bg: "rgba(6,182,212,0.1)" },
+];
+
+// Gate 판단 기준 템플릿 (Phase별)
+export const GATE_CRITERIA_TEMPLATES = {
+  "발의": {
+    mustMeet: [
+      "전략 적합성 확인 (사업 방향과 부합)",
+      "시장 수요/고객 니즈 근거 존재",
+      "규제 요건 사전 검토 완료 (FDA/CE 등)",
+      "기술적 실현 가능성 확인",
+    ],
+    shouldMeet: [
+      { label: "시장 매력도", description: "시장 규모, 성장성, 경쟁 강도" },
+      { label: "기술 실현 가능성", description: "핵심 기술 확보 수준, 개발 난이도" },
+      { label: "전략 시너지", description: "기존 제품/기술 활용도, 포트폴리오 적합성" },
+      { label: "재무 타당성", description: "예상 매출, 개발비용 대비 수익성" },
+    ],
+  },
+  "기획": {
+    mustMeet: [
+      "제품 요구사양서(PRD) 작성 완료",
+      "개발 일정 및 예산 확정",
+      "Design Input 문서화 완료",
+      "위험 분석 예비 완료 (예비 DFMEA)",
+    ],
+    shouldMeet: [
+      { label: "요구사항 완성도", description: "사용자/규제/성능 요구사항 명확성" },
+      { label: "일정 현실성", description: "마일스톤 달성 가능성, 버퍼 적정성" },
+      { label: "자원 가용성", description: "인력, 장비, 외주 확보 수준" },
+      { label: "기술 위험 수준", description: "미검증 기술 의존도, 대안 존재 여부" },
+    ],
+  },
+  "WM": {
+    mustMeet: [
+      "Working Model 제작 완료",
+      "DFMEA 초안 작성 완료",
+      "설계 검증(Verification) 계획 수립",
+      "핵심 성능 목표치 달성 확인",
+    ],
+    shouldMeet: [
+      { label: "WM 기능 검증 결과", description: "핵심 기능 동작 확인, 이슈 해결 수준" },
+      { label: "설계 성숙도", description: "설계 변경 빈도 안정화 여부" },
+      { label: "BOM 확정 수준", description: "핵심 부품 선정, 대체품 확보" },
+      { label: "규격 충족도", description: "안전/성능/EMC 규격 예비 충족" },
+    ],
+  },
+  "Tx": {
+    mustMeet: [
+      "시험용(Tx) 샘플 제작 완료",
+      "설계 검증(V&V) 주요 항목 완료",
+      "규제 인허가 시험 준비/진행",
+      "DFMEA 업데이트 완료",
+    ],
+    shouldMeet: [
+      { label: "시험 합격률", description: "V&V 항목 통과율, 잔여 이슈 수" },
+      { label: "공정 안정성", description: "시작 공정 재현성, 불량률" },
+      { label: "규격 마진 수준", description: "규격 대비 마진 충분성" },
+      { label: "양산 전환 준비도", description: "금형/치공구/설비 준비 수준" },
+    ],
+  },
+  "MSG": {
+    mustMeet: [
+      "Master 샘플 최종 승인",
+      "양산 공정 검증(PV) 완료",
+      "규제 인허가 승인/진행 확인",
+      "PFMEA 작성 완료",
+    ],
+    shouldMeet: [
+      { label: "공정 능력 (Cpk)", description: "주요 공정 Cpk ≥ 1.33 달성" },
+      { label: "품질 안정성", description: "시생산 불량률, 공정 산포" },
+      { label: "출시 준비도", description: "포장, 매뉴얼, 마케팅 자료" },
+      { label: "고객 피드백 반영", description: "Pilot 테스트 피드백 반영 수준" },
+    ],
+  },
+  "양산/이관": {
+    mustMeet: [
+      "양산 품질 기준 충족 확인",
+      "영업 이관 체크리스트 완료",
+      "사용자 교육 및 매뉴얼 준비 완료",
+      "A/S 체계 구축 확인",
+    ],
+    shouldMeet: [
+      { label: "초기 양산 수율", description: "목표 수율 달성, 안정화 추이" },
+      { label: "고객 만족도", description: "초기 출하 피드백, 클레임 수준" },
+      { label: "출시 후 리스크", description: "잔여 위험 수용 가능성" },
+      { label: "공급망 안정성", description: "핵심 부품 수급, 리드타임" },
+    ],
+  },
+};
+
+// Gate status 표시 헬퍼
+export function getGateStatusDisplay(status) {
+  // backward compat: approved→go, rejected→kill
+  const normalized = status === "approved" ? "go" : status === "rejected" ? "kill" : status;
+  const map = {
+    pending: { icon: "⏳", label: "대기", color: "var(--slate-400)", cls: "gate-pending" },
+    go: { icon: "✅", label: "Go", color: "var(--success-400)", cls: "gate-approved" },
+    kill: { icon: "🛑", label: "Kill", color: "var(--danger-400)", cls: "gate-rejected" },
+    hold: { icon: "⏸", label: "Hold", color: "var(--warning-500)", cls: "gate-hold" },
+    recycle: { icon: "🔄", label: "Recycle", color: "var(--primary-400)", cls: "gate-recycle" },
+  };
+  return map[normalized] || map.pending;
+}
+
+// 회의 유형
+export const MEETING_TYPES = [
+  { value: "weekly", label: "주간회의" },
+  { value: "design_review", label: "설계 리뷰" },
+  { value: "kickoff", label: "킥오프" },
+  { value: "retrospective", label: "회고" },
+  { value: "ad_hoc", label: "임시회의" },
+];
 
 // 단계명 포맷팅
 const stageMap = {

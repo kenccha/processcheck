@@ -34,8 +34,8 @@ export async function login(name, role) {
     });
   }
 
-  // Override role for demo convenience
-  const sessionUser = { ...user, role, loginAt: Date.now() };
+  // Use Firestore role (not caller param) to prevent privilege escalation
+  const sessionUser = { ...user, loginAt: Date.now() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
   return sessionUser;
 }
@@ -110,7 +110,8 @@ export async function logout() {
 }
 
 // Page guard — redirect to login if not authenticated
-export function guardPage() {
+// Pass requiredRole to restrict access (e.g., "observer" for admin pages)
+export function guardPage(requiredRole) {
   const user = getUser();
   if (!user) {
     window.location.href = "index.html";
@@ -118,6 +119,10 @@ export function guardPage() {
   }
   if (user.loginAt && Date.now() - user.loginAt > SESSION_TTL) {
     logout();
+    return null;
+  }
+  if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
+    window.location.href = "processcheck.html";
     return null;
   }
   return user;

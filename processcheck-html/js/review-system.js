@@ -100,7 +100,7 @@ async function _notifyNewReview(author, pageId, type, content) {
 
   try {
     const allUsers = await getUsers();
-    const observers = allUsers.filter(u => u.role === "observer" && u.email && u.email !== author.email);
+    const observers = allUsers.filter(u => (u.role === "observer" || u.role === "admin") && u.email && u.email !== author.email);
 
     // 인앱 알림 — observer 전원
     for (const obs of observers) {
@@ -373,7 +373,7 @@ export class ReviewPanel {
   renderReviewCard(review, user) {
     const typeInfo = TYPE_LABELS[review.type] || TYPE_LABELS.comment;
     const statusInfo = STATUS_LABELS[review.status] || STATUS_LABELS.open;
-    const canModify = user && (user.id === review.authorId || user.role === "observer");
+    const canModify = user && (user.id === review.authorId || user.role === "observer" || user.role === "admin");
     const upVotes = Object.values(review.votes || {}).filter(v => v === "up").length;
     const hasVoted = user && review.votes?.[user.id] === "up";
     const canWrite = user?.authProvider === "microsoft";

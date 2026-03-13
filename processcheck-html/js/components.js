@@ -112,18 +112,19 @@ const _ADMIN_USER_LINK = {
   icon: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
 };
 
-function getNavLinks(_userRole) {
+function getNavLinks(userRole) {
   const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
-  // 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가 (피드백 모아보기 앞에)
-  const reviewMenu = links.find((l) => l.label === "리뷰");
-  if (reviewMenu && reviewMenu.children) {
-    // 피드백 모아보기를 마지막에 유지하기 위해 그 앞에 삽입
-    const fbIdx = reviewMenu.children.findIndex(c => c.label === "피드백 모아보기");
-    const insertIdx = fbIdx >= 0 ? fbIdx : reviewMenu.children.length;
-    reviewMenu.children.splice(insertIdx, 0,
-      { href: "admin-users.html", label: "사용자 관리" },
-      { href: "admin-permissions.html", label: "권한 설정" }
-    );
+  // observer만 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가
+  if (userRole === "observer" || userRole === "admin") {
+    const reviewMenu = links.find((l) => l.label === "리뷰");
+    if (reviewMenu && reviewMenu.children) {
+      const fbIdx = reviewMenu.children.findIndex(c => c.label === "피드백 모아보기");
+      const insertIdx = fbIdx >= 0 ? fbIdx : reviewMenu.children.length;
+      reviewMenu.children.splice(insertIdx, 0,
+        { href: "admin-users.html", label: "사용자 관리" },
+        { href: "admin-permissions.html", label: "권한 설정" }
+      );
+    }
   }
   return links;
 }
@@ -186,6 +187,10 @@ export function renderNav(container) {
           <button class="nav-icon-btn" id="nav-home-btn" data-nav="home.html" title="홈">
             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
           </button>
+          <button class="nav-icon-btn" id="nav-review-btn" title="리뷰">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+            <span class="nav-bell-dot hidden" id="nav-review-dot"></span>
+          </button>
           <button class="nav-bell" id="nav-bell-btn">
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -227,6 +232,7 @@ export function renderNav(container) {
       </div>
     </nav>
     <div id="notif-panel-root"></div>
+    <div id="review-panel-root"></div>
   `;
 
   // Bind navigation
@@ -316,6 +322,8 @@ export function renderNav(container) {
 
   bellBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    // Close review panel if open
+    if (reviewPanel && reviewPanel.isOpen) reviewPanel.close();
     notifPanelOpen = !notifPanelOpen;
     renderNotifPanel();
   });
@@ -327,6 +335,36 @@ export function renderNav(container) {
     }
   });
 
+
+  // ─── Review Panel (슬라이드인) ───────────────────────────────────────────────
+  let reviewPanel = null;
+  const reviewBtn = container.querySelector("#nav-review-btn");
+  const reviewDot = container.querySelector("#nav-review-dot");
+  const reviewRoot = container.querySelector("#review-panel-root");
+
+  import("./review-system.js").then(({ subscribeReviews, ReviewPanel }) => {
+    reviewPanel = new ReviewPanel(reviewRoot);
+    reviewPanel.init();
+
+    // Subscribe separately to update dot badge
+    const pageId = (location.pathname.split("/").pop() || "index.html").replace(".html", "");
+    subscribeReviews(pageId, (revs) => {
+      const openCount = revs.filter(r => r.status === "open").length;
+      reviewDot.classList.toggle("hidden", openCount === 0);
+    });
+  }).catch(err => console.warn("리뷰 시스템 로드 실패:", err));
+
+  reviewBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (reviewPanel) {
+      // Close notification panel if open
+      if (notifPanelOpen) {
+        notifPanelOpen = false;
+        renderNotifPanel();
+      }
+      reviewPanel.toggle();
+    }
+  });
 
   // ─── Global Feedback Widget ─────────────────────────────────────────────────
   import("./feedback-widget.js").then(m => m.initFeedbackWidget()).catch(() => {});
@@ -346,6 +384,7 @@ export function renderNav(container) {
   // Return unsubscribe for cleanup
   return () => {
     unsub();
+    if (reviewPanel) reviewPanel.destroy();
   };
 }
 

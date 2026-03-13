@@ -8,64 +8,68 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isInBodyUser() {
+      return isAuthenticated() && request.auth.token.email.matches('.*@inbody[.]com');
+    }
+
     // ─── Users ────────────────────────────────────────────────────────────
-    // Read open: user list needed for task assignment dropdowns
+    // Read: authenticated users need user list for assignment dropdowns
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Projects ─────────────────────────────────────────────────────────
     match /projects/{projectId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Checklist Items ──────────────────────────────────────────────────
     match /checklistItems/{itemId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Template Stages ──────────────────────────────────────────────────
     match /templateStages/{stageId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Template Departments ─────────────────────────────────────────────
     match /templateDepartments/{deptId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Template Items ───────────────────────────────────────────────────
     match /templateItems/{itemId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Notifications ────────────────────────────────────────────────────
     match /notifications/{notifId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
 
     // ─── Customers ────────────────────────────────────────────────────────
     match /customers/{customerId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Launch Checklists ────────────────────────────────────────────────
     match /launchChecklists/{checklistId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Portal Notifications ─────────────────────────────────────────────
     match /portalNotifications/{notifId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
 
@@ -77,21 +81,34 @@ service cloud.firestore {
 
     // ─── Activity Logs ────────────────────────────────────────────────────
     match /activityLogs/{logId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
     // ─── Settings (permissions, etc.) ───────────────────────────────────
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Gate Records ─────────────────────────────────────────────────────
     // Phase별 승인 기록 + 회의록
     match /gateRecords/{recordId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
+    }
+
+    // ─── Lessons Learned ──────────────────────────────────────────────────
+    match /lessons/{lessonId} {
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated();
+    }
+
+    // ─── Meetings ───────────────────────────────────────────────────────
+    match /meetings/{meetingId} {
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
     }
 
     // ─── Feedbacks ────────────────────────────────────────────────────────
@@ -104,7 +121,7 @@ service cloud.firestore {
     // ─── Mail Queue (Firebase Trigger Email Extension) ──────────────────
     // Client creates docs; Extension reads & processes them
     match /mail/{mailId} {
-      allow create: if true;
+      allow create: if isAuthenticated();
       allow read: if false;
       allow update, delete: if false;
     }

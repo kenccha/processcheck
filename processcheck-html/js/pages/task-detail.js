@@ -648,6 +648,38 @@ function bindEvents() {
       const newImportance = document.getElementById("task-importance")?.value;
       const newStatus = document.getElementById("task-status")?.value;
 
+      // Role-based permission check
+      const isOwner = task.assignee === user.name;
+      const isSameDept = task.department === user.department;
+
+      if (user.role === "worker") {
+        // Worker: can only change status of own tasks
+        if (!isOwner) {
+          showFeedback("error", "본인에게 배정된 작업만 수정할 수 있습니다.");
+          actionLoading = false;
+          return;
+        }
+        // Worker cannot reassign or change department
+        if (newAssignee !== (task.assignee || "") || newDept !== (task.department || "")) {
+          showFeedback("error", "담당자/부서 변경은 매니저 이상 권한이 필요합니다.");
+          actionLoading = false;
+          return;
+        }
+      } else if (user.role === "manager") {
+        // Manager: can reassign within own department, cannot change status
+        if (newStatus && newStatus !== task.status) {
+          showFeedback("error", "매니저는 작업 상태를 변경할 수 없습니다. 담당자 배분만 가능합니다.");
+          actionLoading = false;
+          return;
+        }
+        if (!isSameDept && !isOwner) {
+          showFeedback("error", "본인 부서의 작업만 수정할 수 있습니다.");
+          actionLoading = false;
+          return;
+        }
+      }
+      // observer: can edit all fields
+
       if (newAssignee !== (task.assignee || "")) updates.assignee = newAssignee;
       if (newDept !== (task.department || "")) updates.department = newDept;
       if (newImportance !== (task.importance || "green")) updates.importance = newImportance;
