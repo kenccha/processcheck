@@ -1596,6 +1596,46 @@ export async function syncTemplateToProjects() {
   return { updated, added, removed };
 }
 
+// ─── Bulk Assignee Transfer ──────────────────────────────────────────────────
+
+/**
+ * Preview how many checklist items would transfer from one assignee to another.
+ */
+export async function previewAssigneeTransfer(fromName) {
+  const q = query(
+    collection(db, "checklistItems"),
+    where("assignee", "==", fromName)
+  );
+  const snap = await getDocs(q);
+  const active = snap.docs.filter(d => d.data().status !== "completed");
+  return { total: snap.size, active: active.length };
+}
+
+/**
+ * Transfer all active checklist items from one assignee to another.
+ */
+export async function executeAssigneeTransfer(fromName, toName) {
+  const q = query(
+    collection(db, "checklistItems"),
+    where("assignee", "==", fromName)
+  );
+  const snap = await getDocs(q);
+  const active = snap.docs.filter(d => d.data().status !== "completed");
+
+  if (active.length === 0) return 0;
+
+  const BATCH_LIMIT = 450;
+  for (let i = 0; i < active.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    active.slice(i, i + BATCH_LIMIT).forEach(d => {
+      batch.update(doc(db, "checklistItems", d.id), { assignee: toName });
+    });
+    await batch.commit();
+  }
+
+  return active.length;
+}
+
 // ─── Customers (대리점/법인) ────────────────────────────────────────────────
 
 export function subscribeCustomers(callback) {

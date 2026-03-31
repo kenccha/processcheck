@@ -13,6 +13,8 @@ import {
   updateUserDepartment,
   deactivateUser,
   activateUser,
+  previewAssigneeTransfer,
+  executeAssigneeTransfer,
 } from "../firestore-service.js";
 import { departments, escapeHtml } from "../utils.js";
 
@@ -93,6 +95,34 @@ function render() {
           <h1 class="text-2xl font-bold tracking-tight" style="color: var(--slate-100);">사용자 관리</h1>
           <p class="text-sm text-dim" style="margin-top: 0.25rem;">전체 ${users.length}명 (활성 ${totalActive}명)</p>
         </div>
+        <button id="bulk-transfer-btn" class="btn" style="background:var(--primary-500);color:#fff;padding:0.375rem 0.75rem;border-radius:0.5rem;font-size:0.8rem;border:none;cursor:pointer;min-height:2.25rem;">
+          🔄 업무 이관
+        </button>
+      </div>
+
+      <!-- Bulk Transfer Modal (hidden) -->
+      <div id="transfer-panel" style="display:none;" class="card mb-4" style="border:1px solid var(--primary-300);padding:1.25rem;">
+        <h3 class="text-sm font-semibold mb-3" style="color:var(--slate-200)">담당자 업무 일괄 이관</h3>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div>
+            <label class="text-xs text-soft">현재 담당자</label>
+            <select id="transfer-from" class="input-field" style="padding:0.25rem 0.5rem;font-size:0.8rem;min-width:120px;">
+              <option value="">선택...</option>
+              ${users.filter(u => u.active !== false).map(u => `<option value="${escapeHtml(u.name)}">${escapeHtml(u.name)}</option>`).join("")}
+            </select>
+          </div>
+          <span style="color:var(--slate-400);font-size:1.2rem;margin-top:1rem;">→</span>
+          <div>
+            <label class="text-xs text-soft">새 담당자</label>
+            <select id="transfer-to" class="input-field" style="padding:0.25rem 0.5rem;font-size:0.8rem;min-width:120px;">
+              <option value="">선택...</option>
+              ${users.filter(u => u.active !== false).map(u => `<option value="${escapeHtml(u.name)}">${escapeHtml(u.name)}</option>`).join("")}
+            </select>
+          </div>
+          <button id="transfer-preview-btn" class="btn" style="background:var(--surface-3);color:var(--slate-200);padding:0.25rem 0.75rem;border-radius:0.375rem;font-size:0.75rem;border:none;cursor:pointer;margin-top:1rem;">미리보기</button>
+          <button id="transfer-exec-btn" class="btn" style="background:var(--primary-500);color:#fff;padding:0.25rem 0.75rem;border-radius:0.375rem;font-size:0.75rem;border:none;cursor:pointer;margin-top:1rem;" disabled>이관 실행</button>
+        </div>
+        <div id="transfer-preview" class="text-xs text-soft" style="margin-top:0.5rem;"></div>
       </div>
 
       <!-- Stat Cards -->
@@ -231,6 +261,52 @@ function render() {
 // =============================================================================
 
 function bindEvents() {
+  // Bulk transfer toggle
+  const bulkBtn = document.getElementById("bulk-transfer-btn");
+  const transferPanel = document.getElementById("transfer-panel");
+  if (bulkBtn && transferPanel) {
+    bulkBtn.addEventListener("click", () => {
+      transferPanel.style.display = transferPanel.style.display === "none" ? "block" : "none";
+    });
+  }
+
+  // Transfer preview
+  const previewBtn = document.getElementById("transfer-preview-btn");
+  if (previewBtn) {
+    previewBtn.addEventListener("click", async () => {
+      const from = document.getElementById("transfer-from")?.value;
+      const previewDiv = document.getElementById("transfer-preview");
+      const execBtn = document.getElementById("transfer-exec-btn");
+      if (!from) { previewDiv.textContent = "현재 담당자를 선택하세요."; return; }
+      const result = await previewAssigneeTransfer(from);
+      previewDiv.textContent = `${from}님의 미완료 작업 ${result.active}건 (전체 ${result.total}건)이 이관됩니다.`;
+      if (execBtn) execBtn.disabled = result.active === 0;
+    });
+  }
+
+  // Transfer execute
+  const execBtn = document.getElementById("transfer-exec-btn");
+  if (execBtn) {
+    execBtn.addEventListener("click", async () => {
+      const from = document.getElementById("transfer-from")?.value;
+      const to = document.getElementById("transfer-to")?.value;
+      if (!from || !to) { showToast("error", "담당자를 모두 선택하세요."); return; }
+      if (from === to) { showToast("error", "같은 사람에게 이관할 수 없습니다."); return; }
+      execBtn.disabled = true;
+      execBtn.textContent = "이관 중...";
+      try {
+        const count = await executeAssigneeTransfer(from, to);
+        showToast("success", `${count}건의 작업이 ${to}님에게 이관되었습니다.`);
+        execBtn.textContent = "이관 실행";
+        document.getElementById("transfer-panel").style.display = "none";
+      } catch (err) {
+        showToast("error", "이관 실패: " + err.message);
+        execBtn.disabled = false;
+        execBtn.textContent = "이관 실행";
+      }
+    });
+  }
+
   // Search
   const searchInput = app.querySelector("#user-search");
   if (searchInput) {
