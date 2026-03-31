@@ -65,7 +65,7 @@ let urgencyGroups = { overdue: [], today: [], thisWeek: [], later: [] };
 
 // UI state
 const _savedDash = loadViewState('dashboard');
-let activeTab = (_savedDash && _savedDash.activeTab) || "projects";
+let activeTab = (_savedDash && _savedDash.activeTab) || "tasks";
 let showLaterTasks = false;
 let approvalLimit = 10;
 let _hasFullData = false;
