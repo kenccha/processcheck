@@ -1842,7 +1842,7 @@ export async function markPortalNotificationRead(id) {
 
 // ─── Launch Template Items (177개) ─────────────────────────────────────────
 
-function getLaunchTemplateItems() {
+export function getLaunchTemplateItems() {
   return [
     // Pre-A: 브랜드/포지셔닝 (8)
     { code: "P-01", category: "brand", title: "제품 브랜드명 확정 (상표 검색 포함)", department: "마케팅+법무", dDayOffset: -240, durationDays: 14, isRequired: true },

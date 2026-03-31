@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>출시 준비 템플릿 시딩 - ProcessCheck</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script>var t=localStorage.getItem("pc-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");</script>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js",
+      "firebase/storage": "https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="page-wrapper" style="background-color: var(--surface-0)">
+    <main id="app" class="page-content" style="max-width:600px;margin:4rem auto;padding:2rem">
+      <div class="card p-6">
+        <h1 class="text-xl font-bold mb-4" style="color:var(--slate-100)">출시 준비 템플릿 시딩</h1>
+        <p class="text-sm text-dim mb-4">하드코딩된 171개 출시 준비 항목을 Firestore의 launchPipelineStages, launchCategories, launchTemplateItems 컬렉션으로 이전합니다.</p>
+        <div id="status" class="text-sm mb-4" style="color:var(--slate-300)">로그인 후 버튼을 클릭하세요.</div>
+        <button id="seed-btn" class="btn" style="background:var(--primary-500);color:#fff;padding:0.5rem 1.5rem;border-radius:0.5rem;font-size:0.875rem;border:none;cursor:pointer;">시딩 실행</button>
+        <pre id="log" class="text-xs" style="margin-top:1rem;max-height:400px;overflow:auto;background:var(--surface-2);padding:1rem;border-radius:0.5rem;color:var(--slate-300);white-space:pre-wrap;"></pre>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { db } from "./js/firebase-init.js";
+    import { collection, doc, getDocs, setDoc, writeBatch } from "firebase/firestore";
+    import { guardPage } from "./js/auth.js";
+
+    const user = guardPage("observer");
+    if (!user) { document.getElementById("status").textContent = "observer 권한이 필요합니다."; }
+
+    const logEl = document.getElementById("log");
+    const statusEl = document.getElementById("status");
+    function log(msg) { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+
+    // Pipeline stages
+    const STAGES = [
+      { key: "product_info", label: "제품 정보", icon: "📋", order: 0 },
+      { key: "materials", label: "자료 제작", icon: "📸", order: 1 },
+      { key: "distribution", label: "거래처 배포", icon: "📢", order: 2 },
+      { key: "education", label: "교육/행사", icon: "🎓", order: 3 },
+      { key: "launch_check", label: "출시 확인", icon: "✅", order: 4 },
+    ];
+
+    // Categories
+    const CATEGORIES = [
+      { key: "brand", label: "브랜드/포지셔닝", pipelineStageId: "materials", order: 0 },
+      { key: "photo", label: "사진/영상", pipelineStageId: "materials", order: 1 },
+      { key: "print", label: "인쇄물/문서", pipelineStageId: "materials", order: 2 },
+      { key: "digital", label: "디지털 콘텐츠", pipelineStageId: "materials", order: 3 },
+      { key: "pricing", label: "가격/견적/계약", pipelineStageId: "product_info", order: 4 },
+      { key: "sales_training", label: "영업 교육/역량", pipelineStageId: "distribution", order: 5 },
+      { key: "dealer_notify", label: "거래처 통보/관리", pipelineStageId: "distribution", order: 6 },
+      { key: "cs", label: "CS/서비스 준비", pipelineStageId: "launch_check", order: 7 },
+      { key: "regulatory", label: "규제/인허가/등록", pipelineStageId: "product_info", order: 8 },
+      { key: "logistics", label: "물류/재고/출하", pipelineStageId: "launch_check", order: 9 },
+      { key: "launch_event", label: "런칭 이벤트/PR", pipelineStageId: "education", order: 10 },
+      { key: "kol", label: "KOL/학회/임상", pipelineStageId: "education", order: 11 },
+      { key: "insurance", label: "보험급여/조달", pipelineStageId: "launch_check", order: 12 },
+      { key: "post_launch", label: "출시 후 모니터링", pipelineStageId: "launch_check", order: 13 },
+    ];
+
+    import { getLaunchTemplateItems } from "./js/firestore-service.js";
+
+    document.getElementById("seed-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("seed-btn");
+      btn.disabled = true;
+      btn.textContent = "시딩 중...";
+      statusEl.textContent = "실행 중...";
+
+      try {
+        // Check if already seeded
+        const existingSnap = await getDocs(collection(db, "launchPipelineStages"));
+        if (!existingSnap.empty) {
+          log("⚠️ launchPipelineStages에 이미 데이터가 있습니다. 스킵합니다.");
+          statusEl.textContent = "이미 시딩됨";
+          btn.textContent = "완료";
+          return;
+        }
+
+        // 1. Seed pipeline stages
+        log("📦 파이프라인 단계 5개 시딩 중...");
+        for (const stage of STAGES) {
+          await setDoc(doc(db, "launchPipelineStages", stage.key), stage);
+        }
+        log("✅ 파이프라인 단계 완료");
+
+        // 2. Seed categories
+        log("📦 카테고리 14개 시딩 중...");
+        for (const cat of CATEGORIES) {
+          await setDoc(doc(db, "launchCategories", cat.key), cat);
+        }
+        log("✅ 카테고리 완료");
+
+        // 3. Seed template items — read from the hardcoded function
+        log("📦 템플릿 항목 시딩 중...");
+        const items = getLaunchTemplateItems();
+        log(`  ${items.length}개 항목 발견`);
+
+        const BATCH_LIMIT = 450;
+        let count = 0;
+        for (let i = 0; i < items.length; i += BATCH_LIMIT) {
+          const batch = writeBatch(db);
+          items.slice(i, i + BATCH_LIMIT).forEach(item => {
+            const ref = doc(collection(db, "launchTemplateItems"));
+            batch.set(ref, {
+              code: item.code,
+              categoryKey: item.category,
+              title: item.title,
+              department: item.department,
+              dDayOffset: item.dDayOffset,
+              durationDays: item.durationDays,
+              isRequired: item.isRequired || false,
+              perCustomer: item.perCustomer || false,
+            });
+            count++;
+          });
+          await batch.commit();
+          log(`  ${Math.min(i + BATCH_LIMIT, items.length)}/${items.length} 완료`);
+        }
+
+        log(`\n🎉 시딩 완료! ${STAGES.length} 단계 + ${CATEGORIES.length} 카테고리 + ${count} 항목`);
+        statusEl.textContent = `완료: ${count}개 항목 시딩됨`;
+        btn.textContent = "완료 ✓";
+      } catch (err) {
+        log(`❌ 에러: ${err.message}`);
+        statusEl.textContent = "실패";
+        btn.disabled = false;
+        btn.textContent = "재시도";
+      }
+    });
+  </script>
+</body>
+</html>
