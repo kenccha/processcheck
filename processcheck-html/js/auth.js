@@ -4,7 +4,7 @@
 
 import { OAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "./firebase-init.js";
-import { getUserByName, getUserByEmail, createUser } from "./firestore-service.js";
+import { getUserByName, getUserByEmail, createUser, createNotification, subscribeUsers } from "./firestore-service.js";
 
 const STORAGE_KEY = "pc_user";
 const ALLOWED_DOMAIN = "inbody.com"; // Only @inbody.com emails allowed
@@ -81,7 +81,32 @@ export async function loginWithMicrosoft() {
   });
   const msUser = { ...newUser, authProvider: "microsoft", loginAt: Date.now() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(msUser));
-  return { user: msUser, isNewUser: false };
+
+  // Notify admins about new user
+  notifyAdminsNewUser(displayName).catch(() => {});
+
+  return { user: msUser, isNewUser: true };
+}
+
+async function notifyAdminsNewUser(userName) {
+  try {
+    // Get all admin/observer users to notify
+    const allUsers = await new Promise((resolve) => {
+      const unsub = subscribeUsers((u) => { unsub(); resolve(u); });
+    });
+    const admins = allUsers.filter(u => u.role === "admin" || u.role === "observer");
+    for (const admin of admins) {
+      await createNotification({
+        userId: admin.id,
+        title: "새 사용자 가입",
+        message: `${userName}님이 ProcessCheck에 가입했습니다. 부서와 역할을 지정해주세요.`,
+        type: "system",
+        link: "admin-users.html",
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.warn("신규 사용자 알림 실패:", e);
+  }
 }
 
 // Complete registration for new Microsoft users
