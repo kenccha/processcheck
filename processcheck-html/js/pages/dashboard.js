@@ -392,7 +392,7 @@ function renderHeader() {
   return `
     <div class="dash-header mb-4 animate-fade-in">
       <div class="flex items-center gap-3">
-        <h1 class="text-lg font-bold" style="color: var(--slate-100)">
+        <h1 class="text-xl font-bold" style="color: var(--slate-100)">
           ${escapeHtml(user.name)}님
         </h1>
         <span class="badge badge-primary">${escapeHtml(getRoleName(user.role))}</span>
