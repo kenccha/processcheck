@@ -569,7 +569,7 @@ function renderTaskGroup(label, tasks, color, showProjectName) {
       ${tasks
         .map(
           (task) => `
-        <div class="dash-row cursor-pointer" data-task-project="${task.projectId}" data-task-id="${task.id}">
+        <div class="dash-row cursor-pointer" data-task-project="${task.projectId}" data-task-id="${task.id}" data-overdue="${daysUntil(task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)) < 0}">
           <div class="flex items-center gap-2 flex-1" style="min-width: 0">
             <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(task.title)}</span>
             ${showProjectName ? `<span class="text-xs text-soft" style="flex-shrink: 0;">${escapeHtml(getProjectName(task.projectId))}</span>` : ""}

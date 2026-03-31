@@ -3389,6 +3389,13 @@ tbody tr:last-child td {
 .dash-urgency-group {
   border-bottom: 1px solid var(--surface-3);
 }
+.dash-urgency-group .dash-row[data-overdue="true"] {
+  border-left: 3px solid var(--danger-400);
+  background: rgba(239, 68, 68, 0.03);
+}
+.dash-urgency-group .dash-row[data-overdue="true"]:hover {
+  background: rgba(239, 68, 68, 0.06);
+}
 .dash-urgency-header {
   display: flex;
   align-items: center;
