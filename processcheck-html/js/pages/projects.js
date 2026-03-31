@@ -402,8 +402,8 @@ function renderCards(filtered) {
             </div>
             <div class="proj-card-meta">
               <span class="proj-card-type">${escapeHtml(p.productType || "")}</span>
-              <!-- PM 제거됨 -->
               ${riskBadge}
+              ${(() => { const d = daysUntil(p.endDate); if (d === null) return ''; const color = d < 0 ? 'var(--danger-400)' : d <= 7 ? 'var(--warning-400)' : 'var(--success-400)'; return `<span style="font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:0.7rem;font-weight:700;color:${color};margin-left:auto;">${d < 0 ? 'D+' + Math.abs(d) : 'D-' + d}</span>`; })()}
             </div>
             <div class="progress-bar" style="margin:0.5rem 0 0.375rem;">
               <div class="progress-fill" style="width:${progress}%;background:${progressColor};"></div>
