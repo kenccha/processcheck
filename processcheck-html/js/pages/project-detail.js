@@ -18,7 +18,6 @@ import {
   updateChecklistItem,
   getTemplateStages,
   applyTemplateToProject,
-  applyLaunchChecklistToProject,
   subscribeLaunchChecklists,
   subscribeGateRecords,
   updateGateRecord,
@@ -40,6 +39,7 @@ import {
   toggleLessonUpvote,
   updateHandoffChecklist,
 } from "../firestore-service.js";
+import { applyLaunchTemplate } from "../sales-service.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { storage } from "../firebase-init.js";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -2900,7 +2900,7 @@ async function handleApplyLaunch() {
   try {
     const projectType = project?.projectType || "신규개발";
     const endDate = project?.endDate || new Date();
-    const count = await applyLaunchChecklistToProject(projectId, projectType, endDate);
+    const count = await applyLaunchTemplate(projectId, endDate);
     if (count > 0) {
       showToast("success", `${count}개 출시 준비 체크리스트가 생성되었습니다.`);
       if (btn) btn.style.display = "none";

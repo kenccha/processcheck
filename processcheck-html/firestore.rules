@@ -102,6 +102,24 @@ service cloud.firestore {
       allow write: if isInBodyUser();
     }
 
+    // ─── Launch Pipeline Stages (출시 준비 파이프라인 단계) ─────────────
+    match /launchPipelineStages/{stageId} {
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
+    }
+
+    // ─── Launch Categories (출시 준비 카테고리) ──────────────────────────
+    match /launchCategories/{catId} {
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
+    }
+
+    // ─── Launch Template Items (출시 준비 템플릿 항목) ───────────────────
+    match /launchTemplateItems/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if isInBodyUser();
+    }
+
     // ─── Lessons Learned ──────────────────────────────────────────────────
     match /lessons/{lessonId} {
       allow read: if isAuthenticated();

@@ -115,6 +115,18 @@ const _ADMIN_USER_LINK = {
 function getNavLinks(userRole) {
   const links = JSON.parse(JSON.stringify(BASE_NAV_LINKS));
   // observer만 사용자 관리 + 권한 설정을 리뷰 드롭다운에 추가
+  // observer + manager: 출시 준비 템플릿 관리
+  if (userRole === "observer" || userRole === "manager" || userRole === "admin") {
+    const reviewMenu = links.find((l) => l.label === "리뷰");
+    if (reviewMenu && reviewMenu.children) {
+      const fbIdx = reviewMenu.children.findIndex(c => c.label === "피드백 모아보기");
+      const insertIdx = fbIdx >= 0 ? fbIdx : reviewMenu.children.length;
+      reviewMenu.children.splice(insertIdx, 0,
+        { href: "admin-sales-templates.html", label: "출시 준비 템플릿" }
+      );
+    }
+  }
+  // observer만: 사용자 관리 + 권한 설정
   if (userRole === "observer" || userRole === "admin") {
     const reviewMenu = links.find((l) => l.label === "리뷰");
     if (reviewMenu && reviewMenu.children) {

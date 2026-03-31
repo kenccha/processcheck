@@ -11,8 +11,8 @@ import {
   subscribeCustomers,
   createCustomer,
   updateCustomer,
-  CUSTOMER_TYPE_LABELS,
 } from "../firestore-service.js";
+import { CUSTOMER_TYPE_LABELS } from "../sales-service.js";
 import { escapeHtml } from "../utils.js";
 
 initTheme();

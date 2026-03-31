@@ -9,15 +9,17 @@ import { guardPage, getUser, logout } from "../auth.js";
 import { showToast } from "../ui/toast.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
 import {
-  subscribeAllLaunchChecklists,
   subscribeProjects,
+  subscribeCustomers,
+} from "../firestore-service.js";
+import {
+  subscribeAllLaunchChecklists,
   completeLaunchChecklist,
   updateLaunchChecklist,
   confirmLaunchChecklist,
-  applyLaunchChecklistToProject,
-  subscribeCustomers,
+  applyLaunchTemplate,
   LAUNCH_CATEGORY_LABELS,
-} from "../firestore-service.js";
+} from "../sales-service.js";
 import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName, toLocalDateStr } from "../utils.js";
 
 initTheme();
@@ -481,7 +483,7 @@ function renderEmptyState() {
       el.textContent = "생성 중...";
       try {
         const custList = customers.map(c => ({ id: c.id, name: c.name }));
-        const count = await applyLaunchChecklistToProject(pId, pType, endDate, custList);
+        const count = await applyLaunchTemplate(pId, endDate, custList);
         if (count > 0) {
           showToast("success", `${getProjectName(pId)}: ${count}개 출시 준비 체크리스트 생성 완료`);
           el.textContent = "완료";
