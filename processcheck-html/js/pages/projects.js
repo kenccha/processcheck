@@ -18,6 +18,8 @@ import {
   daysUntil,
   exportToCSV,
   toLocalDateStr,
+  calculateProjectHealth,
+  renderHealthBadge,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
 import { renderSkeletonTable } from "../ui/skeleton.js";
@@ -457,6 +459,7 @@ function renderTable(filtered) {
         <thead>
           <tr>
             <th class="sortable-th" data-sort="name" style="cursor:pointer;user-select:none;">프로젝트명 ${sortArrow("name")}</th>
+            <th>건강</th>
             <th>제품유형</th>
             <th class="sortable-th" data-sort="status" style="cursor:pointer;user-select:none;">상태 ${sortArrow("status")}</th>
             <!-- PM 열 제거됨 -->
@@ -475,6 +478,7 @@ function renderTable(filtered) {
               <td>
                 <span class="font-medium" style="color:var(--slate-100)">${escapeHtml(p.name)}</span>
               </td>
+              <td>${renderHealthBadge(calculateProjectHealth(p, allTasks.filter(t => t.projectId === p.id)))}</td>
               <td>${escapeHtml(p.productType || "-")}</td>
               <td><span class="badge ${getProjectStatusBadge(p.status)}">${getProjectStatusLabel(p.status)}</span></td>
               <!-- PM 제거됨 -->

@@ -371,6 +371,67 @@ export function renderSimpleMarkdown(text) {
   return html;
 }
 
+// ─── Project Health Score ────────────────────────────────────────────────────
+
+/**
+ * Calculate project health: green/yellow/red based on completion, delays, schedule.
+ * @param {Object} project - project object with endDate, progress
+ * @param {Array} tasks - checklist items for this project
+ * @returns {{ level: 'green'|'yellow'|'red', score: number, label: string, detail: string }}
+ */
+export function calculateProjectHealth(project, tasks = []) {
+  const activeTasks = tasks.filter(t => t.status !== "completed" && t.status !== "rejected");
+  const completedTasks = tasks.filter(t => t.status === "completed");
+  const totalTasks = tasks.length;
+
+  // Completion rate
+  const completionRate = totalTasks > 0 ? completedTasks.length / totalTasks : 0;
+
+  // Overdue count
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const overdueTasks = activeTasks.filter(t => {
+    const due = t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate);
+    if (isNaN(due.getTime())) return false;
+    due.setHours(0, 0, 0, 0);
+    return due < now;
+  });
+
+  // Schedule pressure (D-Day)
+  const d = daysUntil(project.endDate);
+  const schedulePressure = d === null ? 0 : d < 0 ? 2 : d < 14 ? 1 : 0;
+
+  // Score: 0-100
+  let score = Math.round(completionRate * 60); // 60% weight on completion
+  score -= overdueTasks.length * 5; // -5 per overdue task
+  score -= schedulePressure * 10; // -10 or -20 for schedule pressure
+  score = Math.max(0, Math.min(100, score));
+
+  // Level
+  let level, label;
+  if (score >= 50 && overdueTasks.length === 0) {
+    level = "green"; label = "양호";
+  } else if (score >= 30 && overdueTasks.length <= 3) {
+    level = "yellow"; label = "주의";
+  } else {
+    level = "red"; label = "위험";
+  }
+
+  const detail = `완료율 ${Math.round(completionRate * 100)}%, 지연 ${overdueTasks.length}건`;
+  return { level, score, label, detail };
+}
+
+/**
+ * Render health badge HTML.
+ * @param {{ level: string, label: string, detail: string }} health
+ * @returns {string} HTML
+ */
+export function renderHealthBadge(health) {
+  const colorMap = { green: "var(--success-400)", yellow: "var(--warning-400)", red: "var(--danger-400)" };
+  const bgMap = { green: "rgba(34,197,94,0.12)", yellow: "rgba(245,158,11,0.12)", red: "rgba(239,68,68,0.12)" };
+  return `<span class="badge" style="background:${bgMap[health.level]};color:${colorMap[health.level]};font-size:0.65rem;font-weight:600;padding:0.15rem 0.5rem;" title="${health.detail}">${health.label}</span>`;
+}
+
 // ─── Export Helpers ──────────────────────────────────────────────────────────
 
 export function exportToCSV(data, headers, filename = "export.csv") {
