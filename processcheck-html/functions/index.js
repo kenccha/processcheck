@@ -155,3 +155,161 @@ exports.salesAlertOnGatePass = onDocumentUpdated(
     console.log(`Sales alert sent: ${projectName} - ${after.stage}`);
   }
 );
+
+// ─── Feature: 단계별 리마인더 에스컬레이션 ──────────────────────────────────
+
+exports.dailyReminderEscalation = onSchedule(
+  { schedule: "0 9 * * 1-5", timeZone: "Asia/Seoul", region: "asia-northeast3" },
+  async () => {
+    // 1) Load reminder rules from config
+    let rules = [
+      { daysBefore: 3, recipients: ["assignee"], severity: "info" },
+      { daysBefore: 1, recipients: ["assignee", "manager"], severity: "warning" },
+      { daysBefore: 0, recipients: ["assignee", "manager"], severity: "warning" },
+      { daysAfter: 1, recipients: ["manager", "coordinator"], severity: "danger" },
+      { daysAfter: 3, recipients: ["coordinator"], severity: "critical" },
+    ];
+
+    try {
+      const configDoc = await db.collection("config").doc("reminder-rules").get();
+      if (configDoc.exists && configDoc.data().rules) {
+        rules = configDoc.data().rules;
+      }
+    } catch (e) {
+      console.warn("Using default reminder rules:", e.message);
+    }
+
+    if (!rules || rules.length === 0) {
+      console.log("No reminder rules configured, skipping");
+      return;
+    }
+
+    const webhookUrl = await getWebhookUrl("reminders");
+    if (!webhookUrl) {
+      console.log("No reminders webhook URL configured, skipping");
+      return;
+    }
+
+    // 2) Load all active checklist items with due dates
+    const tasksSnap = await db.collection("checklistItems")
+      .where("status", "in", ["pending", "in_progress"])
+      .get();
+
+    if (tasksSnap.empty) {
+      console.log("No active tasks to remind");
+      return;
+    }
+
+    // 3) Load users for recipient resolution
+    const usersSnap = await db.collection("users").get();
+    const allUsers = {};
+    usersSnap.docs.forEach(d => { allUsers[d.data().name] = { ...d.data(), id: d.id }; });
+
+    // Find managers by department
+    const managers = {};
+    Object.values(allUsers).forEach(u => {
+      if (u.role === "manager" && u.department) {
+        managers[u.department] = u.name;
+      }
+    });
+
+    // Find coordinators (observers)
+    const coordinators = Object.values(allUsers)
+      .filter(u => u.role === "observer")
+      .map(u => u.name);
+
+    // 4) Check today's sent reminders (dedup)
+    const today = new Date().toISOString().split("T")[0];
+    const sentSnap = await db.collection("reminders")
+      .where("date", "==", today)
+      .get();
+    const sentKeys = new Set(sentSnap.docs.map(d => d.data().key));
+
+    // 5) Process each task against rules
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let totalSent = 0;
+
+    for (const taskDoc of tasksSnap.docs) {
+      const task = taskDoc.data();
+      if (!task.dueDate) continue;
+
+      const dueDate = task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueDate.getTime() - now.getTime()) / 86400000);
+
+      // Find matching rule
+      let matchedRule = null;
+      for (const rule of rules) {
+        if (rule.daysBefore !== undefined && diffDays === rule.daysBefore) {
+          matchedRule = rule;
+          break;
+        }
+        if (rule.daysAfter !== undefined && diffDays === -rule.daysAfter) {
+          matchedRule = rule;
+          break;
+        }
+      }
+      // For continuous overdue (3+ days), match the highest daysAfter rule
+      if (!matchedRule && diffDays < -3) {
+        const overdueRules = rules.filter(r => r.daysAfter !== undefined).sort((a, b) => b.daysAfter - a.daysAfter);
+        if (overdueRules.length > 0) matchedRule = overdueRules[0];
+      }
+
+      if (!matchedRule) continue;
+
+      // Dedup key
+      const dedupKey = `${taskDoc.id}-${matchedRule.severity}-${today}`;
+      if (sentKeys.has(dedupKey)) continue;
+
+      // Resolve recipients
+      const recipientNames = new Set();
+      for (const r of matchedRule.recipients) {
+        if (r === "assignee" && task.assignee) recipientNames.add(task.assignee);
+        if (r === "manager" && task.department && managers[task.department]) {
+          recipientNames.add(managers[task.department]);
+        }
+        if (r === "coordinator") coordinators.forEach(c => recipientNames.add(c));
+      }
+
+      if (recipientNames.size === 0) continue;
+
+      // Get project name
+      let projectName = task.projectId;
+      try {
+        const pDoc = await db.collection("projects").doc(task.projectId).get();
+        if (pDoc.exists) projectName = pDoc.data().name;
+      } catch (_) {}
+
+      // Build message
+      const severityEmoji = { info: "📋", warning: "⚠️", danger: "🔴", critical: "🚨" };
+      const severityColor = { info: "06B6D4", warning: "F59E0B", danger: "EF4444", critical: "EF4444" };
+      const daysText = diffDays > 0 ? `마감 ${diffDays}일 전` : diffDays === 0 ? "오늘 마감" : `마감 ${Math.abs(diffDays)}일 초과`;
+
+      const title = `${severityEmoji[matchedRule.severity] || "📋"} ${daysText}: ${task.title}`;
+      const body = [
+        `**프로젝트:** ${projectName}`,
+        `**작업:** ${task.title}`,
+        `**담당자:** ${task.assignee || "미배분"}`,
+        `**부서:** ${task.department || "미정"}`,
+        `**수신자:** ${[...recipientNames].join(", ")}`,
+      ].join("\n\n");
+
+      await sendTeamsMessage(webhookUrl, title, body, severityColor[matchedRule.severity] || "06B6D4");
+
+      // Record sent reminder
+      await db.collection("reminders").add({
+        key: dedupKey,
+        taskId: taskDoc.id,
+        date: today,
+        severity: matchedRule.severity,
+        recipients: [...recipientNames],
+        sentAt: new Date(),
+      });
+
+      totalSent++;
+    }
+
+    console.log(`Reminder escalation complete: ${totalSent} reminders sent`);
+  }
+);
