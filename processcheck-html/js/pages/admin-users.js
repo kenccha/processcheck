@@ -277,8 +277,19 @@ function bindEvents() {
   // Department change per user
   app.querySelectorAll("[data-dept-change]").forEach((sel) => {
     sel.addEventListener("change", async (e) => {
+      const userId = sel.dataset.deptChange;
+      const newDept = e.target.value;
+      const userName = users.find(u => u.id === userId)?.name || "";
       try {
-        await updateUserDepartment(sel.dataset.deptChange, e.target.value);
+        const migrate = await confirmModal(
+          `${userName}님의 부서를 '${newDept}'(으)로 변경합니다.\n배정된 미완료 작업의 부서도 함께 변경하시겠습니까?`
+        );
+        const result = await updateUserDepartment(userId, newDept, migrate);
+        if (migrate && result.migrated > 0) {
+          showToast('success', `부서 변경 완료 (작업 ${result.migrated}건 이관)`);
+        } else {
+          showToast('success', '부서 변경 완료');
+        }
       } catch (err) {
         showToast('error', "부서 변경 실패: " + err.message);
       }

@@ -2295,8 +2295,42 @@ export async function updateUserRole(userId, newRole) {
   await updateDoc(doc(db, "users", userId), { role: newRole });
 }
 
-export async function updateUserDepartment(userId, newDept) {
+export async function updateUserDepartment(userId, newDept, migrateChecklist = false) {
+  // Get user's current info before updating
+  let oldDept = null;
+  let userName = null;
+  if (migrateChecklist) {
+    const userSnap = await getDoc(doc(db, "users", userId));
+    if (userSnap.exists()) {
+      oldDept = userSnap.data().department;
+      userName = userSnap.data().name;
+    }
+  }
+
   await updateDoc(doc(db, "users", userId), { department: newDept });
+
+  // Migrate checklist items if requested
+  if (migrateChecklist && userName && oldDept && oldDept !== newDept) {
+    const q = query(
+      collection(db, "checklistItems"),
+      where("assignee", "==", userName),
+      where("department", "==", oldDept)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return { migrated: 0 };
+
+    const batch = writeBatch(db);
+    let count = 0;
+    snap.docs.forEach(d => {
+      if (d.data().status !== "completed") {
+        batch.update(doc(db, "checklistItems", d.id), { department: newDept });
+        count++;
+      }
+    });
+    if (count > 0) await batch.commit();
+    return { migrated: count };
+  }
+  return { migrated: 0 };
 }
 
 export async function deactivateUser(userId) {
