@@ -26,6 +26,7 @@ import {
   timeAgo,
   daysUntil,
   PHASE_GROUPS,
+  calculateProjectHealth,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
@@ -397,7 +398,11 @@ function renderHeader() {
         </h1>
         <span class="badge badge-primary">${escapeHtml(getRoleName(user.role))}</span>
       </div>
-      <div class="text-xs text-soft">${getTodayString()} &nbsp;·&nbsp; <a href="reports.html" style="color:var(--primary-400);text-decoration:underline;">리포트 보기 →</a></div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-soft">${getTodayString()}</span>
+        <a href="reports.html" class="text-xs" style="color:var(--primary-400);text-decoration:underline;">리포트 보기 →</a>
+        <button class="btn btn-sm" style="background:var(--primary-500);color:#fff;padding:0.25rem 0.75rem;border-radius:0.375rem;font-size:0.75rem;border:none;cursor:pointer;min-height:2rem;" onclick="window.__generateWeeklyReport && window.__generateWeeklyReport()">📋 주간 리포트</button>
+      </div>
     </div>
   `;
 }
@@ -703,6 +708,58 @@ function renderNotificationsTab() {
       .join("")}
   `;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Weekly Report Generator
+// ═══════════════════════════════════════════════════════════════════════════════
+
+window.__generateWeeklyReport = function() {
+  const today = new Date();
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
+
+  const reportRows = projectCards.map(p => {
+    const projectTasks = allTasks.filter(t => t.projectId === p.id);
+    const health = calculateProjectHealth(p, projectTasks);
+    const completedThisWeek = projectTasks.filter(t => {
+      if (t.status !== "completed" || !t.completedDate) return false;
+      const cd = t.completedDate instanceof Date ? t.completedDate : new Date(t.completedDate);
+      return cd >= weekAgo;
+    }).length;
+    const healthColor = { green: "#22C55E", yellow: "#F59E0B", red: "#EF4444" }[health.level];
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;font-weight:600;">${escapeHtml(p.name)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:center;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${healthColor};"></span> ${health.label}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:center;">${p.totalTasks > 0 ? Math.round((projectTasks.filter(t=>t.status==="completed").length / p.totalTasks) * 100) : 0}%</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:center;">${p.overdueCount}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:center;">${completedThisWeek}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:${p.dDay < 0 ? '#EF4444' : '#22C55E'};">${p.dDay < 0 ? 'D+' + Math.abs(p.dDay) : 'D-' + p.dDay}</td>
+    </tr>`;
+  }).join("");
+
+  const urgentCount = urgencyGroups.overdue.length + urgencyGroups.today.length;
+
+  const reportHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>ProcessCheck 주간 리포트 - ${dateStr}</title>
+    <style>body{font-family:'Pretendard Variable',sans-serif;margin:40px;color:#1C1917;} table{width:100%;border-collapse:collapse;margin:20px 0;} th{background:#f5f5f4;padding:8px 12px;text-align:center;font-size:12px;font-weight:600;color:#57534E;border-bottom:2px solid #d6d3d1;} h1{font-size:24px;margin-bottom:4px;} .meta{color:#78716C;font-size:14px;margin-bottom:24px;} .stat{display:inline-block;text-align:center;margin-right:32px;} .stat-val{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;} .stat-label{font-size:12px;color:#78716C;} @media print{body{margin:20px;}} </style></head><body>
+    <h1>ProcessCheck 주간 리포트</h1>
+    <p class="meta">${dateStr} · 작성자: ${escapeHtml(user.name)} · 프로젝트 ${projectCards.length}건</p>
+    <div style="margin-bottom:24px;">
+      <div class="stat"><div class="stat-val" style="color:#06B6D4">${projectCards.length}</div><div class="stat-label">프로젝트</div></div>
+      <div class="stat"><div class="stat-val" style="color:#EF4444">${urgentCount}</div><div class="stat-label">긴급</div></div>
+      <div class="stat"><div class="stat-val" style="color:#F59E0B">${urgencyGroups.overdue.length}</div><div class="stat-label">마감 초과</div></div>
+    </div>
+    <table>
+      <thead><tr><th style="text-align:left">프로젝트</th><th>건강</th><th>완료율</th><th>지연</th><th>이번 주 완료</th><th>D-Day</th></tr></thead>
+      <tbody>${reportRows}</tbody>
+    </table>
+    <p style="color:#A8A29E;font-size:12px;margin-top:32px;">Generated by ProcessCheck · ${dateStr}</p>
+  </body></html>`;
+
+  const w = window.open("", "_blank");
+  w.document.write(reportHTML);
+  w.document.close();
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Click Handlers
