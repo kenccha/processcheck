@@ -14,6 +14,8 @@ import {
 } from "../firestore-service.js";
 import {
   subscribeAllLaunchChecklists,
+  subscribeLaunchPipelineStages,
+  subscribeLaunchCategories,
   completeLaunchChecklist,
   updateLaunchChecklist,
   confirmLaunchChecklist,
@@ -34,19 +36,22 @@ const navRoot = document.getElementById("nav-root");
 // 5-Stage Execution Pipeline
 // =============================================================================
 
-const EXEC_STAGES = [
+// Dynamic pipeline stages + categories from Firestore (fallback to hardcoded defaults)
+const DEFAULT_EXEC_STAGES = [
   { key: "product_info", label: "제품 정보", icon: "📋", categories: ["pricing", "regulatory"] },
   { key: "materials",    label: "자료 제작", icon: "📸", categories: ["brand", "photo", "print", "digital", "design_change"] },
   { key: "distribution", label: "거래처 배포", icon: "📢", categories: ["dealer_notify", "sales_training"] },
   { key: "education",    label: "교육/행사", icon: "🎓", categories: ["launch_event", "kol"] },
   { key: "launch_check", label: "출시 확인", icon: "✅", categories: ["cs", "logistics", "insurance", "post_launch"] },
 ];
+let EXEC_STAGES = [...DEFAULT_EXEC_STAGES];
+let dynamicCategoryLabels = { ...LAUNCH_CATEGORY_LABELS };
 
 function getExecStageForCategory(category) {
   for (const stage of EXEC_STAGES) {
-    if (stage.categories.includes(category)) return stage;
+    if (stage.categories && stage.categories.includes(category)) return stage;
   }
-  return EXEC_STAGES[4]; // default: 출시확인
+  return EXEC_STAGES[EXEC_STAGES.length - 1] || DEFAULT_EXEC_STAGES[4];
 }
 
 // =============================================================================
@@ -171,10 +176,33 @@ function renderSalesNav(container) {
 let unsubProjects = null;
 let unsubItems = null;
 let unsubCustomers = null;
+let unsubStages = null;
+let unsubCategories = null;
 
 function init() {
   renderSalesNav(navRoot);
   app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
+
+  // Subscribe to dynamic pipeline stages + categories from Firestore
+  unsubStages = subscribeLaunchPipelineStages((stages) => {
+    if (stages.length > 0) {
+      // Will be enriched with categories below
+      EXEC_STAGES = stages.map(s => ({ key: s.key, label: s.label, icon: s.icon || "📋", id: s.id, categories: [] }));
+    }
+  });
+
+  unsubCategories = subscribeLaunchCategories((cats) => {
+    if (cats.length > 0) {
+      // Build dynamic category labels
+      dynamicCategoryLabels = {};
+      cats.forEach(c => { dynamicCategoryLabels[c.key] = c.label; });
+      // Assign categories to their pipeline stages
+      EXEC_STAGES.forEach(stage => {
+        stage.categories = cats.filter(c => c.pipelineStageId === stage.id || c.pipelineStageId === stage.key).map(c => c.key);
+      });
+      render();
+    }
+  });
 
   unsubProjects = subscribeProjects((data) => {
     projects = data;
@@ -197,6 +225,8 @@ window.addEventListener("beforeunload", () => {
   unsubProjects?.();
   unsubItems?.();
   unsubCustomers?.();
+  unsubStages?.();
+  unsubCategories?.();
 });
 
 // =============================================================================
@@ -245,7 +275,7 @@ function _getStatusBadge(status) {
 }
 
 function getCategoryBadge(category) {
-  const label = LAUNCH_CATEGORY_LABELS[category] || category;
+  const label = dynamicCategoryLabels[category] || LAUNCH_CATEGORY_LABELS[category] || category;
   const isSalesCore = SALES_CORE_CATEGORIES.includes(category);
   const cls = isSalesCore ? "badge-primary" : "badge-neutral";
   return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
@@ -339,8 +369,9 @@ function render() {
   // Assignees + projectIds for filters
   const projectIds = [...new Set(allItems.map(i => i.projectId))];
   const assignees = [...new Set(allItems.map(i => i.assignee).filter(Boolean))].sort();
+  const allCatKeys = Object.keys(dynamicCategoryLabels).length > 0 ? Object.keys(dynamicCategoryLabels) : Object.keys(LAUNCH_CATEGORY_LABELS);
   const _categories = showAllCategories
-    ? Object.keys(LAUNCH_CATEGORY_LABELS)
+    ? allCatKeys
     : [...SALES_CORE_CATEGORIES];
 
   app.innerHTML = `
