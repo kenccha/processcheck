@@ -30,6 +30,8 @@ import {
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
 import { renderSkeletonStats, renderSkeletonCards } from "../ui/skeleton.js";
+import { subscribeLaunchChecklistsByAssignee, completeLaunchChecklist } from "../sales-service.js";
+import { showToast } from "../ui/toast.js";
 
 // ─── Auth Guard ─────────────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ const navUnsub = renderNav(document.getElementById("nav-root"));
 let allProjects = [];
 let allTasks = [];
 let notifications = [];
+let launchItems = [];
 
 // Dynamic phase groups
 let dynamicPhaseGroups = [];
@@ -212,6 +215,13 @@ if (cached) {
       render();
     })
   );
+
+  // Subscribe to launch checklists assigned to current user
+  const unsubLaunch = subscribeLaunchChecklistsByAssignee(user.name, (items) => {
+    launchItems = items;
+    render();
+  });
+  unsubscribers.push(unsubLaunch);
 })();
 
 // ─── Derived State Computation ──────────────────────────────────────────────
@@ -379,6 +389,7 @@ function render() {
           ${activeTab === "projects" ? renderProjectsTab() : ""}
           ${activeTab === "tasks" ? renderTasksTab() : ""}
           ${activeTab === "notifications" ? renderNotificationsTab() : ""}
+          ${activeTab === "launch" ? renderLaunchTab() : ""}
         </div>
       </div>
     </div>
@@ -426,6 +437,10 @@ function renderStatCards(delayedProjects, urgentCount, unreadNotifCount) {
         <div class="dash-stat-label">알림</div>
         <div class="dash-stat-value" style="color: ${unreadNotifCount > 0 ? "var(--danger-400)" : "var(--slate-300)"}">${unreadNotifCount}</div>
       </div>
+      <div class="dash-stat-card cursor-pointer card-hover" data-stat="launch">
+        <div class="dash-stat-label">출시 준비</div>
+        <div class="dash-stat-value" style="color: ${launchItems.length > 0 ? "var(--warning-400)" : "var(--slate-300)"}">${launchItems.length}</div>
+      </div>
     </div>
   `;
 }
@@ -437,6 +452,7 @@ function renderTabBar(unreadNotifCount) {
     { key: "projects", label: "프로젝트", count: projectCards.length },
     { key: "tasks", label: "내 작업", count: myTasks.length },
     { key: "notifications", label: "알림", count: unreadNotifCount, badgeClass: unreadNotifCount > 0 ? "badge-danger" : "" },
+    { key: "launch", label: "출시 준비", count: launchItems.length },
   ];
 
   return `
@@ -710,6 +726,67 @@ function renderNotificationsTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Launch Tab — 출시 준비
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderLaunchTab() {
+  if (launchItems.length === 0) {
+    return `
+      <div class="empty-state" style="padding:3rem">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:48px;height:48px;color:var(--slate-500)">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <span class="empty-state-text">배정된 출시 준비 항목이 없습니다</span>
+      </div>
+    `;
+  }
+
+  // Group by project
+  const grouped = {};
+  launchItems.forEach((item) => {
+    const projName = item.projectName || item.projectId || "미정";
+    if (!grouped[projName]) grouped[projName] = [];
+    grouped[projName].push(item);
+  });
+
+  return `
+    ${Object.entries(grouped)
+      .map(
+        ([projName, items]) => `
+      <div class="dash-group-header">
+        <span class="text-xs font-semibold" style="color: var(--slate-300)">${escapeHtml(projName)}</span>
+        <span class="badge badge-neutral" style="font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${items.length}</span>
+      </div>
+      ${items
+        .map((item) => {
+          const due = item.dueDate instanceof Date ? item.dueDate : item.dueDate ? new Date(item.dueDate) : null;
+          const d = due ? daysUntil(due) : null;
+          const ddayColor = d === null ? "var(--slate-400)" : d < 0 ? "var(--danger-400)" : d <= 3 ? "var(--warning-400)" : "var(--success-400)";
+          const statusLabel = item.status === "in_progress" ? "진행중" : "대기";
+          const statusClass = item.status === "in_progress" ? "badge-primary" : "badge-neutral";
+          return `
+        <div class="dash-row" style="align-items: center;">
+          <div class="flex items-center gap-2 flex-1" style="min-width: 0">
+            <span class="font-medium text-sm truncate" style="color: var(--slate-200)">${escapeHtml(item.title || "")}</span>
+            ${item.category ? `<span class="badge badge-neutral" style="font-size: 0.6rem; padding: 0.0625rem 0.3rem; flex-shrink: 0;">${escapeHtml(item.category)}</span>` : ""}
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            ${item.department ? `<span class="text-xs text-soft">${escapeHtml(item.department)}</span>` : ""}
+            <span class="badge ${statusClass}" style="font-size: 0.625rem; padding: 0.0625rem 0.3rem;">${statusLabel}</span>
+            <span class="font-mono text-xs font-semibold" style="color: ${ddayColor}; min-width: 3rem; text-align: right;">${d !== null ? formatDDay(d) : "-"}</span>
+            <button class="btn btn-sm btn-launch-complete" data-launch-id="${item.id}" style="background:var(--success-500);color:#fff;padding:0.125rem 0.5rem;border-radius:0.25rem;font-size:0.6875rem;border:none;cursor:pointer;white-space:nowrap;">완료</button>
+          </div>
+        </div>
+      `;
+        })
+        .join("")}
+    `
+      )
+      .join("")}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Weekly Report Generator
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -783,6 +860,7 @@ function bindClickHandlers() {
       if (stat === "tasks") activeTab = "tasks";
       else if (stat === "projects") activeTab = "projects";
       else if (stat === "notifications") activeTab = "notifications";
+      else if (stat === "launch") activeTab = "launch";
       render();
     });
   });
@@ -840,6 +918,24 @@ function bindClickHandlers() {
       }
     });
   }
+
+  // Launch checklist complete buttons
+  app.querySelectorAll(".btn-launch-complete").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.launchId;
+      btn.disabled = true;
+      btn.textContent = "처리 중...";
+      try {
+        await completeLaunchChecklist(id);
+        showToast("success", "완료 처리되었습니다.");
+      } catch (err) {
+        console.error("출시 준비 완료 처리 오류:", err);
+        btn.disabled = false;
+        btn.textContent = "완료";
+      }
+    });
+  });
 
   // Notification items
   app.querySelectorAll(".dash-notif-item").forEach((item) => {
