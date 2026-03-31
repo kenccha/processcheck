@@ -22,10 +22,7 @@ const MS_BTN_HTML = msLoginBtn.innerHTML;
 seedingView.style.display = "none";
 contentView.style.display = "";
 
-// Seed templates if missing (6 phases, 10 depts, 193 items)
-seedTemplatesIfEmpty().then(seeded => {
-  if (seeded) console.log("📦 템플릿 데이터 자동 생성 완료");
-});
+// Template seeding moved to post-login (requires auth)
 
 // ── Microsoft Login (popup) ──
 msLoginBtn.addEventListener("click", async () => {
@@ -38,6 +35,10 @@ msLoginBtn.addEventListener("click", async () => {
 
   try {
     const _result = await loginWithMicrosoft();
+    // Seed templates after successful auth (requires Firestore write permission)
+    seedTemplatesIfEmpty().then(seeded => {
+      if (seeded) console.log("📦 템플릿 데이터 자동 생성 완료");
+    }).catch(() => {});
     // Both existing and new users go straight to dashboard
     // (new users auto-registered as worker, admin assigns role later)
     window.location.href = "home.html";

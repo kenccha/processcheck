@@ -831,7 +831,7 @@
 
   async function loadFeedbackModule() {
     try {
-      const mod = await import("./js/feedback-system.js");
+      const mod = await import("./feedback-system.js");
       const { subscribeFeedbacks, addFeedback, voteFeedback, unvoteFeedback, updateFeedbackStatus, getPageInfo, getCurrentUser, timeAgo } = mod;
       _addFeedback = addFeedback;
       _pageInfo = getPageInfo();
