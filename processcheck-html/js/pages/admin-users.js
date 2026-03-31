@@ -65,6 +65,14 @@ function getFiltered() {
   if (deptFilter) {
     filtered = filtered.filter((u) => u.department === deptFilter);
   }
+  // 미배정 사용자를 상단에 정렬
+  filtered.sort((a, b) => {
+    const aEmpty = !a.department || a.department === "";
+    const bEmpty = !b.department || b.department === "";
+    if (aEmpty && !bEmpty) return -1;
+    if (!aEmpty && bEmpty) return 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
   return filtered;
 }
 
@@ -75,6 +83,7 @@ function render() {
   const managers = users.filter((u) => u.role === "manager").length;
   const observers = users.filter((u) => u.role === "observer").length;
   const admins = users.filter((u) => u.role === "admin").length;
+  const unassigned = users.filter((u) => !u.department || u.department === "").length;
 
   app.innerHTML = `
     <div class="container animate-fade-in">
@@ -107,6 +116,11 @@ function render() {
         <div class="stat-card">
           <div class="stat-card-label">관리자</div>
           <div class="stat-card-row"><span class="stat-value">${admins}</span></div>
+        </div>
+        ${unassigned > 0 ? `<div class="stat-card" style="border-left:3px solid var(--warning-400);background:rgba(245,158,11,0.05);">
+          <div class="stat-card-label" style="color:var(--warning-400)">미배정</div>
+          <div class="stat-card-row"><span class="stat-value" style="color:var(--warning-400)">${unassigned}</span></div>
+        </div>` : ''}
         </div>
       </div>
 
@@ -155,11 +169,12 @@ function render() {
               ${filtered
                 .map(
                   (u) => `
-                <tr>
+                <tr style="${!u.department || u.department === '' ? 'background:rgba(245,158,11,0.05);border-left:3px solid var(--warning-400)' : ''}">
                   <td>
                     <div class="flex items-center gap-2">
                       <span class="text-sm font-semibold" style="color:var(--slate-200)">${escapeHtml(u.name)}</span>
                       ${u.authProvider === "microsoft" ? '<span class="badge badge-info" style="font-size:0.6rem">MS</span>' : ""}
+                      ${!u.department || u.department === '' ? '<span class="badge badge-warning" style="font-size:0.55rem">미배정</span>' : ""}
                     </div>
                   </td>
                   <td class="text-xs" style="color:var(--slate-400)">${escapeHtml(u.email || "-")}</td>
