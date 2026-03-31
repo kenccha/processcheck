@@ -1,7 +1,7 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 
 initializeApp();
 const db = getFirestore();
@@ -310,6 +310,224 @@ exports.dailyReminderEscalation = onSchedule(
       totalSent++;
     }
 
-    console.log(`Reminder escalation complete: ${totalSent} reminders sent`);
+    // 6) Also scan launchChecklists for launch preparation reminders
+    const launchSnap = await db.collection("launchChecklists")
+      .where("status", "in", ["pending", "in_progress"])
+      .get();
+
+    for (const launchDoc of launchSnap.docs) {
+      const task = launchDoc.data();
+      if (!task.dueDate) continue;
+
+      const dueDate = task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueDate.getTime() - now.getTime()) / 86400000);
+
+      let matchedRule = null;
+      for (const rule of rules) {
+        if (rule.daysBefore !== undefined && diffDays === rule.daysBefore) { matchedRule = rule; break; }
+        if (rule.daysAfter !== undefined && diffDays === -rule.daysAfter) { matchedRule = rule; break; }
+      }
+      if (!matchedRule && diffDays < -3) {
+        const overdueRules = rules.filter(r => r.daysAfter !== undefined).sort((a, b) => b.daysAfter - a.daysAfter);
+        if (overdueRules.length > 0) matchedRule = overdueRules[0];
+      }
+      if (!matchedRule) continue;
+
+      const dedupKey = `launch-${launchDoc.id}-${matchedRule.severity}-${today}`;
+      if (sentKeys.has(dedupKey)) continue;
+
+      // Resolve recipients — parse composite departments (e.g. "마케팅+법무" → first department)
+      const recipientNames = new Set();
+      for (const r of matchedRule.recipients) {
+        if (r === "assignee" && task.assignee) recipientNames.add(task.assignee);
+        if (r === "manager" && task.department) {
+          const firstDept = task.department.split("+")[0].trim();
+          if (managers[firstDept]) recipientNames.add(managers[firstDept]);
+        }
+        if (r === "coordinator") coordinators.forEach(c => recipientNames.add(c));
+      }
+      if (recipientNames.size === 0) continue;
+
+      let projectName = task.projectId;
+      try {
+        const pDoc = await db.collection("projects").doc(task.projectId).get();
+        if (pDoc.exists) projectName = pDoc.data().name;
+      } catch (_) {}
+
+      const severityEmoji = { info: "📋", warning: "⚠️", danger: "🔴", critical: "🚨" };
+      const severityColor = { info: "06B6D4", warning: "F59E0B", danger: "EF4444", critical: "EF4444" };
+      const daysText = diffDays > 0 ? `마감 ${diffDays}일 전` : diffDays === 0 ? "오늘 마감" : `마감 ${Math.abs(diffDays)}일 초과`;
+
+      const title = `${severityEmoji[matchedRule.severity] || "📋"} [출시준비] ${daysText}: ${task.title}`;
+      const body = [
+        `**프로젝트:** ${projectName}`,
+        `**작업:** ${task.title}`,
+        `**담당자:** ${task.assignee || "미배분"}`,
+        `**부서:** ${task.department || "미정"}`,
+        `**수신자:** ${[...recipientNames].join(", ")}`,
+      ].join("\n\n");
+
+      await sendTeamsMessage(webhookUrl, title, body, severityColor[matchedRule.severity] || "06B6D4");
+
+      await db.collection("reminders").add({
+        key: dedupKey,
+        taskId: launchDoc.id,
+        source: "launch",
+        date: today,
+        severity: matchedRule.severity,
+        recipients: [...recipientNames],
+        sentAt: new Date(),
+      });
+
+      totalSent++;
+    }
+
+    console.log(`Reminder escalation complete: ${totalSent} reminders sent (including launch items)`);
+  }
+);
+
+// ─── Feature: MSG 게이트 통과 시 출시 체크리스트 자동 생성 ──────────────────
+
+exports.autoLaunchOnGatePass = onDocumentUpdated(
+  { document: "gateRecords/{recordId}", region: "asia-northeast3" },
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    // 1. Check if gateStatus changed to "go" or "approved"
+    const passStatuses = ["go", "approved"];
+    if (passStatuses.includes(before.gateStatus)) return;
+    if (!passStatuses.includes(after.gateStatus)) return;
+
+    // 2. Only trigger on MSG승인회 gate
+    if (after.phaseName !== "MSG승인회") return;
+
+    const projectId = after.projectId;
+    console.log(`MSG gate passed for project ${projectId}, checking launch checklists...`);
+
+    try {
+      // 3a. Check if launch checklists already exist
+      const existingSnap = await db.collection("launchChecklists")
+        .where("projectId", "==", projectId)
+        .get();
+
+      if (existingSnap.size > 0) {
+        console.log(`Launch checklists already exist for project ${projectId}, skipping`);
+        return;
+      }
+
+      // 3b. Get project document to find endDate
+      const projDoc = await db.collection("projects").doc(projectId).get();
+      if (!projDoc.exists) {
+        console.log(`Project ${projectId} not found, skipping auto-launch creation`);
+        return;
+      }
+      const project = projDoc.data();
+      const endDate = project.endDate?.toDate
+        ? project.endDate.toDate()
+        : new Date(project.endDate);
+
+      // 3c. Read all launch template items
+      const templateSnap = await db.collection("launchTemplateItems").get();
+      if (templateSnap.empty) {
+        console.log("No launch template items configured, skipping auto-creation");
+        return;
+      }
+      const templates = templateSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // 3d. Read all customers
+      const customersSnap = await db.collection("customers").get();
+      const customers = customersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // 3e. Build checklist items
+      const items = [];
+      for (const tmpl of templates) {
+        if (tmpl.perCustomer && customers.length > 0) {
+          for (const cust of customers) {
+            items.push({
+              projectId,
+              category: tmpl.categoryKey,
+              code: tmpl.code,
+              title: tmpl.title,
+              department: tmpl.department,
+              dDayOffset: tmpl.dDayOffset,
+              durationDays: tmpl.durationDays,
+              isRequired: tmpl.isRequired,
+              status: "pending",
+              assignee: "",
+              templateItemId: tmpl.id,
+              dueDate: Timestamp.fromDate(
+                new Date(endDate.getTime() + tmpl.dDayOffset * 86400000)
+              ),
+              completedDate: null,
+              checkedBy: null,
+              checkedAt: null,
+              checkedNote: "",
+              customerId: cust.id,
+              customerName: cust.name,
+            });
+          }
+        } else {
+          items.push({
+            projectId,
+            category: tmpl.categoryKey,
+            code: tmpl.code,
+            title: tmpl.title,
+            department: tmpl.department,
+            dDayOffset: tmpl.dDayOffset,
+            durationDays: tmpl.durationDays,
+            isRequired: tmpl.isRequired,
+            status: "pending",
+            assignee: "",
+            templateItemId: tmpl.id,
+            dueDate: Timestamp.fromDate(
+              new Date(endDate.getTime() + tmpl.dDayOffset * 86400000)
+            ),
+            completedDate: null,
+            checkedBy: null,
+            checkedAt: null,
+            checkedNote: "",
+          });
+        }
+      }
+
+      // 3f. Batch write with 450 limit
+      const BATCH_LIMIT = 450;
+      for (let i = 0; i < items.length; i += BATCH_LIMIT) {
+        try {
+          const batch = db.batch();
+          items.slice(i, i + BATCH_LIMIT).forEach(item => {
+            batch.set(db.collection("launchChecklists").doc(), item);
+          });
+          await batch.commit();
+        } catch (e) {
+          console.error(`Batch write failed at offset ${i}:`, e);
+          throw e;
+        }
+      }
+
+      console.log(`Auto-created ${items.length} launch checklist items for project ${projectId} on MSG gate pass`);
+
+      // 3g. Send Teams notification
+      const webhookUrl = await getWebhookUrl("sales");
+      if (webhookUrl) {
+        let projectName = project.name || projectId;
+        const title = `🚀 출시 준비 자동 생성: ${projectName}`;
+        const body = [
+          `**${projectName}** 프로젝트의 MSG승인회가 통과되어 출시 준비 체크리스트가 자동 생성되었습니다.`,
+          "",
+          `- 생성 항목: ${items.length}건`,
+          `- 템플릿 항목: ${templates.length}건`,
+          `- 고객 수: ${customers.length}건`,
+          "",
+          "[영업 출시 준비 보기](https://processsss-appp.web.app/sales.html?projectId=" + projectId + ")",
+        ].join("\n\n");
+
+        await sendTeamsMessage(webhookUrl, title, body, "22C55E");
+      }
+    } catch (e) {
+      console.error(`Auto-launch creation failed for project ${projectId}:`, e);
+    }
   }
 );

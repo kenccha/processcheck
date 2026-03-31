@@ -9,6 +9,9 @@ import {
   markPortalNotificationRead,
 } from "../firestore-service.js";
 import {
+  subscribeLaunchChecklistsByProject,
+} from "../sales-service.js";
+import {
   escapeHtml,
   formatDate,
   PHASE_GROUPS,
@@ -28,6 +31,8 @@ let _allProjects = [];
 let notifications = [];
 let activeView = "projects"; // "projects" | "notifications"
 let loginError = "";
+let launchItemsByProject = {}; // projectId → [launchChecklists filtered by customerId]
+let _launchUnsubs = []; // cleanup array for launch subscriptions
 const unsubs = [];
 
 // --- Session check (TTL: 4시간) ---
@@ -88,6 +93,7 @@ unsubs.push(
 // --- Cleanup ---
 window.addEventListener("beforeunload", () => {
   unsubs.forEach((fn) => fn && fn());
+  _launchUnsubs.forEach((fn) => fn && fn());
 });
 
 // =============================================================================
@@ -101,6 +107,19 @@ function loadPortalData() {
       portalProjects = projects.filter(
         (p) => currentCustomer.products && currentCustomer.products.includes(p.id)
       );
+      // Subscribe to launch checklists for each portal project
+      _launchUnsubs.forEach((fn) => fn && fn());
+      _launchUnsubs = [];
+      portalProjects.forEach((p) => {
+        const unsub = subscribeLaunchChecklistsByProject(p.id, (items) => {
+          // Filter to only items related to this customer
+          launchItemsByProject[p.id] = items.filter(
+            (item) => item.customerId === currentCustomer.id
+          );
+          render();
+        });
+        _launchUnsubs.push(unsub);
+      });
       render();
     })
   );
@@ -212,6 +231,36 @@ function renderPortal() {
   `;
 }
 
+function renderLaunchStatus(projectId) {
+  const items = launchItemsByProject[projectId] || [];
+  if (items.length === 0) return "";
+  const completed = items.filter((i) => i.status === "completed").length;
+  const total = items.length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const color = pct === 100 ? "var(--success-500)" : pct > 50 ? "var(--primary-500)" : "var(--warning-500)";
+  return `
+    <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--surface-3)">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold" style="color:var(--slate-300)">출시 준비 현황</span>
+        <span class="text-xs" style="color:${color};font-weight:600">${completed}/${total} (${pct}%)</span>
+      </div>
+      <div class="progress-bar" style="height:0.375rem">
+        <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      ${items.filter((i) => i.status !== "completed").length > 0 ? `
+        <div style="margin-top:0.5rem">
+          ${items.filter((i) => i.status !== "completed").slice(0, 3).map((i) => `
+            <div class="text-xs" style="color:var(--slate-400);padding:0.125rem 0">
+              · ${escapeHtml(i.title)}
+            </div>
+          `).join("")}
+          ${items.filter((i) => i.status !== "completed").length > 3 ? `<div class="text-xs text-dim" style="padding:0.125rem 0">외 ${items.filter((i) => i.status !== "completed").length - 3}건...</div>` : ""}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderProjectsView() {
   if (portalProjects.length === 0) {
     return `
@@ -273,6 +322,8 @@ function renderProjectsView() {
               </div>
               <span class="text-sm font-semibold" style="color:var(--primary-400)">${p.progress || 0}%</span>
             </div>
+
+            ${renderLaunchStatus(p.id)}
           </div>
         `;
         })
