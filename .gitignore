@@ -47,3 +47,4 @@ next-env.d.ts
 # Firebase
 firebase-debug.log
 processcheck-html/.firebase/
+.gstack/

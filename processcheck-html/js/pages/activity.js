@@ -5,7 +5,7 @@
 import { guardPage } from "../auth.js";
 import { renderNav, initTheme } from "../components.js";
 import { subscribeAllActivityLogs, subscribeProjects } from "../firestore-service.js";
-import { escapeHtml, formatDateTime, timeAgo, exportToCSV } from "../utils.js";
+import { escapeHtml, formatDateTime, timeAgo, exportToCSV, toLocalDateStr } from "../utils.js";
 
 // ─── State ──────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -340,7 +340,7 @@ function bindEvents() {
         { label: "대상", key: "targetType" },
         { label: "대상 ID", key: "targetId" },
         { label: "상세", key: (r) => r.details?.reason || r.details?.content || "" },
-      ], `활동로그_${new Date().toISOString().slice(0, 10)}.csv`);
+      ], `활동로그_${toLocalDateStr(new Date())}.csv`);
     });
   }
 

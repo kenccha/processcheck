@@ -21,7 +21,7 @@ import {
   getBlockingStatus,
   hasCyclicDependency,
 } from "../firestore-service.js";
-import { escapeHtml, formatDate, formatStageName, getFileIcon, formatFileSize, validateFile, departments, PHASE_GROUPS } from "../utils.js";
+import { escapeHtml, formatDate, formatStageName, getFileIcon, formatFileSize, validateFile, departments, PHASE_GROUPS, toLocalDateStr } from "../utils.js";
 import { openSlideOver, closeSlideOver } from "../ui/slide-over.js";
 import { storage } from "../firebase-init.js";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -207,7 +207,7 @@ function render() {
   }
 
   const statusLabels = { pending: "대기", in_progress: "진행 중", completed: "완료", rejected: "반려" };
-  const dueDateVal = task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)).toISOString().slice(0, 10) : "";
+  const dueDateVal = task.dueDate ? toLocalDateStr(task.dueDate) : "";
   const deptOptions = departments.map(d => `<option value="${d}" ${task.department === d ? "selected" : ""}>${d}</option>`).join("");
   const userOptions = allUsers.map(u => `<option value="${u.name}" ${task.assignee === u.name ? "selected" : ""}>${u.name}${u.department ? ` (${u.department})` : ""}</option>`).join("");
   const phase = getPhaseForStage(task.stage);
@@ -640,7 +640,7 @@ function bindEvents() {
     saveBtn.addEventListener("click", async () => {
       if (actionLoading) return;
       actionLoading = true;
-      const dueDateVal = task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)).toISOString().slice(0, 10) : "";
+      const dueDateVal = task.dueDate ? toLocalDateStr(task.dueDate) : "";
       const updates = {};
       const newAssignee = document.getElementById("task-assignee")?.value;
       const newDept = document.getElementById("task-dept")?.value;
@@ -683,7 +683,7 @@ function bindEvents() {
       if (newAssignee !== (task.assignee || "")) updates.assignee = newAssignee;
       if (newDept !== (task.department || "")) updates.department = newDept;
       if (newImportance !== (task.importance || "green")) updates.importance = newImportance;
-      if (newDueDate && newDueDate !== dueDateVal) updates.dueDate = new Date(newDueDate);
+      if (newDueDate && newDueDate !== dueDateVal) updates.dueDate = new Date(newDueDate + "T00:00:00");
 
       try {
         if (newStatus && newStatus !== task.status) {

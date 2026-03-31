@@ -57,6 +57,7 @@ import {
   escapeHtml,
   formatDate,
   formatDateShort,
+  toLocalDateStr,
   getQueryParam,
   daysUntil,
   getRiskLabel,
@@ -543,7 +544,7 @@ function renderWorkTab() {
           <option value="yellow">중요</option>
           <option value="red">긴급</option>
         </select>
-        <input type="date" id="quick-add-due" class="input-field" style="width:auto;font-size:0.7rem;padding:0.25rem 0.4rem;" value="${new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)}">
+        <input type="date" id="quick-add-due" class="input-field" style="width:auto;font-size:0.7rem;padding:0.25rem 0.4rem;" value="${toLocalDateStr(new Date(Date.now() + 14 * 86400000))}">
         <span style="flex:1;"></span>
         <button class="btn-secondary btn-sm" id="open-add-modal-btn" style="padding:0.25rem 0.5rem;font-size:0.65rem;" title="상세 입력">상세 +</button>
         <button class="btn-secondary btn-sm" id="apply-template-btn" style="white-space:nowrap;padding:0.25rem 0.5rem;font-size:0.65rem;">📋 템플릿</button>
@@ -993,6 +994,21 @@ function renderPhaseView() {
       }
     }
 
+    // 계획 대비 실제 일정 차이 계산
+    let scheduleDelayBadge = "";
+    if (savedSch?.plannedEnd && savedSch?.actualEnd) {
+      const plannedEnd = new Date(savedSch.plannedEnd);
+      const actualEnd = new Date(savedSch.actualEnd);
+      plannedEnd.setHours(0, 0, 0, 0);
+      actualEnd.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((actualEnd - plannedEnd) / 86400000);
+      if (diffDays > 0) {
+        scheduleDelayBadge = `<span style="font-size:0.6rem;font-weight:600;color:var(--danger-400);background:var(--danger-400)10;padding:1px 5px;border-radius:var(--radius-sm);">+${diffDays}일</span>`;
+      } else if (diffDays < 0) {
+        scheduleDelayBadge = `<span style="font-size:0.6rem;font-weight:600;color:var(--success-400);background:var(--success-400)10;padding:1px 5px;border-radius:var(--radius-sm);">${diffDays}일</span>`;
+      }
+    }
+
     // Max delay days among overdue incomplete tasks
     const overdueTasks = allTasks.filter(t => {
       if (t.status === "completed" || t.status === "rejected") return false;
@@ -1045,6 +1061,7 @@ function renderPhaseView() {
             <span class="phase-card-name">${phase.name}</span>
             <span class="phase-card-count">${completed}/${total}</span>
             ${minDate && maxDate ? `<span class="phase-card-dates">🗓 ${formatDateShort(minDate)}~${formatDateShort(maxDate)}</span>` : ""}
+            ${scheduleDelayBadge}
             ${statusBadge}
           </div>
           <button class="btn-ghost btn-sm phase-edit-dates-btn" data-phase-edit="${idx}" title="기간 편집" style="font-size:0.6rem;padding:2px 6px;opacity:0.5;" onclick="event.stopPropagation()">✏️</button>
@@ -1054,6 +1071,27 @@ function renderPhaseView() {
         <div class="phase-card-body ${defaultOpen ? 'open' : ''}">
           <!-- 1. Description -->
           ${desc ? `<div class="phase-section phase-desc-section"><span class="phase-section-icon">📋</span><span class="phase-desc-text">${escapeHtml(desc)}</span></div>` : ""}
+
+          <!-- 1.5 계획 vs 실제 일정 비교 -->
+          ${(() => {
+            if (!savedSch?.plannedStart || !savedSch?.plannedEnd) return "";
+            const pS = new Date(savedSch.plannedStart);
+            const pE = new Date(savedSch.plannedEnd);
+            const aS = savedSch.actualStart ? new Date(savedSch.actualStart) : null;
+            const aE = savedSch.actualEnd ? new Date(savedSch.actualEnd) : null;
+            if (!aS || !aE) return "";
+            pS.setHours(0,0,0,0); pE.setHours(0,0,0,0); aS.setHours(0,0,0,0); aE.setHours(0,0,0,0);
+            const diff = Math.round((aE - pE) / 86400000);
+            if (diff === 0 && pS.getTime() === aS.getTime()) return "";
+            const diffColor = diff > 0 ? "var(--danger-400)" : diff < 0 ? "var(--success-400)" : "var(--slate-400)";
+            const diffText = diff > 0 ? `+${diff}일 지연` : diff < 0 ? `${diff}일 단축` : "변경 없음";
+            return `<div class="phase-section" style="padding:0.375rem 0.75rem;font-size:0.7rem;display:flex;align-items:center;gap:0.75rem;background:var(--surface-1);border-radius:var(--radius-md);">
+              <span style="color:var(--slate-400);">계획 ${formatDateShort(pS)}~${formatDateShort(pE)}</span>
+              <span style="color:var(--slate-300);">→</span>
+              <span style="color:var(--slate-200);font-weight:500;">실제 ${formatDateShort(aS)}~${formatDateShort(aE)}</span>
+              <span style="font-weight:600;color:${diffColor};">${diffText}</span>
+            </div>`;
+          })()}
 
           <!-- Inline date editor removed — uses slide-over panel now -->
 
@@ -1612,6 +1650,22 @@ function renderScheduleTab() {
             widthPct = Math.max(2, ((eOff - sOff) / totalDays) * 100);
           }
 
+          // 계획 바 (baseline) — 실제와 다른 경우만 표시
+          const sch = (project.phaseSchedules || {})[`phase${idx}`];
+          let plannedBar = "";
+          if (sch?.plannedStart && sch?.plannedEnd) {
+            const ps = new Date(sch.plannedStart); ps.setHours(0,0,0,0);
+            const pe = new Date(sch.plannedEnd); pe.setHours(0,0,0,0);
+            const psOff = Math.max(0, Math.ceil((ps - projectStart) / 86400000));
+            const peOff = Math.ceil((pe - projectStart) / 86400000);
+            const pStartPct = (psOff / totalDays) * 100;
+            const pWidthPct = Math.max(1, ((peOff - psOff) / totalDays) * 100);
+            // 실제와 다른 경우만 계획 바 표시
+            if (sch.actualStart || sch.actualEnd) {
+              plannedBar = `<div style="position:absolute;left:${pStartPct}%;width:${pWidthPct}%;height:4px;bottom:0;background:var(--slate-500);border-radius:2px;opacity:0.4;" title="계획: ${formatDateShort(ps)}~${formatDateShort(pe)}"></div>`;
+            }
+          }
+
           const barColor = pct === 100 ? "var(--success-500)" :
                            progress.overdue > 0 ? "var(--danger-500)" :
                            pct > 0 ? "var(--primary-500)" : "var(--surface-4)";
@@ -1630,8 +1684,9 @@ function renderScheduleTab() {
               </div>
               <!-- Track -->
               <div style="flex:1;position:relative;height:${ROW_H - 8}px;">
-                <div style="position:absolute;left:${startPct}%;width:${widthPct}%;height:100%;background:var(--surface-3);border-radius:var(--radius-sm);opacity:0.5;"></div>
-                <div style="position:absolute;left:${startPct}%;width:${widthPct * pct / 100}%;height:100%;background:${barColor};border-radius:var(--radius-sm);opacity:0.85;transition:width 0.3s;"></div>
+                ${plannedBar}
+                <div style="position:absolute;left:${startPct}%;width:${widthPct}%;height:${ROW_H - 14}px;top:0;background:var(--surface-3);border-radius:var(--radius-sm);opacity:0.5;"></div>
+                <div style="position:absolute;left:${startPct}%;width:${widthPct * pct / 100}%;height:${ROW_H - 14}px;top:0;background:${barColor};border-radius:var(--radius-sm);opacity:0.85;transition:width 0.3s;"></div>
                 <div style="position:absolute;left:${startPct + 1}%;top:50%;transform:translateY(-50%);font-size:0.6rem;color:white;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.6);z-index:1;white-space:nowrap;">
                   ${pct}%${progress.overdue > 0 ? ` (${progress.overdue}건 지연)` : ""}
                 </div>
@@ -1650,6 +1705,7 @@ function renderScheduleTab() {
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary-500);"></span> 진행중</span>
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:10px;border-radius:2px;background:var(--danger-500);"></span> 지연</span>
         <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:4px;height:14px;background:var(--danger-400);border-radius:1px;"></span> 오늘</span>
+        <span style="display:flex;align-items:center;gap:0.25rem;"><span style="width:10px;height:4px;border-radius:2px;background:var(--slate-500);opacity:0.4;"></span> 계획</span>
         <span>💡 Phase 클릭 → 기간 수정</span>
       </div>
     </div>
@@ -1681,6 +1737,20 @@ function renderScheduleTab() {
               <div><span style="color:var(--slate-400);">진행중</span> <span style="color:var(--primary-400);">${prog.inProgress}</span></div>
               <div style="text-align:right;">${prog.overdue > 0 ? `<span style="color:var(--danger-400);font-weight:600;">지연 ${prog.overdue}건</span>` : `<span style="color:var(--slate-400);">지연 없음</span>`}</div>
             </div>
+            ${(() => {
+              const sch = (project.phaseSchedules || {})[`phase${phases.indexOf(phase)}`];
+              if (!sch?.plannedEnd || !sch?.actualEnd) return "";
+              const pE = new Date(sch.plannedEnd); pE.setHours(0,0,0,0);
+              const aE = new Date(sch.actualEnd); aE.setHours(0,0,0,0);
+              const diff = Math.round((aE - pE) / 86400000);
+              if (diff === 0) return "";
+              const pS = sch.plannedStart ? new Date(sch.plannedStart) : null;
+              return `<div style="margin-top:0.375rem;padding:0.25rem 0.5rem;background:${diff > 0 ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)"};border-radius:var(--radius-sm);font-size:0.65rem;display:flex;align-items:center;gap:0.5rem;">
+                <span style="color:var(--slate-400);">계획 ${pS ? formatDateShort(pS) : ""}~${formatDateShort(pE)}</span>
+                <span style="color:var(--slate-300);">→</span>
+                <span style="font-weight:600;color:${diff > 0 ? "var(--danger-400)" : "var(--success-400)"};">${diff > 0 ? `+${diff}일` : `${diff}일`}</span>
+              </div>`;
+            })()}
           </div>
         `;
       }).join("")}
@@ -2262,8 +2332,8 @@ function openPhaseScheduleSlideOver(phaseIdx) {
   const resolvedEnd = (curSaved?.actualEnd && new Date(curSaved.actualEnd))
     || (curSaved?.plannedEnd && new Date(curSaved.plannedEnd))
     || taskDates.end;
-  const startVal = resolvedStart ? resolvedStart.toISOString().slice(0, 10) : "";
-  const endVal = resolvedEnd ? resolvedEnd.toISOString().slice(0, 10) : "";
+  const startVal = toLocalDateStr(resolvedStart);
+  const endVal = toLocalDateStr(resolvedEnd);
 
   // 전체 Phase 요약 (phaseSchedules 우선, 없으면 task 날짜)
   const allPhaseSummary = phases.map((p, i) => {
@@ -2427,9 +2497,26 @@ function openPhaseScheduleSlideOver(phaseIdx) {
         const totalTasks = phaseUpdates.reduce((sum, pu) => sum + pu.taskUpdates.length, 0);
         await batchUpdateMultiPhaseSchedule(projectId, phaseUpdates);
 
+        // 로컬 project 데이터 즉시 반영 (onSnapshot 대기하지 않고 패널 갱신)
+        if (!project.phaseSchedules) project.phaseSchedules = {};
+        for (const pu of phaseUpdates) {
+          const key = pu.phaseKey;
+          if (!project.phaseSchedules[key]) project.phaseSchedules[key] = {};
+          if (pu.plannedStart) project.phaseSchedules[key].plannedStart = pu.plannedStart;
+          if (pu.plannedEnd) project.phaseSchedules[key].plannedEnd = pu.plannedEnd;
+          if (pu.actualStart) project.phaseSchedules[key].actualStart = pu.actualStart;
+          if (pu.actualEnd) project.phaseSchedules[key].actualEnd = pu.actualEnd;
+          // 로컬 checklistItems dueDate도 반영
+          for (const tu of (pu.taskUpdates || [])) {
+            const item = checklistItems.find(c => c.id === tu.id);
+            if (item) item.dueDate = tu.dueDate;
+          }
+        }
+
         const cascadeMsg = cascade ? " (후속 Phase 포함)" : "";
         showToast("success", `${phase.name} 일정이 변경되었습니다${cascadeMsg} — ${totalTasks}개 작업 업데이트`);
-        closeSlideOver();
+        // 패널을 닫지 않고 갱신된 데이터로 다시 열기
+        openPhaseScheduleSlideOver(phaseIdx);
       } catch (err) {
         console.error("Phase schedule update failed:", err);
         showToast("error", "일정 변경 실패: " + err.message);
@@ -2462,7 +2549,7 @@ function openTaskPeek(task) {
   const statusLabels = { pending: "대기", in_progress: "진행중", completed: "완료", rejected: "반려" };
   // 승인 절차 제거됨
 
-  const dueDateVal = task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)).toISOString().split("T")[0] : "";
+  const dueDateVal = task.dueDate ? toLocalDateStr(task.dueDate) : "";
   const userOptions = allUsers.map(u => `<option value="${escapeHtml(u.name)}" ${task.assignee === u.name ? "selected" : ""}>${escapeHtml(u.name)} (${escapeHtml(u.department || "")})</option>`).join("");
   const deptOptions = [...new Set(checklistItems.map(t => t.department).filter(Boolean))].sort()
     .map(d => `<option value="${escapeHtml(d)}" ${task.department === d ? "selected" : ""}>${escapeHtml(d)}</option>`).join("");
@@ -2609,7 +2696,7 @@ function openTaskPeek(task) {
       if (newAssignee !== (task.assignee || "")) updates.assignee = newAssignee;
       if (newDept !== (task.department || "")) updates.department = newDept;
       if (newImportance !== (task.importance || "green")) updates.importance = newImportance;
-      if (newDueDate && newDueDate !== dueDateVal) updates.dueDate = new Date(newDueDate);
+      if (newDueDate && newDueDate !== dueDateVal) updates.dueDate = new Date(newDueDate + "T00:00:00");
 
       try {
         // Status change
@@ -2763,7 +2850,7 @@ function _parseQuickInput(text) {
   if (dateMatch) {
     let dateStr = dateMatch[1];
     if (dateStr.length === 5) dateStr = `${new Date().getFullYear()}-${dateStr}`;
-    result.dueDate = new Date(dateStr);
+    result.dueDate = new Date(dateStr + "T00:00:00");
     remaining = remaining.replace(dateMatch[0], "").trim();
   }
 
@@ -2856,212 +2943,103 @@ function openPhasePanel(phase, phaseIdx) {
   const scorePercent = shouldMeetMax > 0 ? Math.round(shouldMeetTotal / shouldMeetMax * 100) : 0;
   const scoreColor = scorePercent >= 70 ? "var(--success-400)" : scorePercent >= 40 ? "var(--warning-500)" : "var(--danger-400)";
 
+  // ── 요약 모드: 핵심 정보만 컴팩트하게 ──
+  const handoffItems = gr?.handoffChecklist || [
+    { id: "h0", label: "산출물 검토 및 승인 완료", checked: false },
+    { id: "h1", label: "미결 이슈 목록 정리 및 인수인계", checked: false },
+    { id: "h2", label: "다음 단계 담당자에게 브리핑 완료", checked: false },
+    { id: "h3", label: "관련 문서/파일 공유 및 접근 권한 확인", checked: false },
+    { id: "h4", label: "리스크/주의사항 전달", checked: false },
+  ];
+  const handoffDone = handoffItems.filter(h => h.checked).length;
+  const handoffTotal = handoffItems.length;
+  const mustMetCount = savedMustMeet.filter(m => m.checked).length;
+  const mustTotal = savedMustMeet.length;
+  const historyCount = gr?.decisionHistory?.length || 0;
+  const latestNote = notes.length > 0 ? notes.slice().reverse()[0] : null;
+
   const body = `
     <div class="gate-panel">
-      <!-- Phase 설명 + 진행 현황 -->
+      <!-- 상세보기 버튼 -->
+      <button class="btn-primary" id="gate-open-detail" style="width:100%;border-radius:var(--radius-xl);padding:0.5rem;font-size:0.8rem;margin-bottom:0.25rem;">상세보기 →</button>
+
+      <!-- 1. 진행 + 승인 상태 (한 섹션) -->
       <div class="gate-section">
-        <div class="gate-section-title">📋 Phase 설명</div>
-        <p class="gate-desc">${escapeHtml(desc) || "설명 없음"}</p>
-        <div class="gate-progress-row">
-          <span>체크리스트 진행</span>
-          <span class="gate-progress-count">${doneTasks} / ${totalTasks}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <div>
+            <div class="gate-status ${gsd.cls}" style="display:inline-flex;align-items:center;gap:0.375rem;font-size:0.85rem;">
+              ${gsd.icon} ${gsd.label}
+            </div>
+            ${gr?.approvedBy ? `<div style="font-size:0.65rem;color:var(--slate-400);margin-top:0.15rem;">${escapeHtml(gr.approvedBy)} · ${gr.approvedAt ? formatDate(new Date(gr.approvedAt)) : ""}</div>` : ""}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:1.25rem;font-weight:700;color:var(--slate-100);">${doneTasks}/${totalTasks}</div>
+            <div style="font-size:0.6rem;color:var(--slate-400);">작업 완료</div>
+          </div>
         </div>
         ${totalTasks > 0 ? `<div class="gate-progress-bar"><div class="gate-progress-fill" style="width:${Math.round(doneTasks/totalTasks*100)}%"></div></div>` : ""}
+        ${gr?.decisionReason ? `<div style="font-size:0.7rem;margin-top:0.4rem;padding:0.35rem 0.5rem;background:var(--surface-2);border-radius:var(--radius-md);border-left:3px solid ${gsd.color};color:var(--slate-300);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(gr.decisionReason)}</div>` : ""}
       </div>
 
-      <!-- 현재 승인 상태 -->
+      <!-- 2. 요약 카드 그리드 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+        <!-- Must-Meet 요약 -->
+        <div class="gate-section" style="padding:0.625rem;">
+          <div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.25rem;">🚦 Must-Meet</div>
+          <div style="font-size:1rem;font-weight:700;color:${mustMeetAllPassed ? "var(--success-400)" : mustMetCount > 0 ? "var(--warning-500)" : "var(--slate-300)"};">${mustMetCount}/${mustTotal}</div>
+          <div style="font-size:0.6rem;color:${mustMeetAllPassed ? "var(--success-400)" : "var(--danger-400)"};">${mustMeetAllPassed ? "Go 가능" : "Go 불가"}</div>
+        </div>
+        <!-- Should-Meet 요약 -->
+        <div class="gate-section" style="padding:0.625rem;">
+          <div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.25rem;">📊 Should-Meet</div>
+          <div style="font-size:1rem;font-weight:700;color:${scoreColor};">${shouldMeetTotal}/${shouldMeetMax}</div>
+          <div style="font-size:0.6rem;color:${scoreColor};">${scorePercent}%</div>
+        </div>
+        <!-- 인수인계 요약 -->
+        <div class="gate-section" style="padding:0.625rem;">
+          <div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.25rem;">🤝 인수인계</div>
+          <div style="font-size:1rem;font-weight:700;color:${handoffDone === handoffTotal ? "var(--success-400)" : "var(--slate-300)"};">${handoffDone}/${handoffTotal}</div>
+          <div style="font-size:0.6rem;color:${handoffDone === handoffTotal ? "var(--success-400)" : "var(--slate-400)"};">${handoffDone === handoffTotal ? "완료" : "진행 중"}</div>
+        </div>
+        <!-- 의사결정 이력 요약 -->
+        <div class="gate-section" style="padding:0.625rem;">
+          <div style="font-size:0.65rem;color:var(--slate-400);margin-bottom:0.25rem;">📋 이력</div>
+          <div style="font-size:1rem;font-weight:700;color:var(--slate-200);">${historyCount}건</div>
+          <div style="font-size:0.6rem;color:var(--slate-400);">의사결정</div>
+        </div>
+      </div>
+
+      <!-- 3. 회의록 요약 (최근 1건만) -->
       <div class="gate-section">
-        <div class="gate-section-title">🔒 위원회 승인 상태</div>
-        <div class="gate-status ${gsd.cls}" style="display:flex;align-items:center;gap:0.5rem;">
-          <span>${gsd.icon} ${gsd.label}</span>
-          ${gr?.shouldMeetTotal != null ? `<span style="font-size:0.7rem;opacity:0.8;">(스코어 ${gr.shouldMeetTotal}/${gr.shouldMeetMax || shouldMeetMax})</span>` : ""}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
+          <span style="font-size:0.75rem;font-weight:600;color:var(--slate-200);">💬 회의록 · 피드백 <span style="font-weight:400;color:var(--slate-400);">${notes.length}건</span></span>
+          ${notes.length > 0 ? `<button class="btn-ghost btn-sm gate-notes-detail-btn" data-phase-id="${phaseId}" style="font-size:0.65rem;color:var(--primary-400);padding:2px 8px;">전체 보기 →</button>` : ""}
         </div>
-        ${gr?.approvedBy ? `<div class="gate-meta" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-          <span>결정자: ${escapeHtml(gr.approvedBy)}</span>
-          <span style="color:var(--slate-400);">·</span>
-          <span class="gate-date-display" style="display:inline-flex;align-items:center;gap:0.25rem;">
-            <input type="date" class="gate-date-input" value="${gr.approvedAt ? new Date(gr.approvedAt).toISOString().slice(0,10) : ""}" style="font-size:0.75rem;padding:0.15rem 0.3rem;border:1px solid var(--surface-4);border-radius:var(--radius-sm);background:var(--surface-1);color:var(--text-primary);cursor:pointer;width:auto;" title="날짜 클릭하여 수정">
-          </span>
-        </div>` : ""}
-        ${gr?.decisionReason ? `<div style="font-size:0.75rem;margin-top:0.3rem;padding:0.4rem 0.6rem;background:var(--surface-2);border-radius:var(--radius-md);border-left:3px solid ${gsd.color};">${escapeHtml(gr.decisionReason)}</div>` : ""}
-      </div>
-
-      <!-- Must-Meet 체크리스트 -->
-      ${isObserver ? `
-      <div class="gate-review-section">
-        <h5>🚦 Must-Meet 기준 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">(하나라도 미충족 시 Go 불가)</span></h5>
-        <div id="gate-must-meet-list">
-          ${savedMustMeet.map((m, i) => `
-            <label class="gate-must-meet-item ${m.checked ? "checked" : ""}" data-mm-idx="${i}">
-              <input type="checkbox" ${m.checked ? "checked" : ""}>
-              <span>${escapeHtml(m.label)}</span>
-            </label>
-          `).join("")}
-        </div>
-        <div id="gate-must-meet-result" class="gate-must-meet-summary ${mustMeetAllPassed ? "pass" : "fail"}">
-          ${mustMeetAllPassed ? "전체 충족 — Go 가능" : `미충족 ${savedMustMeet.filter(m => !m.checked).length}건 — Go 불가`}
-        </div>
-      </div>
-
-      <!-- Should-Meet 스코어카드 -->
-      <div class="gate-review-section">
-        <h5>📊 Should-Meet 스코어카드 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">(0~10점)</span></h5>
-        <div id="gate-should-meet-list">
-          ${savedShouldMeet.map((s, i) => `
-            <div class="gate-score-item" data-sm-idx="${i}">
-              <div class="gate-score-label">
-                ${escapeHtml(s.label)}
-                <span class="gate-score-desc">${escapeHtml(s.description || "")}</span>
-              </div>
-              <input type="number" class="gate-score-input" min="0" max="10" value="${s.score || 0}">
-              <span class="gate-score-max">/ 10</span>
+        ${latestNote ? `
+          <div style="padding:0.4rem 0.5rem;background:var(--surface-1);border-radius:var(--radius-md);font-size:0.75rem;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.15rem;">
+              <span style="font-weight:600;color:var(--primary-400);">${escapeHtml(latestNote.author)}</span>
+              <span style="font-size:0.6rem;color:var(--slate-400);">${latestNote.createdAt ? formatDate(latestNote.createdAt) : ""}</span>
             </div>
-          `).join("")}
-        </div>
-        <div class="gate-score-total">
-          <span>총점</span>
-          <span id="gate-score-value" style="color:${scoreColor};">${shouldMeetTotal} / ${shouldMeetMax}</span>
-        </div>
-        <div class="gate-score-bar">
-          <div class="gate-score-bar-fill" style="width:${scorePercent}%;background:${scoreColor};"></div>
-        </div>
-      </div>
-
-      <!-- Gate 의사결정 -->
-      <div class="gate-review-section">
-        <h5>🎯 Gate 의사결정</h5>
-        <div class="gate-decision-grid">
-          ${GATE_DECISIONS.map(d => `
-            <button class="gate-decision-btn" data-gate-decision="${d.value}" style="color:${d.color};border-color:${gateStatus === d.value || (d.value === "go" && gateStatus === "approved") || (d.value === "kill" && gateStatus === "rejected") ? d.color : "var(--surface-3)"}; background:${gateStatus === d.value || (d.value === "go" && gateStatus === "approved") || (d.value === "kill" && gateStatus === "rejected") ? d.bg : "var(--surface-1)"};">
-              <span style="font-size:1rem;">${d.icon}</span> ${d.label}
-            </button>
-          `).join("")}
-        </div>
-        <div style="margin-top:0.5rem;">
-          <label style="font-size:0.72rem;font-weight:600;display:block;margin-bottom:0.2rem;">결정 사유</label>
-          <textarea id="gate-decision-reason" class="gate-decision-reason" style="width:100%;font-size:0.78rem;padding:0.5rem;border:1px solid var(--surface-4);border-radius:var(--radius-md);background:var(--surface-1);color:var(--text-primary);resize:vertical;min-height:60px;" placeholder="결정의 근거와 후속 조치를 기록하세요...">${escapeHtml(gr?.decisionReason || "")}</textarea>
-        </div>
-        <button class="btn-primary btn-sm" id="gate-submit-decision" style="margin-top:0.5rem;width:100%;font-size:0.8rem;" ${gateStatus !== "pending" && gateStatus !== "hold" && gateStatus !== "recycle" ? "" : ""}>결정 저장</button>
-        ${gateStatus !== "pending" ? `<button class="btn-ghost btn-sm" id="gate-reset-decision" style="margin-top:0.3rem;width:100%;font-size:0.75rem;">↩ 초기화 (대기로 변경)</button>` : ""}
-      </div>
-      ` : `
-      <!-- 비 observer: 읽기 전용 Gate Review 정보 -->
-      ${savedMustMeet.some(m => m.checked) || savedShouldMeet.some(s => s.score > 0) ? `
-      <div class="gate-review-section">
-        <h5>🚦 Must-Meet 기준</h5>
-        ${savedMustMeet.map(m => `
-          <div style="font-size:0.75rem;padding:0.25rem 0;display:flex;gap:0.4rem;align-items:center;">
-            <span>${m.checked ? "✅" : "❌"}</span> <span style="${m.checked ? "" : "color:var(--danger-400);"}">${escapeHtml(m.label)}</span>
+            <div style="color:var(--slate-300);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(latestNote.content)}</div>
+            ${latestNote.files?.length ? `<div style="font-size:0.6rem;color:var(--primary-400);margin-top:0.15rem;">📎 ${latestNote.files.length}개 파일</div>` : ""}
           </div>
-        `).join("")}
-        <div class="gate-must-meet-summary ${mustMeetAllPassed ? "pass" : "fail"}" style="margin-top:0.4rem;">
-          ${mustMeetAllPassed ? "전체 충족" : `미충족 ${savedMustMeet.filter(m => !m.checked).length}건`}
-        </div>
-      </div>
-      <div class="gate-review-section">
-        <h5>📊 Should-Meet 스코어</h5>
-        ${savedShouldMeet.map(s => `
-          <div style="font-size:0.75rem;padding:0.2rem 0;display:flex;justify-content:space-between;">
-            <span>${escapeHtml(s.label)}</span>
-            <span style="font-weight:700;">${s.score || 0}/10</span>
+          ${notes.length > 1 ? `<div style="text-align:center;padding-top:0.25rem;font-size:0.6rem;color:var(--slate-400);">외 ${notes.length - 1}건</div>` : ""}
+        ` : `<div style="padding:0.5rem;text-align:center;font-size:0.7rem;color:var(--slate-400);">등록된 회의록이 없습니다</div>`}
+        <!-- 작성 폼: 접기/펼치기 -->
+        <div style="border-top:1px solid var(--surface-3);padding-top:0.375rem;margin-top:0.375rem;">
+          <button class="btn-ghost btn-sm gate-note-toggle-form" style="width:100%;font-size:0.7rem;color:var(--slate-300);padding:0.3rem;">+ 회의록 작성</button>
+          <div class="gate-note-form" style="display:none;">
+            <textarea class="gate-note-input" placeholder="회의 내용, 피드백, 결정 사항 등을 기록하세요..." rows="3"></textarea>
+            <div class="gate-note-file-area" style="margin-top:0.375rem;">
+              <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.3rem 0.6rem;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-sm);font-size:0.7rem;color:var(--slate-300);cursor:pointer;">
+                📎 파일 첨부
+                <input type="file" class="gate-note-file-input" multiple style="display:none;">
+              </label>
+              <div class="gate-note-file-list" style="margin-top:0.25rem;font-size:0.65rem;color:var(--slate-400);"></div>
+            </div>
+            <button class="btn-primary btn-sm gate-note-submit" style="margin-top:0.375rem;">등록</button>
           </div>
-        `).join("")}
-        <div class="gate-score-total" style="margin-top:0.3rem;">
-          <span>총점</span>
-          <span style="color:${scoreColor};">${shouldMeetTotal} / ${shouldMeetMax}</span>
-        </div>
-      </div>
-      ` : `<div style="font-size:0.75rem;color:var(--slate-400);padding:0.5rem 0;">기획조정실이 Gate Review를 진행하면 판단 기준이 여기에 표시됩니다.</div>`}
-      `}
-
-      <!-- 핸드오프 체크리스트 -->
-      <div class="gate-review-section">
-        <h5>🤝 Phase 인수인계 체크리스트</h5>
-        <div id="gate-handoff-list">
-          ${(gr?.handoffChecklist || [
-            { id: "h0", label: "산출물 검토 및 승인 완료", checked: false },
-            { id: "h1", label: "미결 이슈 목록 정리 및 인수인계", checked: false },
-            { id: "h2", label: "다음 단계 담당자에게 브리핑 완료", checked: false },
-            { id: "h3", label: "관련 문서/파일 공유 및 접근 권한 확인", checked: false },
-            { id: "h4", label: "리스크/주의사항 전달", checked: false },
-          ]).map((h, i) => `
-            <label class="gate-must-meet-item ${h.checked ? "checked" : ""}" data-handoff-idx="${i}" style="cursor:pointer;">
-              <input type="checkbox" ${h.checked ? "checked" : ""} class="handoff-cb">
-              <span>${escapeHtml(h.label)}</span>
-              ${h.checkedBy ? `<span style="font-size:0.625rem;color:var(--slate-400);margin-left:auto;">${escapeHtml(h.checkedBy)}</span>` : ""}
-            </label>
-          `).join("")}
-        </div>
-        <div style="font-size:0.7rem;margin-top:0.3rem;color:var(--slate-400);">
-          ${(() => {
-            const items = gr?.handoffChecklist || [];
-            const done = items.filter(h => h.checked).length;
-            const total = items.length || 5;
-            return done === total ? `<span style="color:var(--success-400);">전체 인수인계 완료</span>` : `${done}/${total} 완료`;
-          })()}
-        </div>
-      </div>
-
-      <!-- 의사결정 이력 -->
-      ${(gr?.decisionHistory && gr.decisionHistory.length > 0) ? `
-      <div class="gate-review-section">
-        <h5>📋 의사결정 이력 <span style="font-size:0.65rem;font-weight:400;color:var(--slate-400);">${gr.decisionHistory.length}건</span></h5>
-        <div style="max-height:200px;overflow-y:auto;">
-          ${[...gr.decisionHistory].reverse().map(h => {
-            const decisionLabels = { go: "Go ✅", kill: "Kill ❌", hold: "Hold ⏸", recycle: "Recycle ♻", approved: "승인 ✅", rejected: "반려 ❌", pending: "초기화 ↩" };
-            const decisionColors = { go: "var(--success-400)", kill: "var(--danger-400)", hold: "var(--warning-400)", recycle: "var(--primary-400)", approved: "var(--success-400)", rejected: "var(--danger-400)", pending: "var(--slate-400)" };
-            const dAt = h.decidedAt ? (typeof h.decidedAt.toDate === "function" ? h.decidedAt.toDate() : new Date(h.decidedAt)) : null;
-            const dateStr = dAt ? formatDate(dAt) : "";
-            return `<div style="display:flex;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--surface-3);font-size:0.75rem;">
-              <span style="flex-shrink:0;font-weight:700;color:${decisionColors[h.decision] || "var(--slate-300)"};">${decisionLabels[h.decision] || h.decision}</span>
-              <span style="flex:1;min-width:0;color:var(--slate-300);">${h.reason ? escapeHtml(h.reason) : "<span style='color:var(--slate-500);'>사유 없음</span>"}</span>
-              <span style="flex-shrink:0;color:var(--slate-400);white-space:nowrap;">${escapeHtml(h.decidedBy)} · ${dateStr}</span>
-            </div>`;
-          }).join("")}
-        </div>
-      </div>
-      ` : ""}
-
-      <!-- 회의록 -->
-      <div class="gate-section">
-        <div class="gate-section-title">💬 회의록 · 피드백 <span class="gate-note-count">${notes.length}건</span></div>
-        <div class="gate-notes-list">
-          ${notes.length === 0 ? `<div class="empty-state" style="padding:1rem">
-              <div class="empty-state-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-              </div>
-              <span class="empty-state-text">등록된 회의록이 없습니다</span>
-            </div>` :
-            notes.map(n => `
-              <div class="gate-note">
-                <div class="gate-note-header">
-                  <span class="gate-note-author">${escapeHtml(n.author)}</span>
-                  <span class="gate-note-date">${n.createdAt ? formatDate(n.createdAt) : ""}</span>
-                </div>
-                <div class="gate-note-content">${escapeHtml(n.content)}</div>
-                ${(n.files && n.files.length > 0) ? `
-                  <div class="gate-note-files" style="margin-top:0.375rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
-                    ${n.files.map(f => `
-                      <a href="${f.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-sm);font-size:0.65rem;color:var(--primary-400);text-decoration:none;">
-                        📎 ${escapeHtml(f.name)}
-                      </a>
-                    `).join("")}
-                  </div>
-                ` : ""}
-              </div>
-            `).join("")
-          }
-        </div>
-        <div class="gate-note-form">
-          <textarea class="gate-note-input" placeholder="회의 내용, 피드백, 결정 사항 등을 기록하세요..." rows="3"></textarea>
-          <div class="gate-note-file-area" style="margin-top:0.375rem;">
-            <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.3rem 0.6rem;background:var(--surface-2);border:1px solid var(--surface-4);border-radius:var(--radius-sm);font-size:0.7rem;color:var(--slate-300);cursor:pointer;">
-              📎 파일 첨부
-              <input type="file" class="gate-note-file-input" multiple style="display:none;">
-            </label>
-            <div class="gate-note-file-list" style="margin-top:0.25rem;font-size:0.65rem;color:var(--slate-400);"></div>
-          </div>
-          <button class="btn-primary btn-sm gate-note-submit" style="margin-top:0.375rem;">등록</button>
         </div>
       </div>
     </div>
@@ -3069,190 +3047,31 @@ function openPhasePanel(phase, phaseIdx) {
 
   openSlideOver(`${phase.name} — ${phase.gateStage}`, body);
 
-  // 이벤트 바인딩
+  // 요약 모드 이벤트 바인딩
   setTimeout(() => {
     const panel = document.querySelector(".slide-over-body");
     if (!panel) return;
 
-    // Gate Review 이벤트 (observer only)
-    if (isObserver) {
-      let selectedDecision = gateStatus === "approved" ? "go" : gateStatus === "rejected" ? "kill" : (gateStatus !== "pending" ? gateStatus : "");
-
-      // Must-Meet 체크박스
-      panel.querySelectorAll("#gate-must-meet-list .gate-must-meet-item input").forEach(cb => {
-        cb.addEventListener("change", () => {
-          const item = cb.closest(".gate-must-meet-item");
-          if (cb.checked) item.classList.add("checked"); else item.classList.remove("checked");
-          const allChecked = [...panel.querySelectorAll("#gate-must-meet-list input")].every(c => c.checked);
-          const unchecked = [...panel.querySelectorAll("#gate-must-meet-list input")].filter(c => !c.checked).length;
-          const result = panel.querySelector("#gate-must-meet-result");
-          if (result) {
-            result.className = `gate-must-meet-summary ${allChecked ? "pass" : "fail"}`;
-            result.textContent = allChecked ? "전체 충족 — Go 가능" : `미충족 ${unchecked}건 — Go 불가`;
-          }
-        });
-      });
-
-      // Should-Meet 점수 입력
-      panel.querySelectorAll(".gate-score-input").forEach(input => {
-        input.addEventListener("input", () => {
-          let val = parseInt(input.value) || 0;
-          if (val > 10) { val = 10; input.value = 10; }
-          if (val < 0) { val = 0; input.value = 0; }
-          const total = [...panel.querySelectorAll(".gate-score-input")].reduce((s, inp) => s + (parseInt(inp.value) || 0), 0);
-          const max = panel.querySelectorAll(".gate-score-input").length * 10;
-          const pct = Math.round(total / max * 100);
-          const c = pct >= 70 ? "var(--success-400)" : pct >= 40 ? "var(--warning-500)" : "var(--danger-400)";
-          const sv = panel.querySelector("#gate-score-value");
-          if (sv) { sv.textContent = `${total} / ${max}`; sv.style.color = c; }
-          const bar = panel.querySelector(".gate-score-bar-fill");
-          if (bar) { bar.style.width = `${pct}%`; bar.style.background = c; }
-        });
-      });
-
-      // Decision 버튼
-      panel.querySelectorAll(".gate-decision-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          selectedDecision = btn.dataset.gateDecision;
-          const dec = GATE_DECISIONS.find(d => d.value === selectedDecision);
-          panel.querySelectorAll(".gate-decision-btn").forEach(b => {
-            const bd = GATE_DECISIONS.find(d => d.value === b.dataset.gateDecision);
-            if (b === btn) {
-              b.style.borderColor = dec.color;
-              b.style.background = dec.bg;
-              b.classList.add("selected");
-            } else {
-              b.style.borderColor = "var(--surface-3)";
-              b.style.background = "var(--surface-1)";
-              b.classList.remove("selected");
-            }
-          });
-        });
-      });
-
-      // Submit decision
-      panel.querySelector("#gate-submit-decision")?.addEventListener("click", async () => {
-        if (!selectedDecision) { showToast("warning", "의사결정을 선택해주세요."); return; }
-
-        // Must-Meet check: Go selected but not all met
-        const allMustMet = [...panel.querySelectorAll("#gate-must-meet-list input")].every(c => c.checked);
-        if (selectedDecision === "go" && !allMustMet) {
-          showToast("warning", "Must-Meet 기준이 모두 충족되지 않아 Go를 선택할 수 없습니다.");
-          return;
-        }
-
-        // Collect review data
-        const mustMeetItems = [...panel.querySelectorAll("#gate-must-meet-list .gate-must-meet-item")].map((el, i) => ({
-          id: `mm${i}`,
-          label: el.querySelector("span")?.textContent || "",
-          checked: el.querySelector("input")?.checked || false,
-        }));
-        const shouldMeetItems = [...panel.querySelectorAll(".gate-score-item")].map((el, i) => ({
-          id: `sm${i}`,
-          label: el.querySelector(".gate-score-label")?.childNodes[0]?.textContent?.trim() || "",
-          description: el.querySelector(".gate-score-desc")?.textContent || "",
-          score: parseInt(el.querySelector(".gate-score-input")?.value) || 0,
-          maxScore: 10,
-        }));
-        const smTotal = shouldMeetItems.reduce((s, it) => s + it.score, 0);
-        const smMax = shouldMeetItems.length * 10;
-        const reason = panel.querySelector("#gate-decision-reason")?.value?.trim() || "";
-
-        // Map decision to gateStatus for backward compat
-        const statusMap = { go: "go", kill: "kill", hold: "hold", recycle: "recycle" };
-        const newStatus = statusMap[selectedDecision];
-
-        const submitBtn = panel.querySelector("#gate-submit-decision");
-        try {
-          if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "저장 중..."; }
-          await updateGateRecord(projectId, phaseId, phase.name, newStatus, user?.name || "", {
-            mustMeetItems,
-            shouldMeetItems,
-            shouldMeetTotal: smTotal,
-            shouldMeetMax: smMax,
-            decisionReason: reason,
-          });
-          const decLabel = GATE_DECISIONS.find(d => d.value === selectedDecision)?.label || selectedDecision;
-          showToast("success", `${phase.name} Gate: ${decLabel}`);
-          // Optimistic update
-          const existingIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
-          const now = new Date().toISOString();
-          const patch = { phaseId, phaseName: phase.name, gateStatus: newStatus, approvedBy: user?.name || "", approvedAt: now, mustMeetItems, shouldMeetItems, shouldMeetTotal: smTotal, shouldMeetMax: smMax, decisionReason: reason, meetingNotes: notes };
-          if (existingIdx >= 0) Object.assign(gateRecords[existingIdx], patch);
-          else gateRecords.push(patch);
-          openPhasePanel(phase, phaseIdx);
-        } catch (err) {
-          showToast("error", "저장 실패: " + err.message);
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "결정 저장"; }
-        }
-      });
-
-      // Reset decision
-      panel.querySelector("#gate-reset-decision")?.addEventListener("click", async () => {
-        try {
-          await updateGateRecord(projectId, phaseId, phase.name, "pending", "", {
-            mustMeetItems: savedMustMeet.map(m => ({ ...m, checked: false })),
-            shouldMeetItems: savedShouldMeet.map(s => ({ ...s, score: 0 })),
-            shouldMeetTotal: 0,
-            shouldMeetMax: shouldMeetMax,
-            decisionReason: "",
-          });
-          showToast("success", "초기화 완료");
-          const existingIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
-          if (existingIdx >= 0) {
-            gateRecords[existingIdx].gateStatus = "pending";
-            gateRecords[existingIdx].approvedBy = "";
-            gateRecords[existingIdx].approvedAt = null;
-            gateRecords[existingIdx].decisionReason = "";
-          }
-          openPhasePanel(phase, phaseIdx);
-        } catch (err) {
-          showToast("error", "초기화 실패: " + err.message);
-        }
-      });
-    }
-
-    // 핸드오프 체크리스트
-    panel.querySelectorAll(".handoff-cb").forEach(cb => {
-      cb.addEventListener("change", async () => {
-        const items = [...panel.querySelectorAll("[data-handoff-idx]")].map((el, i) => {
-          const input = el.querySelector("input");
-          return {
-            id: `h${i}`,
-            label: el.querySelector("span").textContent.trim(),
-            checked: input.checked,
-            checkedBy: input.checked ? (user?.name || "") : "",
-            checkedAt: input.checked ? new Date().toISOString() : null,
-          };
-        });
-        try {
-          await updateHandoffChecklist(projectId, phaseId, items);
-          // Update local state
-          const grIdx = gateRecords.findIndex(r => r.phaseId === phaseId);
-          if (grIdx >= 0) gateRecords[grIdx].handoffChecklist = items;
-        } catch (e) {
-          console.error("핸드오프 저장 실패:", e);
-        }
-      });
+    // 상세보기 버튼
+    panel.querySelector("#gate-open-detail")?.addEventListener("click", () => {
+      window.location.href = `phase-detail.html?projectId=${encodeURIComponent(projectId)}&phase=${phaseIdx}`;
     });
 
-    // 승인 날짜 수정
-    const dateInput = panel.querySelector(".gate-date-input");
-    if (dateInput) {
-      dateInput.addEventListener("change", async () => {
-        const newDate = dateInput.value;
-        if (!newDate) return;
-        try {
-          await updateGateApprovedAt(projectId, phaseId, newDate);
-          // Optimistic update
-          const idx = gateRecords.findIndex(r => r.phaseId === phaseId);
-          if (idx >= 0) gateRecords[idx].approvedAt = new Date(newDate).toISOString();
-          showToast("success", "승인 날짜가 수정되었습니다");
-        } catch (err) {
-          showToast("error", "날짜 수정 실패: " + err.message);
-        }
+    // 회의록 작성 폼 토글
+    const toggleFormBtn = panel.querySelector(".gate-note-toggle-form");
+    const noteForm = panel.querySelector(".gate-note-form");
+    if (toggleFormBtn && noteForm) {
+      toggleFormBtn.addEventListener("click", () => {
+        const visible = noteForm.style.display !== "none";
+        noteForm.style.display = visible ? "none" : "";
+        toggleFormBtn.textContent = visible ? "+ 회의록 작성" : "- 접기";
       });
     }
+
+    // 회의록 전체 보기 → phase-detail 페이지로 이동
+    panel.querySelector(".gate-notes-detail-btn")?.addEventListener("click", () => {
+      window.location.href = `phase-detail.html?projectId=${encodeURIComponent(projectId)}&phase=${phaseIdx}`;
+    });
 
     // 파일 첨부 미리보기
     const fileInput = panel.querySelector(".gate-note-file-input");
@@ -3264,7 +3083,7 @@ function openPhasePanel(phase, phaseIdx) {
       });
     }
 
-    // 회의록 등록 (파일 첨부 포함)
+    // 회의록 등록
     const submitBtn = panel.querySelector(".gate-note-submit");
     const textarea = panel.querySelector(".gate-note-input");
     if (submitBtn && textarea) {
@@ -3275,8 +3094,6 @@ function openPhasePanel(phase, phaseIdx) {
         try {
           submitBtn.disabled = true;
           submitBtn.textContent = files.length > 0 ? "업로드 중..." : "등록 중...";
-
-          // Upload files to Storage
           const uploadedFiles = [];
           for (const file of files) {
             const fileId = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -3286,7 +3103,6 @@ function openPhasePanel(phase, phaseIdx) {
             const url = await getDownloadURL(snap.ref);
             uploadedFiles.push({ name: file.name, url, size: file.size, type: file.type });
           }
-
           await addGateMeetingNote(projectId, phaseId, phase.name, user?.name || "익명", content || "(파일 첨부)", uploadedFiles);
           showToast("success", "회의록이 등록되었습니다");
           setTimeout(() => openPhasePanel(phase, phaseIdx), 300);
@@ -3310,7 +3126,7 @@ async function handleQuickAdd() {
   const dept = document.getElementById("quick-add-dept")?.value || user.department || departments[0];
   const importance = document.getElementById("quick-add-importance")?.value || "green";
   const dueDateStr = document.getElementById("quick-add-due")?.value;
-  const dueDate = dueDateStr ? new Date(dueDateStr) : new Date(Date.now() + 14 * 86400000);
+  const dueDate = dueDateStr ? new Date(dueDateStr + "T00:00:00") : new Date(Date.now() + 14 * 86400000);
   const suggestions = getSmartAssigneeSuggestions(dept);
   const assignee = suggestions.length > 0 ? suggestions[0].name : user.name;
   isCreating = true;
@@ -3369,7 +3185,7 @@ function showAddTaskModal() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
             <label class="form-label">마감일</label>
-            <input type="date" id="modal-task-due" class="input-field" value="${new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)}">
+            <input type="date" id="modal-task-due" class="input-field" value="${toLocalDateStr(new Date(Date.now() + 14 * 86400000))}">
           </div>
           <div>
             <label class="form-label">중요도</label>
@@ -3430,7 +3246,7 @@ function showAddTaskModal() {
         department: overlay.querySelector("#modal-task-dept").value,
         stage: overlay.querySelector("#modal-task-stage").value,
         importance: overlay.querySelector("#modal-task-importance").value,
-        dueDate: new Date(overlay.querySelector("#modal-task-due").value),
+        dueDate: new Date(overlay.querySelector("#modal-task-due").value + "T00:00:00"),
         status: "pending",
         source: "manual",
       });
@@ -3493,7 +3309,7 @@ function openMeetingsPanel() {
 }
 
 function openMeetingCreatePanel() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalDateStr(new Date());
   const phases = getActivePhaseGroups();
   const body = `
     <form id="so-meeting-form" style="display:flex;flex-direction:column;gap:0.75rem;">
@@ -3834,7 +3650,7 @@ function openMeetingEditPanel(meetingId) {
   if (!m) return;
 
   const phases = getActivePhaseGroups();
-  const dateVal = m.date instanceof Date ? m.date.toISOString().slice(0, 10) : "";
+  const dateVal = m.date ? toLocalDateStr(m.date) : "";
 
   const body = `
     <form id="so-meeting-edit-form" style="display:flex;flex-direction:column;gap:0.75rem;">
@@ -3924,7 +3740,7 @@ function openMeetingEditPanel(meetingId) {
 
     // Prefill existing actions (skip converted ones — they're immutable)
     (m.actionItems || []).filter(ai => !ai.convertedTaskId).forEach(ai => {
-      const dueVal = ai.dueDate instanceof Date ? ai.dueDate.toISOString().slice(0, 10) : ai.dueDate || "";
+      const dueVal = ai.dueDate ? toLocalDateStr(ai.dueDate) : "";
       const row = addEditRow(actionsEl, `
         <input type="text" class="input-field" data-action-title value="${escapeHtml(ai.title)}" style="flex:1;min-width:150px;font-size:0.75rem;">
         <input type="text" class="input-field" data-action-assignee value="${escapeHtml(ai.assignee || "")}" placeholder="담당자" style="width:70px;font-size:0.75rem;">

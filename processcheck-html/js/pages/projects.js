@@ -17,6 +17,7 @@ import {
   getRiskClass,
   daysUntil,
   exportToCSV,
+  toLocalDateStr,
 } from "../utils.js";
 import { saveViewState, loadViewState } from "../ui/view-state.js";
 import { renderSkeletonTable } from "../ui/skeleton.js";
@@ -326,7 +327,7 @@ function render() {
             <div class="flex gap-4">
               <div style="flex:1">
                 <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">시작일 <span style="color:var(--danger-400)">*</span></label>
-                <input type="date" class="input-field" id="cp-start" value="${new Date().toISOString().split("T")[0]}" />
+                <input type="date" class="input-field" id="cp-start" value="${toLocalDateStr(new Date())}" />
               </div>
               <div style="flex:1">
                 <label class="text-sm font-medium text-soft" style="display:block;margin-bottom:0.375rem">종료 예정일 <span style="color:var(--danger-400)">*</span></label>
@@ -1084,7 +1085,7 @@ function bindControls() {
         showToast('warning', "필수 항목을 모두 입력하세요.");
         return;
       }
-      if (new Date(endStr) <= new Date(startStr)) {
+      if (new Date(endStr + "T00:00:00") <= new Date(startStr + "T00:00:00")) {
         showToast('warning', "종료일은 시작일보다 이후여야 합니다.");
         return;
       }
@@ -1099,8 +1100,8 @@ function bindControls() {
           projectType: "신규개발",
           status: "active",
           progress: 0,
-          startDate: new Date(startStr),
-          endDate: new Date(endStr),
+          startDate: new Date(startStr + "T00:00:00"),
+          endDate: new Date(endStr + "T00:00:00"),
           pm,
           riskLevel: "green",
           currentStage: "발의검토",

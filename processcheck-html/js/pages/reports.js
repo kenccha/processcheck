@@ -16,6 +16,7 @@ import {
   PHASE_GROUPS,
   formatDate,
   getRiskLabel,
+  toLocalDateStr,
 } from "../utils.js";
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ function exportProjectProgressCSV() {
   const rows = data.map((d) =>
     toCSVRow([d.name, d.progress, getRiskLabel(d.riskLevel), d.currentStage, formatDate(d.startDate), formatDate(d.endDate)])
   );
-  downloadCSV([header, ...rows].join("\n"), "프로젝트현황_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "프로젝트현황_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 2: Department Workload Heatmap ─────────────────────────────────
@@ -205,7 +206,7 @@ function exportDeptWorkloadCSV() {
   const rows = data.map((d) =>
     toCSVRow([d.dept, d.total, d.completed, d.inProgress, d.pending, d.overdue])
   );
-  downloadCSV([header, ...rows].join("\n"), "부서별업무량_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "부서별업무량_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 3: Phase Bottleneck Analysis ───────────────────────────────────
@@ -229,7 +230,7 @@ function exportPhaseCSV() {
   const rows = data.map((d) =>
     toCSVRow([d.name, d.total, d.completed, d.inProgress, d.overdue, d.completionRate])
   );
-  downloadCSV([header, ...rows].join("\n"), "Phase별분석_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "Phase별분석_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 4: Weekly/Monthly Completion Trend ─────────────────────────────
@@ -279,7 +280,7 @@ function exportTrendCSV() {
   const weekly = computeWeeklyTrend(8);
   const header = toCSVRow(["기간", "완료 작업 수"]);
   const rows = weekly.map((d) => toCSVRow([d.label, d.completed]));
-  downloadCSV([header, ...rows].join("\n"), "완료추이_주간_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "완료추이_주간_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 5: Assignee Workload ───────────────────────────────────────────
@@ -352,7 +353,7 @@ function exportHeatmapCSV() {
     });
     return toCSVRow([name, t.active, t.overdue, t.projects.size, ...cells]);
   });
-  downloadCSV([header, ...rows].join("\n"), "워크로드히트맵_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "워크로드히트맵_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 7: Resource Conflict Detection (교차 프로젝트 리소스 충돌) ──────
@@ -396,7 +397,7 @@ function exportAssigneeCSV() {
   const rows = data.map((d) =>
     toCSVRow([d.name, d.total, d.completed, d.inProgress, d.pending, d.overdue])
   );
-  downloadCSV([header, ...rows].join("\n"), "담당자별워크로드_" + new Date().toISOString().slice(0, 10) + ".csv");
+  downloadCSV([header, ...rows].join("\n"), "담당자별워크로드_" + toLocalDateStr(new Date()) + ".csv");
 }
 
 // ─── Section 9: Approval Anomaly Detection (승인 이상 감지) ─────────────────

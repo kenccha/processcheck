@@ -18,7 +18,7 @@ import {
   subscribeCustomers,
   LAUNCH_CATEGORY_LABELS,
 } from "../firestore-service.js";
-import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName } from "../utils.js";
+import { escapeHtml, formatDate, daysUntil, timeAgo, getRoleName, toLocalDateStr } from "../utils.js";
 
 initTheme();
 
@@ -1273,10 +1273,7 @@ function openEditModal(itemId) {
   document.getElementById("edit-department").value = item.department || "";
   document.getElementById("edit-status").value = item.status || "pending";
 
-  const dueDateVal = item.dueDate
-    ? (item.dueDate instanceof Date ? item.dueDate : new Date(item.dueDate)).toISOString().split("T")[0]
-    : "";
-  document.getElementById("edit-duedate").value = dueDateVal;
+  document.getElementById("edit-duedate").value = item.dueDate ? toLocalDateStr(item.dueDate) : "";
 
   // Store editing item id
   modal.dataset.editingId = itemId;
@@ -1307,10 +1304,8 @@ function bindEditEvents() {
     if (newDept !== (item.department || "")) updates.department = newDept;
     if (newStatus !== item.status) updates.status = newStatus;
     if (newDueDate) {
-      const oldDate = item.dueDate
-        ? (item.dueDate instanceof Date ? item.dueDate : new Date(item.dueDate)).toISOString().split("T")[0]
-        : "";
-      if (newDueDate !== oldDate) updates.dueDate = new Date(newDueDate);
+      const oldDate = item.dueDate ? toLocalDateStr(item.dueDate) : "";
+      if (newDueDate !== oldDate) updates.dueDate = new Date(newDueDate + "T00:00:00");
     }
 
     if (Object.keys(updates).length === 0) {

@@ -264,6 +264,17 @@ export function formatDateTime(date) {
   return `${applyDateFormat(d, getDateFormat())} ${hh}:${mi}`;
 }
 
+// YYYY-MM-DD (로컬 시간 기준, <input type="date"> value용)
+export function toLocalDateStr(date) {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // Short date (for inline use like phase headers)
 export function formatDateShort(date) {
   if (!date) return "-";
