@@ -1475,6 +1475,127 @@ export async function applyTemplateToProject(projectId, _projectType) {
   return checklistItems.length;
 }
 
+// ─── Template → Project Sync ────────────────────────────────────────────────
+
+/**
+ * Sync template changes to all existing projects' checklist items.
+ * - Updated template items → update matching checklistItems (title, isRequired)
+ * - Deleted template items → optionally remove from projects
+ * - New template items → add to projects that don't have them
+ * @returns {{ updated: number, added: number, removed: number }}
+ */
+export async function syncTemplateToProjects() {
+  // 1) Load all template items
+  const templateSnap = await getDocs(collection(db, "templateItems"));
+  const templates = new Map();
+  templateSnap.docs.forEach(d => templates.set(d.id, { ...d.data(), id: d.id }));
+
+  // 2) Load all checklist items that have a templateItemId
+  const checklistSnap = await getDocs(collection(db, "checklistItems"));
+  const allChecklists = checklistSnap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+  const linkedItems = allChecklists.filter(c => c.templateItemId);
+
+  // 3) Load stages and departments for new item creation
+  const stages = await getTemplateStages();
+  const depts = await getTemplateDepartments();
+  const stageMap = {};
+  for (const s of stages) stageMap[s.id] = s;
+  const deptMap = {};
+  for (const d of depts) deptMap[d.id] = d;
+
+  let updated = 0;
+  let added = 0;
+  let removed = 0;
+  const BATCH_LIMIT = 450;
+  let batch = writeBatch(db);
+  let batchCount = 0;
+
+  async function commitIfNeeded() {
+    if (batchCount >= BATCH_LIMIT) {
+      await batch.commit();
+      batch = writeBatch(db);
+      batchCount = 0;
+    }
+  }
+
+  // 4) Update existing checklist items where template changed
+  for (const ci of linkedItems) {
+    const tmpl = templates.get(ci.templateItemId);
+    if (!tmpl) {
+      // Template was deleted — mark checklist item as orphaned (don't delete, user may have data)
+      continue;
+    }
+
+    // Check if title or isRequired changed
+    const needsUpdate = ci.title !== tmpl.content || ci.isRequired !== tmpl.isRequired;
+    if (needsUpdate) {
+      batch.update(doc(db, "checklistItems", ci._docId), {
+        title: tmpl.content,
+        isRequired: tmpl.isRequired,
+      });
+      batchCount++;
+      updated++;
+      await commitIfNeeded();
+    }
+  }
+
+  // 5) Add new template items to projects that don't have them
+  // Group existing items by projectId → Set of templateItemIds
+  const projectTemplateMap = new Map();
+  for (const ci of allChecklists) {
+    if (!projectTemplateMap.has(ci.projectId)) {
+      projectTemplateMap.set(ci.projectId, new Set());
+    }
+    if (ci.templateItemId) {
+      projectTemplateMap.get(ci.projectId).add(ci.templateItemId);
+    }
+  }
+
+  // Get unique project IDs
+  const projectIds = [...projectTemplateMap.keys()];
+  const today = new Date();
+
+  for (const projectId of projectIds) {
+    const existingIds = projectTemplateMap.get(projectId);
+    for (const [tmplId, tmpl] of templates) {
+      if (existingIds.has(tmplId)) continue; // already exists
+
+      const stage = stageMap[tmpl.stageId];
+      const dept = deptMap[tmpl.departmentId];
+      if (!stage || !dept) continue;
+
+      const ref = doc(collection(db, "checklistItems"));
+      batch.set(ref, {
+        projectId,
+        stage: stage.workStageName,
+        department: dept.name,
+        title: tmpl.content,
+        description: "",
+        assignee: "",
+        reviewer: "",
+        status: "pending",
+        dueDate: Timestamp.fromDate(new Date(today.getTime() + 30 * 86400000)),
+        completedDate: null,
+        files: [],
+        comments: [],
+        dependencies: [],
+        isRequired: tmpl.isRequired,
+        templateItemId: tmpl.id,
+      });
+      batchCount++;
+      added++;
+      await commitIfNeeded();
+    }
+  }
+
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+
+  console.log(`✅ 템플릿 동기화 완료: ${updated}개 업데이트, ${added}개 추가, ${removed}개 삭제`);
+  return { updated, added, removed };
+}
+
 // ─── Customers (대리점/법인) ────────────────────────────────────────────────
 
 export function subscribeCustomers(callback) {

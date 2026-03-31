@@ -17,6 +17,7 @@ import {
   subscribeTemplateSubChecklist,
   addTemplateSubChecklistItem, updateTemplateSubChecklistItem,
   deleteTemplateSubChecklistItem,
+  syncTemplateToProjects,
 } from "../firestore-service.js";
 import { escapeHtml } from "../utils.js";
 
@@ -953,11 +954,17 @@ function render() {
           </p>
         </div>
 
-        <!-- View Mode Toggle -->
-        <div class="flex items-center gap-1" style="background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 0.75rem; padding: 0.25rem;">
-          ${renderViewModeBtn("matrix", "매트릭스", ICON_MATRIX)}
-          ${renderViewModeBtn("tree", "트리", ICON_TREE)}
-          ${renderViewModeBtn("list", "리스트", ICON_LIST)}
+        <div class="flex items-center gap-3">
+          <!-- Sync Button -->
+          <button id="sync-template-btn" class="btn" style="background:var(--primary-500);color:#fff;padding:0.375rem 0.75rem;border-radius:0.5rem;font-size:0.8rem;border:none;cursor:pointer;min-height:2.25rem;display:flex;align-items:center;gap:0.375rem;">
+            🔄 프로젝트 동기화
+          </button>
+          <!-- View Mode Toggle -->
+          <div class="flex items-center gap-1" style="background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 0.75rem; padding: 0.25rem;">
+            ${renderViewModeBtn("matrix", "매트릭스", ICON_MATRIX)}
+            ${renderViewModeBtn("tree", "트리", ICON_TREE)}
+            ${renderViewModeBtn("list", "리스트", ICON_LIST)}
+          </div>
         </div>
       </div>
 
@@ -1453,6 +1460,24 @@ function renderDeptModal(editDept) {
 // --- Event Binding -----------------------------------------------------------
 
 function bindEvents() {
+  // ─── Sync Template to Projects ─────────────────────────────────────────────
+  const syncBtn = document.getElementById("sync-template-btn");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async () => {
+      syncBtn.disabled = true;
+      syncBtn.textContent = "동기화 중...";
+      try {
+        const result = await syncTemplateToProjects();
+        syncBtn.textContent = `✅ 완료 (${result.updated}개 수정, ${result.added}개 추가)`;
+        setTimeout(() => { syncBtn.textContent = "🔄 프로젝트 동기화"; syncBtn.disabled = false; }, 3000);
+      } catch (err) {
+        console.error("동기화 실패:", err);
+        syncBtn.textContent = "❌ 실패";
+        setTimeout(() => { syncBtn.textContent = "🔄 프로젝트 동기화"; syncBtn.disabled = false; }, 3000);
+      }
+    });
+  }
+
   // ─── View Mode Toggle ─────────────────────────────────────────────────────
   app.querySelectorAll(".view-mode-btn").forEach(btn => {
     btn.addEventListener("click", () => {
