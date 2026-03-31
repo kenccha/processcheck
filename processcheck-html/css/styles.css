@@ -829,7 +829,8 @@ select.input-field {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 2.75rem; /* 44px touch target */
   border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
