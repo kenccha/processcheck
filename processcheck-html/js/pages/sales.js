@@ -133,6 +133,10 @@ function renderSalesNav(container) {
           <button class="sales-nav-icon-btn" id="sales-theme-btn" title="테마 전환">
             ${getThemeIcon()}
           </button>
+          ${(u.role === "observer" || u.role === "manager" || u.role === "admin") ? `
+          <button class="sales-nav-icon-btn" id="sales-template-btn" title="출시 준비 템플릿 관리">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </button>` : ""}
           <button class="sales-nav-icon-btn" id="sales-hub-btn" title="ProcessCheck 허브">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
           </button>
@@ -155,6 +159,8 @@ function renderSalesNav(container) {
   container.querySelector("#sales-hub-btn").addEventListener("click", () => window.location.href = "processcheck.html");
   container.querySelector("#sales-logout-btn").addEventListener("click", logout);
   container.querySelector("#sales-theme-btn").addEventListener("click", toggleTheme);
+  const templateBtn = container.querySelector("#sales-template-btn");
+  if (templateBtn) templateBtn.addEventListener("click", () => window.location.href = "admin-sales-templates.html");
 
   // View tab clicks
   container.querySelectorAll("[data-view]").forEach(btn => {
@@ -184,24 +190,34 @@ function init() {
   app.innerHTML = `<div class="container">${renderSkeletonStats(4)}${renderSkeletonCards(6)}</div>`;
 
   // Subscribe to dynamic pipeline stages + categories from Firestore
-  unsubStages = subscribeLaunchPipelineStages((stages) => {
-    if (stages.length > 0) {
-      // Will be enriched with categories below
-      EXEC_STAGES = stages.map(s => ({ key: s.key, label: s.label, icon: s.icon || "📋", id: s.id, categories: [] }));
+  // Both subscriptions update shared state, so we rebuild on either change
+  let _dynamicStages = [];
+  let _dynamicCats = [];
+
+  function rebuildExecStages() {
+    if (_dynamicStages.length > 0 && _dynamicCats.length > 0) {
+      EXEC_STAGES = _dynamicStages.map(s => {
+        const stageCats = _dynamicCats.filter(c => c.pipelineStageId === s.id || c.pipelineStageId === s.key).map(c => c.key);
+        return { key: s.key, label: s.label, icon: s.icon || "📋", id: s.id, categories: stageCats };
+      });
+      dynamicCategoryLabels = {};
+      _dynamicCats.forEach(c => { dynamicCategoryLabels[c.key] = c.label; });
     }
+    // Always use defaults if Firestore data not loaded yet
+    if (EXEC_STAGES.length === 0) {
+      EXEC_STAGES = [...DEFAULT_EXEC_STAGES];
+    }
+    render();
+  }
+
+  unsubStages = subscribeLaunchPipelineStages((stages) => {
+    _dynamicStages = stages;
+    rebuildExecStages();
   });
 
   unsubCategories = subscribeLaunchCategories((cats) => {
-    if (cats.length > 0) {
-      // Build dynamic category labels
-      dynamicCategoryLabels = {};
-      cats.forEach(c => { dynamicCategoryLabels[c.key] = c.label; });
-      // Assign categories to their pipeline stages
-      EXEC_STAGES.forEach(stage => {
-        stage.categories = cats.filter(c => c.pipelineStageId === stage.id || c.pipelineStageId === stage.key).map(c => c.key);
-      });
-      render();
-    }
+    _dynamicCats = cats;
+    rebuildExecStages();
   });
 
   unsubProjects = subscribeProjects((data) => {
