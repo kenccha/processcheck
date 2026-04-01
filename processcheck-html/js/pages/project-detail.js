@@ -1445,7 +1445,7 @@ function _renderListView() {
 function renderEmptyState() {
   const hasAnyTasks = checklistItems.length > 0;
   const applyBtn = !hasAnyTasks ? `
-    <button id="apply-template-btn" class="btn btn-primary" style="margin-top:1rem">
+    <button id="apply-template-empty-btn" class="btn btn-primary" style="margin-top:1rem">
       📋 템플릿에서 체크리스트 생성
     </button>
     <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--slate-400)">체크리스트 관리에서 등록한 템플릿 항목을 이 프로젝트에 적용합니다</p>
@@ -2107,9 +2107,11 @@ function bindEvents() {
   const openModalBtn = app.querySelector("#open-add-modal-btn");
   if (openModalBtn) openModalBtn.addEventListener("click", showAddTaskModal);
 
-  // Apply template button
+  // Apply template button (header + empty state)
   const applyTemplateBtn = app.querySelector("#apply-template-btn");
   if (applyTemplateBtn) applyTemplateBtn.addEventListener("click", handleApplyTemplate);
+  const applyTemplateEmptyBtn = app.querySelector("#apply-template-empty-btn");
+  if (applyTemplateEmptyBtn) applyTemplateEmptyBtn.addEventListener("click", handleApplyTemplate);
 
   // Apply launch checklist button
   const applyLaunchBtn = app.querySelector("#apply-launch-btn");
