@@ -972,14 +972,6 @@ export async function completeTask(taskId) {
   } catch (e) { console.error("통계 재계산 실패:", e); }
 }
 
-// 승인 절차 제거됨 — 하위 호환용 stub
-export async function approveTask(_taskId, _reviewerName) {
-  console.warn("approveTask is deprecated — approval workflow removed");
-}
-
-export async function rejectTask(_taskId, _reviewerName, _reason) {
-  console.warn("rejectTask is deprecated — approval workflow removed");
-}
 
 export async function restartTask(taskId) {
   const taskSnap = await getDoc(doc(db, "checklistItems", taskId));
@@ -1169,10 +1161,6 @@ export async function loadDashboardActiveTasks(department = null) {
   return tasks;
 }
 
-// 개별 작업 승인 제거됨 — 항상 빈 배열 반환
-export async function loadDashboardPendingApprovals(_department = null) {
-  return [];
-}
 
 export async function createNotification(data) {
   validateRequired(data, ["userId", "title"]);
@@ -2294,11 +2282,6 @@ export async function addGateMeetingNote(projectId, phaseId, phaseName, author, 
 
 // ─── Bulk Operations ─────────────────────────────────────────────────────────
 
-// 개별 작업 승인 제거됨 — stub
-export async function bulkApproveTasks(_taskIds, _reviewerName) {
-  console.warn("bulkApproveTasks: 개별 작업 승인이 제거되었습니다.");
-  return { successCount: 0, failCount: 0 };
-}
 
 export async function bulkUpdateAssignee(taskIds, newAssignee) {
   let successCount = 0;

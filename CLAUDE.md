@@ -187,7 +187,7 @@ docs/
 ### 승인 구조 (확정 — 2026-03-12 변경)
 - **개별 작업 승인 절차 제거됨**: 실무자가 작업 완료 처리하면 바로 완료 (approvalStatus 없음)
 - `completeTask()`: status를 "completed"로 직접 변경, approvalStatus 미사용
-- `approveTask()`, `rejectTask()`: stub 함수 (호출 시 console.warn만)
+- `approveTask()`, `rejectTask()`, `bulkApproveTasks()`, `loadDashboardPendingApprovals()`: 제거됨
 - **위원회 승인(gate approval)은 유지**: Phase별 `gateRecords` 컬렉션으로 승인/반려 관리
 - `updateGateRecord()`: Phase 단위 위원회 승인/반려/초기화 (observer만 가능)
 - Phase 뷰에 인라인으로 위원회 승인 상태 표시 + 승인/반려 버튼 (observer만)

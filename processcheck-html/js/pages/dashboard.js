@@ -15,7 +15,6 @@ import {
   fallbackLoadChecklistItemsByAssignee,
   fallbackLoadNotifications,
   loadDashboardActiveTasks,
-  loadDashboardPendingApprovals,
   getTemplateStages,
   checkAndCreateEscalations,
 } from "../firestore-service.js";
@@ -143,18 +142,7 @@ if (cached) {
       tasks = await fallbackLoadChecklistItemsByAssignee(user.name);
     } else {
       const dept = user.role === "manager" ? user.department : null;
-      const [activeTasks, approvalTasks] = await Promise.all([
-        loadDashboardActiveTasks(dept),
-        loadDashboardPendingApprovals(dept),
-      ]);
-      const seen = new Set();
-      tasks = [];
-      for (const t of [...activeTasks, ...approvalTasks]) {
-        if (!seen.has(t.id)) {
-          seen.add(t.id);
-          tasks.push(t);
-        }
-      }
+      tasks = await loadDashboardActiveTasks(dept);
     }
 
     const [projects, notifs] = await Promise.all([
