@@ -2,7 +2,8 @@
 import { guardPage } from '../auth.js';
 import { renderNav, initTheme } from '../components.js';
 initTheme();
-import { subscribeAllChecklistItems, subscribeProjects, approveTask, rejectTask } from '../firestore-service.js';
+import { subscribeAllChecklistItems, subscribeProjects } from '../firestore-service.js';
+// approveTask, rejectTask 제거됨 — 개별 작업 승인 절차 삭제 (위원회 승인만 유지)
 import { escapeHtml, formatDate, formatStageName } from '../utils.js';
 import { showToast } from '../ui/toast.js';
 import { renderSkeletonTable } from '../ui/skeleton.js';
