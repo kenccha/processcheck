@@ -369,6 +369,26 @@
       <!-- Prompt -->
       <p class="login-prompt animate-fade-in-delay-1">InBody 계정으로 시작하세요</p>
 
+      <!-- Demo Cards (localhost only) -->
+      <div id="demo-cards-wrap" class="animate-fade-in-delay-1" style="display:none;">
+        <p class="login-prompt" style="margin-bottom:0.75rem;font-size:0.75rem;color:var(--warning-400)">개발/테스트 전용 데모 로그인</p>
+        <div class="demo-cards-row">
+          <button class="demo-btn demo-btn--primary" data-name="김기조" data-role="observer">
+            <span class="demo-btn-role">기획조정실</span>
+            <span class="demo-btn-name">김기조</span>
+          </button>
+          <button class="demo-btn demo-btn--warning" data-name="이매니저" data-role="manager">
+            <span class="demo-btn-role">매니저</span>
+            <span class="demo-btn-name">이매니저</span>
+          </button>
+          <button class="demo-btn demo-btn--success" data-name="박실무" data-role="worker">
+            <span class="demo-btn-role">실무자</span>
+            <span class="demo-btn-name">박실무</span>
+          </button>
+        </div>
+        <div class="login-divider">또는</div>
+      </div>
+
       <!-- Microsoft Login (primary, top) -->
       <div class="animate-fade-in-delay-1" id="ms-login-wrap">
         <button class="ms-login-btn" id="ms-login-btn">

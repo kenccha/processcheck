@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Login Page — Microsoft OAuth login only
+// Login Page — Microsoft OAuth + Demo Cards (localhost only)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { getUser, loginWithMicrosoft } from "../auth.js";
+import { getUser, login, loginWithMicrosoft } from "../auth.js";
 import { seedTemplatesIfEmpty } from "../firestore-service.js";
 
 // If already logged in, redirect immediately
@@ -14,6 +14,7 @@ if (getUser()) {
 const seedingView = document.getElementById("login-seeding");
 const contentView = document.getElementById("login-content");
 const msLoginBtn = document.getElementById("ms-login-btn");
+const demoWrap = document.getElementById("demo-cards-wrap");
 
 // MS button original HTML (for reset)
 const MS_BTN_HTML = msLoginBtn.innerHTML;
@@ -21,6 +22,30 @@ const MS_BTN_HTML = msLoginBtn.innerHTML;
 // Show login content immediately (no seeding)
 seedingView.style.display = "none";
 contentView.style.display = "";
+
+// Show demo cards only on localhost
+const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+if (isLocal && demoWrap) {
+  demoWrap.style.display = "";
+  demoWrap.querySelectorAll(".demo-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name;
+      const role = btn.dataset.role;
+      btn.classList.add("loading");
+      btn.disabled = true;
+      try {
+        await login(name, role);
+        seedTemplatesIfEmpty().catch(() => {});
+        window.location.href = "home.html";
+      } catch (e) {
+        console.error("Demo login error:", e);
+        showError(e.message || "데모 로그인 실패");
+        btn.classList.remove("loading");
+        btn.disabled = false;
+      }
+    });
+  });
+}
 
 // Template seeding moved to post-login (requires auth)
 
